@@ -42,12 +42,14 @@ export function AuthProvider({ children }) {
     try {
       setError(null);
       const response = await api.post("/auth/login", { username, password });
-      const { token, user } = response.data;
+      const { token } = response.data;
 
       localStorage.setItem("token", token);
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      setCurrentUser(user);
+      // Fetch user data after successful login
+      const userResponse = await api.get("/user/me");
+      setCurrentUser(userResponse.data);
       setIsAuthenticated(true);
       return true;
     } catch (err) {
@@ -59,16 +61,25 @@ export function AuthProvider({ children }) {
   const register = async (username, password) => {
     try {
       setError(null);
-      const response = await api.post("/auth/register", {
+      // First, register the user
+      await api.post("/auth/register", {
         username,
         password,
       });
-      const { token, user } = response.data;
+
+      // Then automatically log in
+      const loginResponse = await api.post("/auth/login", {
+        username,
+        password,
+      });
+      const { token } = loginResponse.data;
 
       localStorage.setItem("token", token);
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      setCurrentUser(user);
+      // Fetch user data after successful registration and login
+      const userResponse = await api.get("/user/me");
+      setCurrentUser(userResponse.data);
       setIsAuthenticated(true);
       return true;
     } catch (err) {

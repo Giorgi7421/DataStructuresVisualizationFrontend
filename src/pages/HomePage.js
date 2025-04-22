@@ -245,7 +245,7 @@ function HomePage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {dataStructures.map((ds) => (
             <div
               key={ds.id}
@@ -279,6 +279,7 @@ function HomePage() {
                 <div className="mt-4">
                   <Link
                     to={`/datastructure/${ds.id}`}
+                    state={{ dataStructure: ds }}
                     className="block w-full text-center bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600"
                   >
                     Open

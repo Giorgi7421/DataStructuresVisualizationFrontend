@@ -22,24 +22,76 @@ api.interceptors.response.use(
 
 export default api;
 
+// Helper function to determine whether a data structure has multiple implementations
+const hasMultipleImplementations = (type) => {
+  // Convert type to uppercase for consistency with backend
+  const typeUpper = type.toUpperCase();
+
+  // Data structures with multiple implementations
+  const multiImplTypes = [
+    "VECTOR",
+    "STACK",
+    "QUEUE",
+    "MAP",
+    "TREE",
+    "SET",
+    "EDITOR_BUFFER",
+  ];
+
+  return multiImplTypes.includes(typeUpper);
+};
+
+// Helper function to format data structure type for URL
+const formatTypeForUrl = (type) => {
+  // Convert to lowercase and replace underscores with hyphens
+  return type.toLowerCase().replace(/_/g, "-");
+};
+
 // Data structure-specific API calls
 export const dataStructureService = {
   // Get all data structures for the current user
   getAll: () => api.get("/user/get-all-data-structures"),
 
-  // Get a specific data structure by ID
-  getById: (id) => api.get(`/datastructures/${id}`),
-
   // Create a new data structure
   create: (type, name, implementation) =>
     api.post("/datastructures", { type, name, implementation }),
 
-  // Perform operation on data structure
-  performOperation: (id, operation, value) =>
-    api.post(`/datastructures/${id}/operations`, { operation, value }),
+  // Find data structure by type, name and implementation (if needed)
+  // Returns operations history with current state as the last entry
+  findDataStructure: (type, name, implementation) => {
+    // Format type for URL (lowercase and replace underscores with hyphens)
+    const dsType = formatTypeForUrl(type);
 
-  // Get operation history for a data structure
-  getHistory: (id) => api.get(`/datastructures/${id}/history`),
+    // Construct URL with path variables
+    // For types with multiple implementations, include implementation in path
+    // Order: implementation first, then name
+    let url = hasMultipleImplementations(type)
+      ? `/${dsType}/find/${implementation}/${name}`
+      : `/${dsType}/find/${name}`;
+
+    return api.get(url);
+  },
+
+  // Perform operation on data structure
+  performOperation: (type, name, implementation, operation, value) => {
+    // Format type for URL (lowercase and replace underscores with hyphens)
+    const dsType = formatTypeForUrl(type);
+
+    // Construct URL with path variables
+    // For types with multiple implementations, include implementation in path
+    // Order: implementation first, then name
+    let url = hasMultipleImplementations(type)
+      ? `/${dsType}/operation/${implementation}/${name}`
+      : `/${dsType}/operation/${name}`;
+
+    // Create request body with operation and value
+    const requestBody = {
+      operation,
+      value,
+    };
+
+    return api.post(url, requestBody);
+  },
 
   // Delete a data structure
   delete: (id) => api.delete(`/datastructures/${id}`),

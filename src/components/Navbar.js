@@ -3,7 +3,7 @@ import React, { useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
-function Navbar() {
+const Navbar = () => {
   const { isAuthenticated, currentUser, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -52,6 +52,6 @@ function Navbar() {
       </div>
     </nav>
   );
-}
+};
 
 export default Navbar;

@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
 function RegisterPage() {
-  const [username, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -28,6 +28,7 @@ function RegisterPage() {
     setIsLoading(false);
 
     if (success) {
+      // Navigate to home page since we're automatically logged in
       navigate("/home");
     }
   };
@@ -52,7 +53,7 @@ function RegisterPage() {
               id="name"
               type="text"
               value={username}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
