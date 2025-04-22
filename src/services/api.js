@@ -25,13 +25,14 @@ export default api;
 // Data structure-specific API calls
 export const dataStructureService = {
   // Get all data structures for the current user
-  getAll: () => api.get("/datastructures"),
+  getAll: () => api.get("/user/get-all-data-structures"),
 
   // Get a specific data structure by ID
   getById: (id) => api.get(`/datastructures/${id}`),
 
   // Create a new data structure
-  create: (type, name) => api.post("/datastructures", { type, name }),
+  create: (type, name, implementation) =>
+    api.post("/datastructures", { type, name, implementation }),
 
   // Perform operation on data structure
   performOperation: (id, operation, value) =>

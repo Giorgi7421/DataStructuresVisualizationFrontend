@@ -23,7 +23,7 @@ function Navbar() {
           {isAuthenticated ? (
             <>
               <span className="hidden md:inline">
-                Welcome, {currentUser?.name}
+                Welcome, {currentUser?.username}
               </span>
               <Link to="/home" className="hover:text-blue-200">
                 My Data Structures

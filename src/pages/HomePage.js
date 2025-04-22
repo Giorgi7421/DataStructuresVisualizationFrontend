@@ -10,7 +10,8 @@ function HomePage() {
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newDSName, setNewDSName] = useState("");
-  const [newDSType, setNewDSType] = useState("stack");
+  const [newDSType, setNewDSType] = useState("STACK");
+  const [newDSImplementation, setNewDSImplementation] = useState("ARRAY_STACK");
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -49,11 +50,16 @@ function HomePage() {
     e.preventDefault();
     try {
       setCreating(true);
-      const response = await dataStructureService.create(newDSType, newDSName);
+      const response = await dataStructureService.create(
+        newDSType,
+        newDSName,
+        newDSImplementation
+      );
       setDataStructures([...dataStructures, response.data]);
       setShowCreateModal(false);
       setNewDSName("");
-      setNewDSType("stack");
+      setNewDSType("STACK");
+      setNewDSImplementation("ARRAY_STACK");
     } catch (err) {
       setError("Failed to create data structure");
       console.error(err);
@@ -65,35 +71,142 @@ function HomePage() {
   // Get appropriate icon based on data structure type
   const getTypeIcon = (type) => {
     switch (type) {
-      case "stack":
-        return "📚";
-      case "queue":
-        return "🔄";
-      case "linkedList":
-        return "🔗";
-      case "binaryTree":
-        return "🌳";
-      case "graph":
-        return "🕸️";
-      case "hashMap":
-        return "🗺️";
+      case "VECTOR":
+        return "📏"; // Ruler for vector
+      case "STACK":
+        return "📚"; // Books for stack
+      case "QUEUE":
+        return "🔄"; // Circular arrows for queue
+      case "MAP":
+        return "🗺️"; // Map for map
+      case "TREE":
+        return "🌳"; // Tree for tree
+      case "SET":
+        return "🔢"; // Numbers for set
+      case "EDITOR_BUFFER":
+        return "📝"; // Memo for editor buffer
+      case "GRID":
+        return "📊"; // Chart for grid
+      case "DEQUE":
+        return "↔️"; // Left-right arrows for deque
+      case "FILE_SYSTEM":
+        return "📁"; // File folder for file system
+      case "WEB_BROWSER":
+        return "🌐"; // Globe for web browser
+      case "BIG_NUMBERS":
+        return "🔢"; // Numbers for big numbers
       default:
-        return "📊";
+        return "📊"; // Default chart icon
     }
   };
 
   // Format data structure type to display name
   const formatType = (type) => {
+    // Convert SNAKE_CASE to Title Case
+    return type
+      .split("_")
+      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  // Get implementation options based on data structure type
+  const getImplementationOptions = (type) => {
     switch (type) {
-      case "linkedList":
-        return "Linked List";
-      case "binaryTree":
-        return "Binary Tree";
-      case "hashMap":
-        return "Hash Map";
+      case "VECTOR":
+        return [
+          { value: "ARRAY_VECTOR", label: "Array Vector" },
+          { value: "LINKED_LIST_VECTOR", label: "Linked List Vector" },
+        ];
+      case "STACK":
+        return [
+          { value: "ARRAY_STACK", label: "Array Stack" },
+          { value: "LINKED_LIST_STACK", label: "Linked List Stack" },
+          { value: "TWO_QUEUE_STACK", label: "Two Queue Stack" },
+        ];
+      case "QUEUE":
+        return [
+          { value: "ARRAY_QUEUE", label: "Array Queue" },
+          { value: "LINKED_LIST_QUEUE", label: "Linked List Queue" },
+          {
+            value: "UNSORTED_VECTOR_PRIORITY_QUEUE",
+            label: "Unsorted Vector Priority Queue",
+          },
+          {
+            value: "SORTED_LINKED_LIST_PRIORITY_QUEUE",
+            label: "Sorted Linked List Priority Queue",
+          },
+          {
+            value: "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE",
+            label: "Unsorted Doubly Linked List Priority Queue",
+          },
+          {
+            value: "BINARY_HEAP_PRIORITY_QUEUE",
+            label: "Binary Heap Priority Queue",
+          },
+        ];
+      case "MAP":
+        return [
+          { value: "ARRAY_MAP", label: "Array Map" },
+          { value: "HASH_MAP", label: "Hash Map" },
+          { value: "TREE_MAP", label: "Tree Map" },
+        ];
+      case "TREE":
+        return [
+          { value: "BS_TREE", label: "BS Tree" },
+          { value: "AVL_TREE", label: "AVL Tree" },
+          { value: "EXPRESSION_TREE", label: "Expression Tree" },
+        ];
+      case "SET":
+        return [
+          { value: "TREE_SET", label: "Tree Set" },
+          { value: "HASH_SET", label: "Hash Set" },
+          { value: "SMALL_INT_SET", label: "Small Int Set" },
+          { value: "MOVE_TO_FRONT_SET", label: "Move To Front Set" },
+        ];
+      case "EDITOR_BUFFER":
+        return [
+          { value: "ARRAY_EDITOR_BUFFER", label: "Array Editor Buffer" },
+          {
+            value: "TWO_STACK_EDITOR_BUFFER",
+            label: "Two Stack Editor Buffer",
+          },
+          {
+            value: "LINKED_LIST_EDITOR_BUFFER",
+            label: "Linked List Editor Buffer",
+          },
+          {
+            value: "DOUBLY_LINKED_LIST_EDITOR_BUFFER",
+            label: "Doubly Linked List Editor Buffer",
+          },
+        ];
+      case "GRID":
+        return [{ value: "GRID", label: "Grid" }];
+      case "DEQUE":
+        return [{ value: "DEQUE", label: "Deque" }];
+      case "FILE_SYSTEM":
+        return [{ value: "FILE_SYSTEM", label: "File System" }];
+      case "WEB_BROWSER":
+        return [{ value: "WEB_BROWSER", label: "Web Browser" }];
+      case "BIG_NUMBERS":
+        return [{ value: "BIG_NUMBERS", label: "Big Numbers" }];
       default:
-        return type.charAt(0).toUpperCase() + type.slice(1);
+        return [];
     }
+  };
+
+  // Helper function to check if a data structure type has multiple implementations
+  const hasMultipleImplementations = (type) => {
+    const options = getImplementationOptions(type);
+    return options.length > 1;
+  };
+
+  // Format implementation to display name
+  const formatImplementation = (implementation) => {
+    // Convert SNAKE_CASE to Title Case
+    return implementation
+      .split("_")
+      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+      .join(" ");
   };
 
   return (
@@ -156,12 +269,12 @@ function HomePage() {
                     <TrashIcon className="w-5 h-5" />
                   </button>
                 </div>
-                <p className="text-gray-600 mt-1">{formatType(ds.type)}</p>
-                <p className="text-gray-500 mt-1 text-sm">
-                  Created: {new Date(ds.createdAt).toLocaleDateString()}
-                </p>
-                <p className="text-gray-500 text-sm">
-                  Last updated: {new Date(ds.updatedAt).toLocaleDateString()}
+                <p className="text-gray-600 mt-1">
+                  {ds.implementation
+                    ? `${formatType(ds.type)} - ${formatImplementation(
+                        ds.implementation
+                      )}`
+                    : formatType(ds.type)}
                 </p>
                 <div className="mt-4">
                   <Link
@@ -199,24 +312,59 @@ function HomePage() {
                 />
               </div>
 
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-gray-700 mb-2" htmlFor="type">
                   Type
                 </label>
                 <select
                   id="type"
                   value={newDSType}
-                  onChange={(e) => setNewDSType(e.target.value)}
+                  onChange={(e) => {
+                    setNewDSType(e.target.value);
+                    // Reset implementation when type changes
+                    setNewDSImplementation(
+                      getImplementationOptions(e.target.value)[0]?.value || ""
+                    );
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="stack">Stack</option>
-                  <option value="queue">Queue</option>
-                  <option value="linkedList">Linked List</option>
-                  <option value="binaryTree">Binary Tree</option>
-                  <option value="graph">Graph</option>
-                  <option value="hashMap">Hash Map</option>
+                  <option value="VECTOR">Vector</option>
+                  <option value="STACK">Stack</option>
+                  <option value="QUEUE">Queue</option>
+                  <option value="MAP">Map</option>
+                  <option value="TREE">Tree</option>
+                  <option value="SET">Set</option>
+                  <option value="EDITOR_BUFFER">Editor Buffer</option>
+                  <option value="GRID">Grid</option>
+                  <option value="DEQUE">Deque</option>
+                  <option value="FILE_SYSTEM">File System</option>
+                  <option value="WEB_BROWSER">Web Browser</option>
+                  <option value="BIG_NUMBERS">Big Numbers</option>
                 </select>
               </div>
+
+              {hasMultipleImplementations(newDSType) && (
+                <div className="mb-6">
+                  <label
+                    className="block text-gray-700 mb-2"
+                    htmlFor="implementation"
+                  >
+                    Implementation
+                  </label>
+                  <select
+                    id="implementation"
+                    value={newDSImplementation}
+                    onChange={(e) => setNewDSImplementation(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {getImplementationOptions(newDSType).map((impl) => (
+                      <option key={impl.value} value={impl.value}>
+                        {impl.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex justify-end space-x-3">
                 <button

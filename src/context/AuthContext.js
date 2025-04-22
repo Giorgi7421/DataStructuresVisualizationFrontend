@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
       // Fetch user profile
-      const response = await api.get("/users/me");
+      const response = await api.get("/user/me");
       setCurrentUser(response.data);
       setIsAuthenticated(true);
     } catch (err) {
