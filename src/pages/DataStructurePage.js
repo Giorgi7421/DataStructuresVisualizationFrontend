@@ -32,7 +32,7 @@ function DataStructurePage() {
   const [autoPlaySpeed, setAutoPlaySpeed] = useState(1000); // ms
   const [enableMemoryVisualization, setEnableMemoryVisualization] =
     useState(true);
-  const [snapshotMode, setSnapshotMode] = useState(false);
+  const [snapshotMode, setSnapshotMode] = useState(true);
 
   const svgRef = useRef(null);
   const autoPlayRef = useRef(null);
@@ -1995,46 +1995,6 @@ function DataStructurePage() {
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <div className="flex items-center">
-                        <label htmlFor="memory-viz" className="mr-1 text-xs">
-                          Memory:
-                        </label>
-                        <button
-                          id="memory-viz"
-                          onClick={() =>
-                            setEnableMemoryVisualization(
-                              !enableMemoryVisualization
-                            )
-                          }
-                          className={`px-2 py-0.5 text-xs rounded ${
-                            enableMemoryVisualization
-                              ? "bg-blue-500 text-white"
-                              : "bg-gray-200 text-gray-700"
-                          }`}
-                          title="Toggle memory visualization"
-                        >
-                          {enableMemoryVisualization ? "On" : "Off"}
-                        </button>
-                      </div>
-
-                      <div className="flex items-center">
-                        <label htmlFor="snapshot-mode" className="mr-1 text-xs">
-                          Snapshots:
-                        </label>
-                        <button
-                          id="snapshot-mode"
-                          onClick={toggleSnapshotMode}
-                          className={`px-2 py-0.5 text-xs rounded ${
-                            snapshotMode
-                              ? "bg-blue-500 text-white"
-                              : "bg-gray-200 text-gray-700"
-                          }`}
-                          title="Toggle snapshot mode"
-                        >
-                          {snapshotMode ? "On" : "Off"}
-                        </button>
-                      </div>
-
                       <div className="flex items-center">
                         <label
                           htmlFor="playback-speed"
