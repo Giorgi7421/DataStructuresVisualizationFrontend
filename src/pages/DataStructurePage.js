@@ -1576,17 +1576,17 @@ function DataStructurePage() {
 
   // Navigation functions for snapshot and history
   const goToFirst = () => {
+    // Only operate in snapshot mode and only within the current operation
     if (
       snapshotMode &&
       operations[currentHistoryIndex]?.memorySnapshots?.length > 0
     ) {
       setCurrentSnapshotIndex(0);
-    } else {
-      setCurrentHistoryIndex(0);
     }
   };
 
   const goToLast = () => {
+    // Only operate in snapshot mode and only within the current operation
     if (
       snapshotMode &&
       operations[currentHistoryIndex]?.memorySnapshots?.length > 0
@@ -1594,41 +1594,24 @@ function DataStructurePage() {
       setCurrentSnapshotIndex(
         operations[currentHistoryIndex].memorySnapshots.length - 1
       );
-    } else {
-      setCurrentHistoryIndex(operations.length - 1);
     }
   };
 
   const goToPrevious = () => {
-    if (snapshotMode) {
-      if (currentSnapshotIndex > 0) {
-        setCurrentSnapshotIndex(currentSnapshotIndex - 1);
-      } else if (currentHistoryIndex > 0) {
-        // Move to previous operation and its last snapshot
-        setCurrentHistoryIndex(currentHistoryIndex - 1);
-        const prevOp = operations[currentHistoryIndex - 1];
-        if (prevOp?.memorySnapshots?.length > 0) {
-          setCurrentSnapshotIndex(prevOp.memorySnapshots.length - 1);
-        }
-      }
-    } else if (currentHistoryIndex > 0) {
-      setCurrentHistoryIndex(currentHistoryIndex - 1);
+    // Only operate in snapshot mode and only within the current operation
+    if (snapshotMode && currentSnapshotIndex > 0) {
+      setCurrentSnapshotIndex(currentSnapshotIndex - 1);
     }
   };
 
   const goToNext = () => {
+    // Only operate in snapshot mode and only within the current operation
     if (snapshotMode) {
       const maxSnapshot =
         operations[currentHistoryIndex]?.memorySnapshots?.length - 1;
       if (currentSnapshotIndex < maxSnapshot) {
         setCurrentSnapshotIndex(currentSnapshotIndex + 1);
-      } else if (currentHistoryIndex < operations.length - 1) {
-        // Move to next operation and its first snapshot
-        setCurrentHistoryIndex(currentHistoryIndex + 1);
-        setCurrentSnapshotIndex(0);
       }
-    } else if (currentHistoryIndex < operations.length - 1) {
-      setCurrentHistoryIndex(currentHistoryIndex + 1);
     }
   };
 
@@ -2330,7 +2313,12 @@ function DataStructurePage() {
                     <div className="flex space-x-1">
                       <button
                         onClick={goToFirst}
-                        disabled={currentSnapshotIndex === 0}
+                        disabled={
+                          !snapshotMode ||
+                          !operations[currentHistoryIndex]?.memorySnapshots
+                            ?.length ||
+                          currentSnapshotIndex === 0
+                        }
                         className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
                         title="First Snapshot"
                       >
@@ -2351,7 +2339,12 @@ function DataStructurePage() {
 
                       <button
                         onClick={goToPrevious}
-                        disabled={currentSnapshotIndex === 0}
+                        disabled={
+                          !snapshotMode ||
+                          !operations[currentHistoryIndex]?.memorySnapshots
+                            ?.length ||
+                          currentSnapshotIndex === 0
+                        }
                         className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
                         title="Previous Snapshot"
                       >
@@ -2360,7 +2353,13 @@ function DataStructurePage() {
 
                       <button
                         onClick={toggleAutoPlay}
-                        className="p-1 rounded-full hover:bg-gray-200"
+                        disabled={
+                          !operations[currentHistoryIndex]?.memorySnapshots
+                            ?.length ||
+                          operations[currentHistoryIndex]?.memorySnapshots
+                            ?.length <= 1
+                        }
+                        className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
                         title={autoPlay ? "Pause" : "Play"}
                       >
                         {autoPlay ? (
@@ -2373,10 +2372,13 @@ function DataStructurePage() {
                       <button
                         onClick={goToNext}
                         disabled={
+                          !snapshotMode ||
+                          !operations[currentHistoryIndex]?.memorySnapshots
+                            ?.length ||
                           currentSnapshotIndex >=
-                          operations[currentHistoryIndex]?.memorySnapshots
-                            ?.length -
-                            1
+                            operations[currentHistoryIndex]?.memorySnapshots
+                              ?.length -
+                              1
                         }
                         className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
                         title="Next Snapshot"
@@ -2387,10 +2389,13 @@ function DataStructurePage() {
                       <button
                         onClick={goToLast}
                         disabled={
+                          !snapshotMode ||
+                          !operations[currentHistoryIndex]?.memorySnapshots
+                            ?.length ||
                           currentSnapshotIndex >=
-                          operations[currentHistoryIndex]?.memorySnapshots
-                            ?.length -
-                            1
+                            operations[currentHistoryIndex]?.memorySnapshots
+                              ?.length -
+                              1
                         }
                         className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
                         title="Last Snapshot"
