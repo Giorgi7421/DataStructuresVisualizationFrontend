@@ -261,23 +261,6 @@ function DataStructurePage() {
     console.log("Current Snapshot Index:", currentSnapshotIndex);
     console.log("Operations array length:", operations.length);
 
-    // Add debug info on the visualization
-    contentGroup
-      .append("text")
-      .attr("x", 10)
-      .attr("y", height - 10)
-      .attr("font-size", "10px")
-      .attr("fill", "#64748b")
-      .text(
-        `Operation: ${
-          operation.operationName || operation.operation
-        } | History: ${currentHistoryIndex + 1}/${
-          operations.length
-        } | Snapshot: ${currentSnapshotIndex + 1}/${
-          operation.memorySnapshots?.length || 0
-        }`
-      );
-
     // Get the specific memorySnapshot from the operation
     let memorySnapshot = null;
     if (operation.memorySnapshots && operation.memorySnapshots.length > 0) {
@@ -665,38 +648,6 @@ function DataStructurePage() {
         currentColor: "#334155", // Dark gray for current pointer
       },
     };
-
-    // Add title for the visualization
-    container
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", 30)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "18px")
-      .attr("font-weight", "bold")
-      .attr("fill", "#334155")
-      .text("Web Browser - Browser History");
-
-    // Add operation info
-    if (operation) {
-      const operationName =
-        operation.operation || operation.operationName || "Unknown operation";
-
-      container
-        .append("text")
-        .attr("x", width / 2)
-        .attr("y", 55)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "14px")
-        .attr("fill", "#4b5563")
-        .text(
-          `Operation: ${operationName}${
-            operation.parameters
-              ? " (" + JSON.stringify(operation.parameters) + ")"
-              : ""
-          }`
-        );
-    }
 
     // Add arrowhead definitions for connections
     const defs = container.append("defs");
