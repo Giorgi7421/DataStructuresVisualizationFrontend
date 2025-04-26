@@ -201,16 +201,6 @@ function DataStructurePage() {
       .attr("fill", "#f8fafc")
       .attr("stroke", "#d1d5db");
 
-    // Add a test text to verify SVG rendering is working
-    svg
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", 20)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "12px")
-      .attr("fill", "#64748b")
-      .text("Visualization Area");
-
     // Get the current operation
     const operation = operations[currentHistoryIndex];
     if (!operation) {
@@ -273,6 +263,21 @@ function DataStructurePage() {
     console.log("Memory Snapshot:", memorySnapshot);
 
     try {
+      const structureType = (dataStructure.type || "").toUpperCase();
+
+      // Special case for web browser visualization
+      if (structureType === "WEB_BROWSER") {
+        console.log("Rendering WEB_BROWSER visualization");
+        renderWebBrowserVisualization(
+          svg,
+          width,
+          height,
+          operation,
+          memorySnapshot
+        );
+        return;
+      }
+
       // FALLBACK: If there's no specific selected memory snapshot, use the operation state directly
       if (!memorySnapshot && operation.state) {
         console.log(
@@ -283,10 +288,6 @@ function DataStructurePage() {
         const newOperation = { ...operation };
 
         // Determine visualization method based on structure type
-        const structureType = (dataStructure.type || "").toUpperCase();
-        const isVector = structureType === "VECTOR";
-
-        console.log(`Is vector implementation: ${isVector}`);
         console.log("Structure type for visualization:", structureType);
 
         // Select the appropriate visualization method
@@ -353,12 +354,18 @@ function DataStructurePage() {
         effectiveOperation.state
       );
 
-      // Determine visualization method based on structure type
-      const structureType = (dataStructure.type || "").toUpperCase();
-      const isVector = structureType === "VECTOR";
-
-      console.log(`Is vector implementation: ${isVector}`);
-      console.log("Structure type for visualization:", structureType);
+      // Special case for web browser visualization
+      if (structureType === "WEB_BROWSER") {
+        console.log("Rendering WEB_BROWSER visualization with memory snapshot");
+        renderWebBrowserVisualization(
+          svg,
+          width,
+          height,
+          effectiveOperation,
+          memorySnapshot
+        );
+        return;
+      }
 
       // Select the appropriate visualization method
       if (enableMemoryVisualization) {
@@ -426,6 +433,846 @@ function DataStructurePage() {
     dataStructure,
     enableMemoryVisualization,
   ]);
+
+  // Helper to generate curved path between two points
+  const generateCurvedPath = (source, target) => {
+    // Calculate horizontal and vertical distance between points
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Determine direction to adjust control points
+    const isRightToLeft = target.x < source.x;
+    const isTopToBottom = target.y > source.y;
+
+    // Adjust control point distances based on total distance
+    const controlPointDistance = Math.min(100, distance * 0.5);
+
+    // Position control points based on direction
+    let cp1x, cp1y, cp2x, cp2y;
+
+    if (Math.abs(dx) > Math.abs(dy) * 2) {
+      // Mostly horizontal path
+      cp1x = source.x + (isRightToLeft ? -0.2 : 0.2) * distance;
+      cp1y = source.y;
+      cp2x = target.x + (isRightToLeft ? 0.2 : -0.2) * distance;
+      cp2y = target.y;
+    } else if (Math.abs(dy) > Math.abs(dx) * 2) {
+      // Mostly vertical path
+      cp1x = source.x;
+      cp1y = source.y + (isTopToBottom ? 0.2 : -0.2) * distance;
+      cp2x = target.x;
+      cp2y = target.y + (isTopToBottom ? -0.2 : 0.2) * distance;
+    } else {
+      // Diagonal path
+      cp1x = source.x + (isRightToLeft ? -0.2 : 0.2) * distance;
+      cp1y = source.y + (isTopToBottom ? 0.2 : -0.2) * distance;
+      cp2x = target.x + (isRightToLeft ? 0.2 : -0.2) * distance;
+      cp2y = target.y + (isTopToBottom ? -0.2 : 0.2) * distance;
+    }
+
+    return `M ${source.x} ${source.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
+  };
+
+  // Add this new function for web browser visualization
+  const renderWebBrowserVisualization = (
+    svg,
+    width,
+    height,
+    operation,
+    memorySnapshot
+  ) => {
+    console.log("Rendering Web Browser visualization");
+
+    // Extract data from operation or memory snapshot
+    let browserData = {};
+
+    // First try to get data from memory snapshot
+    if (memorySnapshot) {
+      // Use memory snapshot directly
+      browserData = memorySnapshot;
+      console.log("Web Browser data from memory snapshot:", browserData);
+    } else if (operation.state) {
+      // Fallback to operation state
+      browserData = operation.state;
+      console.log("Web Browser data from operation state:", browserData);
+    }
+
+    // Get the last snapshot of the last operation history if available
+    const lastOpIndex = operations.length - 1;
+    const lastOp = operations[lastOpIndex];
+    const lastSnapshotIndex = lastOp?.memorySnapshots?.length - 1 || 0;
+    const lastSnapshot = lastOp?.memorySnapshots?.[lastSnapshotIndex];
+
+    if (lastSnapshot) {
+      browserData = lastSnapshot;
+      console.log("Using last snapshot of last operation:", browserData);
+    }
+
+    // Extract the browser components
+    const localVariables = browserData.localVariables || {};
+    const instanceVariables = browserData.instanceVariables || {};
+    const addressObjectMap = browserData.addressObjectMap || {};
+    const currentPageAddress = instanceVariables.current;
+
+    console.log("Local variables:", localVariables);
+    console.log("Instance variables:", instanceVariables);
+    console.log("Address object map:", addressObjectMap);
+    console.log("Current page address:", currentPageAddress);
+
+    // Entity styles
+    const styles = {
+      browser: {
+        width: 500,
+        height: 80,
+        fill: "#f8fafc", // Very light gray
+        stroke: "#94a3b8", // Gray
+        textColor: "#334155", // Dark gray
+      },
+      page: {
+        width: 200,
+        height: 120,
+        fill: "#ffffff", // White
+        stroke: "#94a3b8", // Gray
+        textColor: "#334155", // Dark gray
+        currentFill: "#f1f5f9", // Light gray for current page
+        currentStroke: "#64748b", // Darker gray for current page
+      },
+      localVars: {
+        width: 200,
+        height: 30, // Will be adjusted based on content
+        fill: "#f8fafc", // Very light gray
+        stroke: "#94a3b8", // Gray
+        textColor: "#334155", // Dark gray
+      },
+      instanceVars: {
+        width: 200,
+        height: 30, // Will be adjusted based on content
+        fill: "#f1f5f9", // Light slate
+        stroke: "#64748b", // Slate
+        textColor: "#334155", // Dark slate
+      },
+      connection: {
+        stroke: "#64748b", // Slate
+        width: 2,
+        nextColor: "#64748b", // Gray for next pointers
+        prevColor: "#64748b", // Gray for previous pointers
+        currentColor: "#334155", // Dark gray for current pointer
+      },
+    };
+
+    // Add title for the visualization
+    svg
+      .append("text")
+      .attr("x", width / 2)
+      .attr("y", 30)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "18px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#334155")
+      .text("Web Browser - Browser History");
+
+    // Add operation info
+    if (operation) {
+      const operationName =
+        operation.operation || operation.operationName || "Unknown operation";
+
+      svg
+        .append("text")
+        .attr("x", width / 2)
+        .attr("y", 55)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "14px")
+        .attr("fill", "#4b5563")
+        .text(
+          `Operation: ${operationName}${
+            operation.parameters
+              ? " (" + JSON.stringify(operation.parameters) + ")"
+              : ""
+          }`
+        );
+    }
+
+    // Add arrowhead definitions for connections
+    const defs = svg.append("defs");
+
+    // Next pointer (blue)
+    defs
+      .append("marker")
+      .attr("id", "next-arrow")
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 8)
+      .attr("refY", 0)
+      .attr("markerWidth", 8)
+      .attr("markerHeight", 8)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-5L10,0L0,5")
+      .attr("fill", styles.connection.nextColor);
+
+    // Previous pointer (red)
+    defs
+      .append("marker")
+      .attr("id", "prev-arrow")
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 8)
+      .attr("refY", 0)
+      .attr("markerWidth", 8)
+      .attr("markerHeight", 8)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-5L10,0L0,5")
+      .attr("fill", styles.connection.prevColor);
+
+    // Current pointer (green)
+    defs
+      .append("marker")
+      .attr("id", "current-arrow")
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 8)
+      .attr("refY", 0)
+      .attr("markerWidth", 8)
+      .attr("markerHeight", 8)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-5L10,0L0,5")
+      .attr("fill", styles.connection.currentColor);
+
+    // 1. Render Local Variables Box
+    const localVarsBox = svg.append("g").attr("class", "local-variables");
+
+    // Adjust height based on number of variables
+    const localVarCount = Object.keys(localVariables).length;
+    const localVarsHeight = Math.max(80, 40 + localVarCount * 30 + 20); // Add more bottom padding to match node boxes
+    styles.localVars.height = localVarsHeight;
+
+    // Box container
+    localVarsBox
+      .append("rect")
+      .attr("x", 50)
+      .attr("y", 80)
+      .attr("width", styles.localVars.width)
+      .attr("height", styles.localVars.height)
+      .attr("fill", "#ffffff")
+      .attr("stroke", "#94a3b8")
+      .attr("stroke-width", 1)
+      .attr("rx", 5);
+
+    // Title
+    localVarsBox
+      .append("rect")
+      .attr("x", 50)
+      .attr("y", 80)
+      .attr("width", styles.localVars.width)
+      .attr("height", 25)
+      .attr("fill", "#94a3b8")
+      .attr("fill-opacity", 0.3)
+      .attr("stroke", "none")
+      .attr("rx", 5)
+      .attr("ry", 0);
+
+    localVarsBox
+      .append("text")
+      .attr("x", 50 + styles.localVars.width / 2)
+      .attr("y", 80 + 17)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "13px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#334155")
+      .text("Local Variables");
+
+    // Divider line
+    localVarsBox
+      .append("line")
+      .attr("x1", 50)
+      .attr("y1", 80 + 25)
+      .attr("x2", 50 + styles.localVars.width)
+      .attr("y2", 80 + 25)
+      .attr("stroke", "#94a3b8")
+      .attr("stroke-width", 1);
+
+    // Variables
+    let yOffset = 30; // Start below the header
+    Object.entries(localVariables).forEach(([key, value]) => {
+      // Add field container for local variables
+      localVarsBox
+        .append("rect")
+        .attr("x", 50 + 10) // Same padding as page nodes (10px)
+        .attr("y", 80 + yOffset)
+        .attr("width", styles.localVars.width - 20)
+        .attr("height", 25) // Same as page nodes
+        .attr("fill", "white")
+        .attr("stroke", "#e2e8f0")
+        .attr("stroke-width", 1)
+        .attr("rx", 3);
+
+      // Variable name (like "value:" in node boxes)
+      localVarsBox
+        .append("text")
+        .attr("x", 50 + 20) // Same as page nodes
+        .attr("y", 80 + yOffset + 17) // Center in the row like page nodes
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#334155")
+        .text(key + ":");
+
+      // Variable value (like the values in node boxes)
+      localVarsBox
+        .append("text")
+        .attr("x", 50 + styles.localVars.width - 20) // Same as page nodes
+        .attr("y", 80 + yOffset + 17) // Center in the row like page nodes
+        .attr("text-anchor", "end")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#334155")
+        .text(
+          String(value).length > 10
+            ? String(value).substring(0, 9) + "..."
+            : value
+        );
+
+      yOffset += 30; // Same spacing as page nodes (node boxes use 30px spacing)
+    });
+
+    // 2. Render Instance Variables Box
+    const instanceVarsBox = svg.append("g").attr("class", "instance-variables");
+
+    // Adjust height based on number of variables
+    const instanceVarCount = Object.keys(instanceVariables).length;
+    const instanceVarsHeight = Math.max(80, 40 + instanceVarCount * 30 + 20); // Add more bottom padding to match node boxes
+    styles.instanceVars.height = instanceVarsHeight;
+
+    // Box container
+    instanceVarsBox
+      .append("rect")
+      .attr("x", width - 50 - styles.instanceVars.width)
+      .attr("y", 80)
+      .attr("width", styles.instanceVars.width)
+      .attr("height", styles.instanceVars.height)
+      .attr("fill", "#ffffff")
+      .attr("stroke", "#94a3b8")
+      .attr("stroke-width", 1)
+      .attr("rx", 5);
+
+    // Title
+    instanceVarsBox
+      .append("rect")
+      .attr("x", width - 50 - styles.instanceVars.width)
+      .attr("y", 80)
+      .attr("width", styles.instanceVars.width)
+      .attr("height", 25)
+      .attr("fill", "#94a3b8")
+      .attr("fill-opacity", 0.3)
+      .attr("stroke", "none")
+      .attr("rx", 5)
+      .attr("ry", 0);
+
+    instanceVarsBox
+      .append("text")
+      .attr("x", width - 50 - styles.instanceVars.width / 2)
+      .attr("y", 80 + 17)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "13px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#334155")
+      .text("Instance Variables");
+
+    // Divider line
+    instanceVarsBox
+      .append("line")
+      .attr("x1", width - 50 - styles.instanceVars.width)
+      .attr("y1", 80 + 25)
+      .attr("x2", width - 50)
+      .attr("y2", 80 + 25)
+      .attr("stroke", "#94a3b8")
+      .attr("stroke-width", 1);
+
+    // Variables
+    yOffset = 30; // Start below the header
+    Object.entries(instanceVariables).forEach(([key, value]) => {
+      // Add field container for instance variables
+      instanceVarsBox
+        .append("rect")
+        .attr("x", width - 50 - styles.instanceVars.width + 10) // Same padding as page nodes (10px)
+        .attr("y", 80 + yOffset)
+        .attr("width", styles.instanceVars.width - 20)
+        .attr("height", 25) // Same as page nodes
+        .attr("fill", "white")
+        .attr("stroke", "#e2e8f0")
+        .attr("stroke-width", 1)
+        .attr("rx", 3);
+
+      // Variable name (like "value:" in node boxes)
+      instanceVarsBox
+        .append("text")
+        .attr("x", width - 50 - styles.instanceVars.width + 20) // Same as page nodes
+        .attr("y", 80 + yOffset + 17) // Center in the row like page nodes
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#334155")
+        .text(key + ":");
+
+      // Variable value (like the values in node boxes)
+      instanceVarsBox
+        .append("text")
+        .attr("x", width - 70) // Same as page nodes
+        .attr("y", 80 + yOffset + 17) // Center in the row like page nodes
+        .attr("text-anchor", "end")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#334155")
+        .text(
+          String(value).length > 10
+            ? String(value).substring(0, 9) + "..."
+            : value
+        );
+
+      yOffset += 30; // Same spacing as page nodes (node boxes use 30px spacing)
+    });
+
+    // 3. Build page nodes layout information
+    const pageNodes = [];
+    const pagePositions = {};
+    const connections = [];
+
+    // Get all page nodes from address object map
+    const addresses = Object.keys(addressObjectMap);
+
+    // Helper to check if an address is valid
+    const isValidAddress = (addr) =>
+      addr && addr !== "null" && addr !== "0x0" && addr in addressObjectMap;
+
+    // Find starting point (page with no previous)
+    let startAddress = null;
+    for (const addr of addresses) {
+      const page = addressObjectMap[addr];
+      if (!isValidAddress(page.previousAddress)) {
+        startAddress = addr;
+        break;
+      }
+    }
+
+    // If no start found, just use the first address
+    if (!startAddress && addresses.length > 0) {
+      startAddress = addresses[0];
+    }
+
+    // Build the linked list of pages in order
+    let currentAddr = startAddress;
+    let xPos = width / 2 - styles.page.width / 2;
+    let nextX = 100;
+
+    while (isValidAddress(currentAddr)) {
+      const page = addressObjectMap[currentAddr];
+      const yCenter = height / 2;
+
+      // Add to our nodes list
+      pageNodes.push({
+        address: currentAddr,
+        value: page.value,
+        previousAddress: page.previousAddress,
+        nextAddress: page.nextAddress,
+        isCurrent: currentAddr === currentPageAddress,
+        x: nextX,
+        y: yCenter - styles.page.height / 2,
+      });
+
+      // Save position for reference
+      pagePositions[currentAddr] = {
+        x: nextX,
+        y: yCenter - styles.page.height / 2,
+      };
+
+      // Move to next page
+      currentAddr = page.nextAddress;
+      nextX += styles.page.width + 50;
+    }
+
+    // Center the pages horizontally if there's more than one
+    if (pageNodes.length > 1) {
+      const totalWidth =
+        pageNodes.length * styles.page.width + (pageNodes.length - 1) * 50;
+      const startX = (width - totalWidth) / 2;
+
+      pageNodes.forEach((node, index) => {
+        node.x = startX + index * (styles.page.width + 50);
+        pagePositions[node.address] = {
+          x: node.x,
+          y: node.y,
+        };
+      });
+    }
+
+    // 4. Setup connections between nodes
+    pageNodes.forEach((node) => {
+      // Next connections
+      if (isValidAddress(node.nextAddress)) {
+        connections.push({
+          source: node.address,
+          target: node.nextAddress,
+          type: "next",
+        });
+      }
+
+      // Previous connections
+      if (isValidAddress(node.previousAddress)) {
+        connections.push({
+          source: node.address,
+          target: node.previousAddress,
+          type: "prev",
+        });
+      }
+    });
+
+    // Current node connection from instance variable
+    if (isValidAddress(currentPageAddress)) {
+      connections.push({
+        source: "current",
+        target: currentPageAddress,
+        type: "current",
+        sourcePoint: {
+          x: width - 50 - styles.instanceVars.width / 2,
+          y: 80 + styles.instanceVars.height + 5,
+        },
+      });
+    }
+
+    // 5. Render all page nodes
+    pageNodes.forEach((node) => {
+      const pageGroup = svg
+        .append("g")
+        .attr("class", "page-node")
+        .attr("transform", `translate(${node.x}, ${node.y})`);
+
+      // Increase height for better field separation
+      const nodeHeight = 130; // More compact height
+
+      // Page rectangle
+      pageGroup
+        .append("rect")
+        .attr("width", styles.page.width)
+        .attr("height", nodeHeight)
+        .attr(
+          "fill",
+          node.isCurrent ? styles.page.currentFill : styles.page.fill
+        )
+        .attr(
+          "stroke",
+          node.isCurrent ? styles.page.currentStroke : styles.page.stroke
+        )
+        .attr("stroke-width", node.isCurrent ? 2 : 1)
+        .attr("rx", 5);
+
+      // Title section
+      pageGroup
+        .append("rect")
+        .attr("width", styles.page.width)
+        .attr("height", 25)
+        .attr(
+          "fill",
+          node.isCurrent ? styles.page.currentStroke : styles.page.stroke
+        )
+        .attr("fill-opacity", 0.3)
+        .attr("rx", 5)
+        .attr("ry", 0);
+
+      // Page title (short address)
+      pageGroup
+        .append("text")
+        .attr("x", styles.page.width / 2)
+        .attr("y", 17)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "13px")
+        .attr("font-weight", "bold")
+        .attr("fill", styles.page.textColor)
+        .text(
+          node.address.substring(0, 8) + (node.isCurrent ? " (current)" : "")
+        );
+
+      // Divider line after title
+      pageGroup
+        .append("line")
+        .attr("x1", 0)
+        .attr("y1", 25)
+        .attr("x2", styles.page.width)
+        .attr("y2", 25)
+        .attr("stroke", styles.page.stroke)
+        .attr("stroke-width", 1);
+
+      // Create fields section with vertical layout
+      const fieldsGroup = pageGroup.append("g").attr("class", "fields");
+
+      // Add value field
+      fieldsGroup
+        .append("rect")
+        .attr("x", 10)
+        .attr("y", 32)
+        .attr("width", styles.page.width - 20)
+        .attr("height", 25)
+        .attr("fill", "none")
+        .attr("stroke", "#e2e8f0")
+        .attr("stroke-width", 1)
+        .attr("rx", 3);
+
+      // Value label
+      fieldsGroup
+        .append("text")
+        .attr("x", 20)
+        .attr("y", 49)
+        .attr("font-size", "13px")
+        .attr("font-weight", "bold")
+        .attr("fill", styles.page.textColor)
+        .text("value:");
+
+      // Page value
+      fieldsGroup
+        .append("text")
+        .attr("x", styles.page.width - 20)
+        .attr("y", 49)
+        .attr("text-anchor", "end")
+        .attr("font-size", "13px")
+        .attr("font-weight", "bold")
+        .attr("fill", styles.page.textColor)
+        .text(node.value || "null");
+
+      // Add previous field
+      fieldsGroup
+        .append("rect")
+        .attr("x", 10)
+        .attr("y", 62)
+        .attr("width", styles.page.width - 20)
+        .attr("height", 25)
+        .attr("fill", "none")
+        .attr("stroke", "#e2e8f0")
+        .attr("stroke-width", 1)
+        .attr("rx", 3);
+
+      // Previous address
+      fieldsGroup
+        .append("text")
+        .attr("x", 20)
+        .attr("y", 79)
+        .attr("font-size", "13px")
+        .attr("font-weight", "bold")
+        .attr("fill", styles.page.textColor)
+        .text("prev:");
+
+      fieldsGroup
+        .append("text")
+        .attr("x", styles.page.width - 20)
+        .attr("y", 79)
+        .attr("text-anchor", "end")
+        .attr("font-size", "13px")
+        .attr("fill", styles.connection.prevColor)
+        .attr("font-weight", "bold")
+        .text(node.previousAddress?.substring(0, 8) || "null");
+
+      // Add next field
+      fieldsGroup
+        .append("rect")
+        .attr("x", 10)
+        .attr("y", 92)
+        .attr("width", styles.page.width - 20)
+        .attr("height", 25)
+        .attr("fill", "none")
+        .attr("stroke", "#e2e8f0")
+        .attr("stroke-width", 1)
+        .attr("rx", 3);
+
+      // Next address
+      fieldsGroup
+        .append("text")
+        .attr("x", 20)
+        .attr("y", 109)
+        .attr("font-size", "13px")
+        .attr("font-weight", "bold")
+        .attr("fill", styles.page.textColor)
+        .text("next:");
+
+      fieldsGroup
+        .append("text")
+        .attr("x", styles.page.width - 20)
+        .attr("y", 109)
+        .attr("text-anchor", "end")
+        .attr("font-size", "13px")
+        .attr("fill", styles.connection.nextColor)
+        .attr("font-weight", "bold")
+        .text(node.nextAddress?.substring(0, 8) || "null");
+
+      // Update node height in our positions record for connection calculations
+      pagePositions[node.address] = {
+        x: node.x,
+        y: node.y,
+        width: styles.page.width,
+        height: nodeHeight,
+      };
+    });
+
+    // 6. Render Address Object Map Box
+    // Only if there's space at the bottom and not too many pages
+    if (pageNodes.length <= 5) {
+      const addressMapBox = svg.append("g").attr("class", "address-object-map");
+
+      const mapBoxY = height - 120;
+      const mapBoxHeight = 160;
+      const mapBoxWidth = width - 100;
+
+      // Box container
+      addressMapBox
+        .append("rect")
+        .attr("x", 50)
+        .attr("y", mapBoxY)
+        .attr("width", mapBoxWidth)
+        .attr("height", mapBoxHeight)
+        .attr("fill", "#f8fafc")
+        .attr("stroke", "#cbd5e1")
+        .attr("stroke-width", 1)
+        .attr("rx", 5);
+
+      // Title
+      addressMapBox
+        .append("rect")
+        .attr("x", 50)
+        .attr("y", mapBoxY)
+        .attr("width", mapBoxWidth)
+        .attr("height", 30)
+        .attr("fill", "#94a3b8")
+        .attr("fill-opacity", 0.3)
+        .attr("stroke", "none")
+        .attr("rx", 5)
+        .attr("ry", 0);
+
+      addressMapBox
+        .append("text")
+        .attr("x", 50 + mapBoxWidth / 2)
+        .attr("y", mapBoxY + 20)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "14px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#475569")
+        .text("Address Object Map");
+
+      // Address entries
+      const entryWidth = 180;
+      const entriesPerRow = Math.floor(mapBoxWidth / entryWidth);
+
+      addresses.forEach((address, index) => {
+        const row = Math.floor(index / entriesPerRow);
+        const col = index % entriesPerRow;
+
+        const entryX = 50 + col * entryWidth + 10;
+        const entryY = mapBoxY + 40 + row * 40;
+
+        // Address
+        addressMapBox
+          .append("text")
+          .attr("x", entryX)
+          .attr("y", entryY)
+          .attr("font-size", "12px")
+          .attr("font-weight", "bold")
+          .attr("fill", "#475569")
+          .text(address.substring(0, 8) + ":");
+
+        // Value
+        const value = addressObjectMap[address]?.value;
+        addressMapBox
+          .append("text")
+          .attr("x", entryX + 80)
+          .attr("y", entryY)
+          .attr("font-size", "12px")
+          .attr("fill", "#475569")
+          .text(value || "null");
+      });
+    }
+
+    // 7. Render connections between nodes
+    const connectionsGroup = svg.append("g").attr("class", "connections");
+
+    connections.forEach((conn) => {
+      let sourcePoint, targetPoint;
+
+      // Special case for 'current' source
+      if (conn.source === "current") {
+        sourcePoint = conn.sourcePoint;
+      } else {
+        const sourcePos = pagePositions[conn.source];
+        if (!sourcePos) return;
+
+        sourcePoint = {
+          x: sourcePos.x + styles.page.width / 2,
+          y: sourcePos.y + styles.page.height / 2,
+        };
+      }
+
+      const targetPos = pagePositions[conn.target];
+      if (!targetPos) return;
+
+      targetPoint = {
+        x: targetPos.x + styles.page.width / 2,
+        y: targetPos.y + styles.page.height / 2,
+      };
+
+      // Adjust source and target points based on connection type
+      if (conn.type === "next") {
+        sourcePoint.x = sourcePoint.x + styles.page.width / 2;
+        targetPoint.x = targetPoint.x - styles.page.width / 2;
+      } else if (conn.type === "prev") {
+        sourcePoint.x = sourcePoint.x - styles.page.width / 2;
+        targetPoint.x = targetPoint.x + styles.page.width / 2;
+      }
+
+      // Generate curved path
+      const path = generateCurvedPath(sourcePoint, targetPoint);
+
+      // Determine color and marker based on connection type
+      let color, marker;
+      switch (conn.type) {
+        case "next":
+          color = styles.connection.nextColor;
+          marker = "url(#next-arrow)";
+          break;
+        case "prev":
+          color = styles.connection.prevColor;
+          marker = "url(#prev-arrow)";
+          break;
+        case "current":
+          color = styles.connection.currentColor;
+          marker = "url(#current-arrow)";
+          break;
+        default:
+          color = styles.connection.stroke;
+          marker = null;
+      }
+
+      // Draw path
+      connectionsGroup
+        .append("path")
+        .attr("d", path)
+        .attr("fill", "none")
+        .attr("stroke", color)
+        .attr("stroke-width", styles.connection.width)
+        .attr("marker-end", marker)
+        .attr("opacity", 0.8);
+
+      // Add label if needed
+      if (conn.label) {
+        const pathNode = connectionsGroup.select("path").node();
+        if (pathNode) {
+          const pathLength = pathNode.getTotalLength();
+          const midPoint = pathNode.getPointAtLength(pathLength / 2);
+
+          connectionsGroup
+            .append("text")
+            .attr("x", midPoint.x)
+            .attr("y", midPoint.y - 5)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "12px")
+            .attr("fill", color)
+            .text(conn.label);
+        }
+      }
+    });
+  };
 
   // Then all the useEffect hooks that reference renderVisualization will come after it
   useEffect(() => {
@@ -546,975 +1393,6 @@ function DataStructurePage() {
       });
     }
   }, [svgRef.current]);
-
-  // Rendering functions for different data structure types
-
-  const renderArrayVisualization = (svg, width, height, operation) => {
-    console.log("Rendering array visualization with operation:", operation);
-
-    try {
-      const state = operation.state || {};
-      const structureData = state.elements || [];
-
-      console.log("Operation state:", state);
-      console.log("Structure data:", structureData);
-
-      // If structureData is empty but we have memorySnapshots, try to extract elements directly
-      if (structureData.length === 0 && operation.memorySnapshots?.length > 0) {
-        console.log(
-          "No elements in state, attempting to extract from memory snapshots..."
-        );
-
-        // Get the last memory snapshot for this operation
-        const memorySnapshot =
-          operation.memorySnapshots[operation.memorySnapshots.length - 1];
-
-        if (memorySnapshot && memorySnapshot.instanceVariables) {
-          const { instanceVariables, addressObjectMap } = memorySnapshot;
-
-          // Check for array and count in instanceVariables
-          const arrayAddress = instanceVariables.array;
-          const count = instanceVariables.count || instanceVariables.size || 0;
-
-          console.log("Found array address:", arrayAddress, "count:", count);
-
-          if (
-            arrayAddress &&
-            addressObjectMap &&
-            addressObjectMap[arrayAddress]
-          ) {
-            const arrayData = addressObjectMap[arrayAddress];
-            if (Array.isArray(arrayData)) {
-              // Use only the first 'count' elements
-              const elements = arrayData
-                .slice(0, count)
-                .filter((item) => item !== null);
-              console.log("Extracted elements from array:", elements);
-              structureData.push(...elements);
-            }
-          }
-        }
-      }
-
-      // If still no data to display, show a message
-      if (structureData.length === 0) {
-        svg
-          .append("text")
-          .attr("x", width / 2)
-          .attr("y", height / 2)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "16px")
-          .attr("fill", "#374151")
-          .text("No elements to display. Try adding elements first.");
-        return;
-      }
-
-      // Display info about current operation
-      svg
-        .append("text")
-        .attr("x", 20)
-        .attr("y", 30)
-        .attr("font-size", "14px")
-        .attr("fill", "#4b5563")
-        .text(`Operation: ${operation.operation || "Initial State"}`);
-
-      // Set up display constants
-      const cellWidth = 60;
-      const cellHeight = 40;
-      const startX = Math.max(
-        20,
-        (width - cellWidth * structureData.length) / 2
-      );
-      const startY = height / 3;
-
-      // Create array cells
-      structureData.forEach((value, index) => {
-        const cellX = startX + index * cellWidth;
-
-        // Cell rectangle
-        svg
-          .append("rect")
-          .attr("x", cellX)
-          .attr("y", startY)
-          .attr("width", cellWidth)
-          .attr("height", cellHeight)
-          .attr("fill", "#f3f4f6")
-          .attr("stroke", "#d1d5db")
-          .attr("rx", 4);
-
-        // Index label
-        svg
-          .append("text")
-          .attr("x", cellX + cellWidth / 2)
-          .attr("y", startY - 10)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "12px")
-          .attr("fill", "#6b7280")
-          .text(index);
-
-        // Cell value
-        svg
-          .append("text")
-          .attr("x", cellX + cellWidth / 2)
-          .attr("y", startY + cellHeight / 2 + 5)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "14px")
-          .attr("fill", "#111827")
-          .text(value);
-      });
-
-      console.log("Array visualization complete");
-    } catch (error) {
-      console.error("Error in renderArrayVisualization:", error);
-      svg
-        .append("text")
-        .attr("x", width / 2)
-        .attr("y", height / 2)
-        .attr("text-anchor", "middle")
-        .attr("fill", "red")
-        .text(`Error: ${error.message}`);
-    }
-  };
-
-  const renderLinkedListVisualization = (svg, width, height, operation) => {
-    // Placeholder implementation
-    svg
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", height / 2)
-      .attr("text-anchor", "middle")
-      .text("Linked List Visualization");
-  };
-
-  const renderTreeVisualization = (svg, width, height, operation) => {
-    // Placeholder implementation
-    svg
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", height / 2)
-      .attr("text-anchor", "middle")
-      .text("Tree Visualization");
-  };
-
-  const renderStackQueueVisualization = (svg, width, height, operation) => {
-    // Placeholder implementation
-    svg
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", height / 2)
-      .attr("text-anchor", "middle")
-      .text("Stack/Queue Visualization");
-  };
-
-  const renderHashMapVisualization = (svg, width, height, operation) => {
-    // Placeholder implementation
-    svg
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", height / 2)
-      .attr("text-anchor", "middle")
-      .text("HashMap Visualization");
-  };
-
-  const renderDefaultVisualization = (svg, width, height, operation) => {
-    // Placeholder implementation
-    svg
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", height / 2)
-      .attr("text-anchor", "middle")
-      .text("Default Visualization");
-  };
-
-  // Helper to generate curved path between two points
-  const generateCurvedPath = (source, target) => {
-    // Calculate horizontal and vertical distance between points
-    const dx = target.x - source.x;
-    const dy = target.y - source.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    // Determine direction to adjust control points
-    const isRightToLeft = target.x < source.x;
-    const isTopToBottom = target.y > source.y;
-
-    // Adjust control point distances based on total distance
-    const controlPointDistance = Math.min(100, distance * 0.5);
-
-    // Position control points based on direction
-    let cp1x, cp1y, cp2x, cp2y;
-
-    if (Math.abs(dx) > Math.abs(dy) * 2) {
-      // Mostly horizontal path
-      cp1x = source.x + (isRightToLeft ? -0.2 : 0.2) * distance;
-      cp1y = source.y;
-      cp2x = target.x + (isRightToLeft ? 0.2 : -0.2) * distance;
-      cp2y = target.y;
-    } else if (Math.abs(dy) > Math.abs(dx) * 2) {
-      // Mostly vertical path
-      cp1x = source.x;
-      cp1y = source.y + (isTopToBottom ? 0.2 : -0.2) * distance;
-      cp2x = target.x;
-      cp2y = target.y + (isTopToBottom ? -0.2 : 0.2) * distance;
-    } else {
-      // Diagonal path
-      cp1x = source.x + (isRightToLeft ? -0.2 : 0.2) * distance;
-      cp1y = source.y + (isTopToBottom ? 0.2 : -0.2) * distance;
-      cp2x = target.x + (isRightToLeft ? 0.2 : -0.2) * distance;
-      cp2y = target.y + (isTopToBottom ? -0.2 : 0.2) * distance;
-    }
-
-    return `M ${source.x} ${source.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
-  };
-
-  const renderMemoryVisualization = (operation, svgRef) => {
-    try {
-      if (
-        !operation ||
-        !operation.memorySnapshots ||
-        operation.memorySnapshots.length === 0
-      ) {
-        console.error("No memory snapshots available for visualization");
-        return;
-      }
-
-      console.log("Operation for memory viz:", operation);
-
-      // Get the appropriate memory snapshot based on mode
-      const memorySnapshot =
-        snapshotMode && operation.memorySnapshots.length > currentSnapshotIndex
-          ? operation.memorySnapshots[currentSnapshotIndex]
-          : operation.memorySnapshots[operation.memorySnapshots.length - 1];
-
-      console.log("Memory Snapshot for visualization:", memorySnapshot);
-
-      const svg = d3.select(svgRef.current);
-      svg.selectAll("*").remove();
-
-      // Define layout dimensions and spacing
-      const margin = { top: 30, right: 30, bottom: 30, left: 30 };
-      const width = svgRef.current.clientWidth - margin.left - margin.right;
-      const height = svgRef.current.clientHeight - margin.top - margin.bottom;
-
-      // Create a container group with margins
-      const g = svg
-        .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
-
-      // Extract data from memory snapshot
-      const {
-        addressObjectMap = {},
-        localVariables = {},
-        instanceVariables = {},
-      } = memorySnapshot;
-
-      console.log("Address map:", addressObjectMap);
-      console.log("Local vars:", localVariables);
-      console.log("Instance vars:", instanceVariables);
-
-      // Add snapshot title
-      svg
-        .append("text")
-        .attr("x", svgRef.current.clientWidth / 2)
-        .attr("y", 20)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "14px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#333")
-        .text(
-          `${operation.operation || "State"} - Snapshot ${
-            currentSnapshotIndex + 1
-          }/${operation.memorySnapshots.length}`
-        );
-
-      // Split the visualization area into sections
-      const variablesSectionWidth = Math.min(300, width * 0.3); // Either 300px or 30% of width
-      const heapSectionWidth = width - variablesSectionWidth;
-
-      // Variables related style and layout
-      const variableBoxHeight = 36;
-      const variableBoxWidth = variablesSectionWidth - 20;
-      const variableSpacing = 8;
-
-      // Heap related style and layout
-      const heapBoxHeight = 36;
-      const heapBoxPadding = 16;
-      const heapSpacing = 24;
-      const fieldSpacing = 5;
-
-      // Color scheme
-      const colors = {
-        instanceVariable: "#e3f2fd", // Light blue background
-        instanceVariableBorder: "#90caf9", // Blue border
-        localVariable: "#f3e5f5", // Light purple background
-        localVariableBorder: "#ce93d8", // Purple border
-        heapObject: "#f5f5f5", // Light gray background
-        heapObjectBorder: "#9e9e9e", // Gray border
-        heapObjectTitle: "#424242", // Dark gray title
-        arrayBackground: "#e8f5e9", // Light green for arrays
-        arrayBorder: "#81c784", // Green border for arrays
-        objectBackground: "#fff3e0", // Light orange for objects
-        objectBorder: "#ffb74d", // Orange border for objects
-        nullValue: "#9e9e9e", // Gray for null values
-        referenceArrow: "#5c6bc0", // Indigo for references
-        text: "#212121", // Nearly black for text
-        sectionTitle: "#1976d2", // Blue for section titles
-        highlight: "#ff8a65", // Highlight color (light orange)
-      };
-
-      // Collect all variables (instance and local)
-      const allVariables = {};
-      let variableY = 40; // Start position for variables
-
-      // Referenced addresses for highlighting important heap objects
-      const referencedAddresses = new Set();
-
-      // For arrows rendering later
-      const connections = [];
-
-      // Draw section headers
-      g.append("text")
-        .attr("x", 10)
-        .attr("y", 15)
-        .attr("font-size", "16px")
-        .attr("font-weight", "bold")
-        .attr("fill", colors.sectionTitle)
-        .text("Variables");
-
-      g.append("text")
-        .attr("x", variablesSectionWidth + 20)
-        .attr("y", 15)
-        .attr("font-size", "16px")
-        .attr("font-weight", "bold")
-        .attr("fill", colors.sectionTitle)
-        .text("Heap Memory");
-
-      // Render instance variables first with a title
-      if (Object.keys(instanceVariables).length > 0) {
-        g.append("text")
-          .attr("x", 10)
-          .attr("y", variableY)
-          .attr("font-size", "14px")
-          .attr("font-weight", "bold")
-          .attr("fill", colors.text)
-          .text("Instance Variables");
-
-        variableY += 25;
-
-        // Sort instance variables to group similar types
-        const sortedInstanceVars = Object.entries(instanceVariables).sort(
-          (a, b) => {
-            const aIsRef = isAddress(a[1]);
-            const bIsRef = isAddress(b[1]);
-
-            // First group by reference/primitive
-            if (aIsRef && !bIsRef) return -1;
-            if (!aIsRef && bIsRef) return 1;
-
-            // Then by name
-            return a[0].localeCompare(b[0]);
-          }
-        );
-
-        sortedInstanceVars.forEach(([varName, value]) => {
-          // Store variable info for later rendering
-          allVariables[`instance_${varName}`] = {
-            name: varName,
-            value,
-            type: "instance",
-            y: variableY,
-          };
-
-          // Track referenced addresses
-          if (isAddress(value)) {
-            referencedAddresses.add(value);
-          }
-
-          variableY += variableBoxHeight + variableSpacing;
-        });
-
-        variableY += 15; // Extra space after instance variables
-      }
-
-      // Render local variables with a title if any exist
-      if (Object.keys(localVariables).length > 0) {
-        g.append("text")
-          .attr("x", 10)
-          .attr("y", variableY)
-          .attr("font-size", "14px")
-          .attr("font-weight", "bold")
-          .attr("fill", colors.text)
-          .text("Local Variables");
-
-        variableY += 25;
-
-        // Sort local variables to group similar types
-        const sortedLocalVars = Object.entries(localVariables).sort((a, b) => {
-          const aIsRef = isAddress(a[1]);
-          const bIsRef = isAddress(b[1]);
-
-          // First group by reference/primitive
-          if (aIsRef && !bIsRef) return -1;
-          if (!aIsRef && bIsRef) return 1;
-
-          // Then by name
-          return a[0].localeCompare(b[0]);
-        });
-
-        sortedLocalVars.forEach(([varName, value]) => {
-          // Store variable info for later rendering
-          allVariables[`local_${varName}`] = {
-            name: varName,
-            value,
-            type: "local",
-            y: variableY,
-          };
-
-          // Track referenced addresses
-          if (isAddress(value)) {
-            referencedAddresses.add(value);
-          }
-
-          variableY += variableBoxHeight + variableSpacing;
-        });
-      }
-
-      // Process heap objects and analyze their structure
-      const processedHeapObjects = new Map();
-      const objectSizes = new Map(); // To store calculated sizes for each object
-
-      // First pass - analyze heap objects and determine their structure
-      for (const [address, object] of Object.entries(addressObjectMap)) {
-        // Skip if not a valid object or already processed
-        if (!object || processedHeapObjects.has(address)) continue;
-
-        // Initialize with default size
-        const objectType = object.type || "unknown";
-        const isArray = objectType === "array";
-        const elements = object.elements || [];
-        const fields = object.fields || {};
-
-        // Calculate object size
-        const fieldCount = Object.keys(fields).length;
-        const elementCount = elements.length;
-
-        const headerHeight = 30;
-        const fieldsHeight =
-          fieldCount > 0 ? fieldCount * (heapBoxHeight + fieldSpacing) + 30 : 0;
-        const elementsHeight =
-          elementCount > 0
-            ? elementCount * (heapBoxHeight + fieldSpacing) + 30
-            : 0;
-
-        // Calculate total height based on content
-        const totalHeight =
-          headerHeight +
-          fieldsHeight +
-          elementsHeight +
-          (fieldCount > 0 && elementCount > 0 ? 10 : 0); // Add spacing between fields and elements
-
-        // Calculate width based on longest field name
-        let maxWidth = 180; // Minimum width
-
-        if (fieldCount > 0) {
-          const longestFieldName = Object.keys(fields).reduce(
-            (max, field) => Math.max(max, field.length),
-            0
-          );
-          maxWidth = Math.max(maxWidth, longestFieldName * 8 + 120);
-        }
-
-        objectSizes.set(address, {
-          width: maxWidth,
-          height: totalHeight,
-          fieldCount,
-          elementCount,
-        });
-
-        processedHeapObjects.set(address, object);
-      }
-
-      // Sort heap objects with referenced ones first, arrays, then others
-      const sortedHeapAddresses = [...processedHeapObjects.keys()].sort(
-        (a, b) => {
-          // First prioritize referenced objects
-          const aIsReferenced = referencedAddresses.has(a);
-          const bIsReferenced = referencedAddresses.has(b);
-
-          if (aIsReferenced && !bIsReferenced) return -1;
-          if (!aIsReferenced && bIsReferenced) return 1;
-
-          // Then prioritize arrays
-          const aObject = processedHeapObjects.get(a);
-          const bObject = processedHeapObjects.get(b);
-
-          const aIsArray = aObject.type === "array";
-          const bIsArray = bObject.type === "array";
-
-          if (aIsArray && !bIsArray) return -1;
-          if (!aIsArray && bIsArray) return 1;
-
-          // Lastly sort by address
-          return a.localeCompare(b);
-        }
-      );
-
-      // Layout heap objects in a grid-like pattern
-      const heapX = variablesSectionWidth + 20;
-      let heapY = 40;
-      let rowMaxHeight = 0;
-      let currentX = heapX;
-
-      // Map to store object positions for connections
-      const heapPositions = {};
-
-      // Second pass - render heap objects based on the sorted list
-      sortedHeapAddresses.forEach((address) => {
-        const object = processedHeapObjects.get(address);
-        const size = objectSizes.get(address);
-
-        // Check if we need to wrap to next row
-        if (currentX + size.width > width) {
-          currentX = heapX;
-          heapY += rowMaxHeight + heapSpacing;
-          rowMaxHeight = 0;
-        }
-
-        // Store position for later connection drawing
-        heapPositions[address] = {
-          x: currentX,
-          y: heapY,
-          width: size.width,
-          height: size.height,
-        };
-
-        // Update row max height
-        rowMaxHeight = Math.max(rowMaxHeight, size.height);
-
-        // Move x position for next object
-        currentX += size.width + heapSpacing;
-      });
-
-      // Draw connections between variables and heap objects first (behind everything)
-      // so they don't overlap with objects
-      const drawConnections = () => {
-        // Add marker definition for arrows
-        const defs = svg.append("defs");
-
-        defs
-          .append("marker")
-          .attr("id", "arrow")
-          .attr("viewBox", "0 -5 10 10")
-          .attr("refX", 10)
-          .attr("refY", 0)
-          .attr("markerWidth", 8)
-          .attr("markerHeight", 8)
-          .attr("orient", "auto")
-          .append("path")
-          .attr("d", "M0,-5L10,0L0,5")
-          .attr("fill", colors.referenceArrow);
-
-        // Draw all connections
-        connections.forEach((conn) => {
-          const targetPos = heapPositions[conn.target];
-
-          if (!targetPos) {
-            console.warn(`Cannot find target for connection: ${conn.target}`);
-            return;
-          }
-
-          // Draw connection path
-          g.append("path")
-            .attr(
-              "d",
-              generateCurvedPath(conn.source, {
-                x: targetPos.x + 10,
-                y: targetPos.y + 15,
-              })
-            )
-            .attr("stroke", colors.referenceArrow)
-            .attr("stroke-width", 2)
-            .attr("fill", "none")
-            .attr("marker-end", "url(#arrow)")
-            .attr("opacity", 0.8);
-
-          // Add a small label if needed
-          if (conn.label) {
-            const pathNode = g.select("path").node();
-            if (pathNode) {
-              const pathLength = pathNode.getTotalLength();
-              const midPoint = pathNode.getPointAtLength(pathLength / 2);
-
-              g.append("text")
-                .attr("x", midPoint.x)
-                .attr("y", midPoint.y - 5)
-                .attr("text-anchor", "middle")
-                .attr("font-size", "10px")
-                .attr("fill", colors.referenceArrow)
-                .text(conn.label);
-            }
-          }
-        });
-      };
-
-      // Draw all heap objects
-      sortedHeapAddresses.forEach((address) => {
-        const object = processedHeapObjects.get(address);
-        const isReferenced = referencedAddresses.has(address);
-        const size = objectSizes.get(address);
-        const pos = heapPositions[address];
-
-        if (!pos) return;
-
-        const x = pos.x;
-        const y = pos.y;
-        const objectType = object.type || "unknown";
-        const isArray = objectType === "array";
-
-        // Determine background and border colors based on type
-        const bgColor = isArray
-          ? colors.arrayBackground
-          : colors.objectBackground;
-        const borderColor = isArray ? colors.arrayBorder : colors.objectBorder;
-
-        // Draw object container with a subtle shadow for referenced objects
-        if (isReferenced) {
-          g.append("rect")
-            .attr("x", x + 3)
-            .attr("y", y + 3)
-            .attr("width", size.width)
-            .attr("height", size.height)
-            .attr("fill", "#00000015")
-            .attr("rx", 5);
-        }
-
-        // Main object container
-        g.append("rect")
-          .attr("x", x)
-          .attr("y", y)
-          .attr("width", size.width)
-          .attr("height", size.height)
-          .attr("fill", bgColor)
-          .attr("stroke", isReferenced ? colors.highlight : borderColor)
-          .attr("stroke-width", isReferenced ? 2 : 1)
-          .attr("rx", 5);
-
-        // Object header section
-        g.append("rect")
-          .attr("x", x)
-          .attr("y", y)
-          .attr("width", size.width)
-          .attr("height", 30)
-          .attr("fill", isReferenced ? colors.highlight : borderColor)
-          .attr("opacity", isReferenced ? 0.7 : 0.5)
-          .attr("stroke", "none")
-          .attr("rx", 5)
-          .attr("ry", 0);
-
-        // Object address label
-        g.append("text")
-          .attr("x", x + 10)
-          .attr("y", y + 20)
-          .attr("font-size", "12px")
-          .attr("font-weight", "bold")
-          .attr("fill", colors.heapObjectTitle)
-          .text(address.substring(0, 8));
-
-        // Object type label
-        g.append("text")
-          .attr("x", x + size.width - 10)
-          .attr("y", y + 20)
-          .attr("text-anchor", "end")
-          .attr("font-size", "12px")
-          .attr("font-weight", "bold")
-          .attr("fill", colors.heapObjectTitle)
-          .text(objectType);
-
-        let contentY = y + 30; // Start position for content
-
-        // Draw object fields if any
-        const fields = object.fields || {};
-        if (Object.keys(fields).length > 0) {
-          // Fields section label
-          g.append("rect")
-            .attr("x", x)
-            .attr("y", contentY)
-            .attr("width", size.width)
-            .attr("height", 24)
-            .attr("fill", isArray ? colors.arrayBorder : colors.objectBorder)
-            .attr("opacity", 0.3)
-            .attr("stroke", "none");
-
-          g.append("text")
-            .attr("x", x + 10)
-            .attr("y", contentY + 16)
-            .attr("font-size", "12px")
-            .attr("font-weight", "bold")
-            .attr("fill", colors.text)
-            .text("Fields");
-
-          contentY += 24;
-
-          // Draw each field
-          Object.entries(fields).forEach(([fieldName, fieldValue]) => {
-            // Field box
-            g.append("rect")
-              .attr("x", x)
-              .attr("y", contentY)
-              .attr("width", size.width)
-              .attr("height", heapBoxHeight)
-              .attr("fill", "rgba(255,255,255,0.7)")
-              .attr(
-                "stroke",
-                isArray ? colors.arrayBorder : colors.objectBorder
-              )
-              .attr("stroke-width", 0.5);
-
-            // Field name
-            g.append("text")
-              .attr("x", x + 15)
-              .attr("y", contentY + 24)
-              .attr("font-size", "12px")
-              .attr("fill", colors.text)
-              .text(fieldName);
-
-            // Field value
-            const isRef = isAddress(fieldValue);
-            const valueText =
-              fieldValue === null
-                ? "null"
-                : fieldValue === undefined
-                ? "undefined"
-                : String(fieldValue);
-
-            const valueColor =
-              fieldValue === null
-                ? colors.nullValue
-                : isRef
-                ? colors.referenceArrow
-                : colors.text;
-
-            const valueX = x + size.width - 15;
-
-            g.append("text")
-              .attr("x", valueX)
-              .attr("y", contentY + 24)
-              .attr("text-anchor", "end")
-              .attr("font-size", "12px")
-              .attr("font-family", "monospace")
-              .attr("fill", valueColor)
-              .text(valueText);
-
-            // Add connection for reference fields
-            if (isRef) {
-              connections.push({
-                source: {
-                  x: valueX,
-                  y: contentY + 18,
-                },
-                target: fieldValue,
-                label: null,
-              });
-            }
-
-            contentY += heapBoxHeight + fieldSpacing;
-          });
-
-          // Add spacing between fields and elements
-          if (object.elements && object.elements.length > 0) {
-            contentY += 10;
-          }
-        }
-
-        // Draw array elements if any
-        const elements = object.elements || [];
-        if (elements.length > 0) {
-          // Elements section label
-          g.append("rect")
-            .attr("x", x)
-            .attr("y", contentY)
-            .attr("width", size.width)
-            .attr("height", 24)
-            .attr("fill", colors.arrayBorder)
-            .attr("opacity", 0.3)
-            .attr("stroke", "none");
-
-          g.append("text")
-            .attr("x", x + 10)
-            .attr("y", contentY + 16)
-            .attr("font-size", "12px")
-            .attr("font-weight", "bold")
-            .attr("fill", colors.text)
-            .text("Elements");
-
-          contentY += 24;
-
-          // Draw each element with its index
-          elements.forEach((element, index) => {
-            // Element box
-            g.append("rect")
-              .attr("x", x)
-              .attr("y", contentY)
-              .attr("width", size.width)
-              .attr("height", heapBoxHeight)
-              .attr("fill", "rgba(255,255,255,0.7)")
-              .attr("stroke", colors.arrayBorder)
-              .attr("stroke-width", 0.5);
-
-            // Element index
-            g.append("text")
-              .attr("x", x + 15)
-              .attr("y", contentY + 24)
-              .attr("font-size", "12px")
-              .attr("fill", colors.text)
-              .text(`[${index}]`);
-
-            // Element value
-            const isRef = isAddress(element);
-            const valueText =
-              element === null
-                ? "null"
-                : element === undefined
-                ? "undefined"
-                : String(element);
-
-            const valueColor =
-              element === null
-                ? colors.nullValue
-                : isRef
-                ? colors.referenceArrow
-                : colors.text;
-
-            const valueX = x + size.width - 15;
-
-            g.append("text")
-              .attr("x", valueX)
-              .attr("y", contentY + 24)
-              .attr("text-anchor", "end")
-              .attr("font-size", "12px")
-              .attr("font-family", "monospace")
-              .attr("fill", valueColor)
-              .text(valueText);
-
-            // Add connection for reference elements
-            if (isRef) {
-              connections.push({
-                source: {
-                  x: valueX,
-                  y: contentY + 18,
-                },
-                target: element,
-                label: null,
-              });
-            }
-
-            contentY += heapBoxHeight + fieldSpacing;
-          });
-        }
-      });
-
-      // Draw variables last so they appear on top
-      Object.entries(allVariables).forEach(([key, variable]) => {
-        const x = 0;
-        const y = variable.y;
-        const isInstanceVar = variable.type === "instance";
-
-        // Variable box with background color based on type
-        g.append("rect")
-          .attr("x", x)
-          .attr("y", y)
-          .attr("width", variableBoxWidth)
-          .attr("height", variableBoxHeight)
-          .attr(
-            "fill",
-            isInstanceVar ? colors.instanceVariable : colors.localVariable
-          )
-          .attr(
-            "stroke",
-            isInstanceVar
-              ? colors.instanceVariableBorder
-              : colors.localVariableBorder
-          )
-          .attr("rx", 4)
-          .attr("ry", 4);
-
-        // Variable name
-        g.append("text")
-          .attr("x", x + 15)
-          .attr("y", y + 24)
-          .attr("font-size", "13px")
-          .attr("fill", colors.text)
-          .text(variable.name);
-
-        // Variable value
-        const isRef = isAddress(variable.value);
-        const valueText =
-          variable.value === null
-            ? "null"
-            : variable.value === undefined
-            ? "undefined"
-            : String(variable.value);
-
-        const valueColor =
-          variable.value === null
-            ? colors.nullValue
-            : isRef
-            ? colors.referenceArrow
-            : colors.text;
-
-        const valueX = x + variableBoxWidth - 15;
-
-        g.append("text")
-          .attr("x", valueX)
-          .attr("y", y + 24)
-          .attr("text-anchor", "end")
-          .attr("font-size", "13px")
-          .attr("font-family", "monospace")
-          .attr("fill", valueColor)
-          .text(valueText);
-
-        // Add connection if it's a reference
-        if (isRef) {
-          connections.push({
-            source: {
-              x: valueX,
-              y: y + 18,
-            },
-            target: variable.value,
-            label: null,
-          });
-        }
-      });
-
-      // Draw all connections
-      drawConnections();
-
-      // Calculate total height needed and resize SVG if necessary
-      const maxHeapY = Object.values(heapPositions).reduce(
-        (max, pos) => Math.max(max, pos.y + pos.height),
-        0
-      );
-
-      const maxVariableY = Math.max(
-        ...Object.values(allVariables).map((v) => v.y + variableBoxHeight),
-        0 // Ensure we have at least one valid value for max
-      );
-
-      const totalHeight = Math.max(maxHeapY, maxVariableY) + margin.bottom + 40;
-      svg.attr("height", totalHeight + margin.top);
-    } catch (error) {
-      console.error("Error rendering memory visualization:", error);
-      // Display error message in SVG
-      const svg = d3.select(svgRef.current);
-      svg.selectAll("*").remove();
-
-      svg
-        .append("text")
-        .attr("x", 20)
-        .attr("y", 50)
-        .attr("fill", "red")
-        .text(`Error: ${error.message}`);
-    }
-  };
 
   // Navigation functions for snapshot and history
   const goToFirst = () => {
