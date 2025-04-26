@@ -9,6 +9,10 @@ import {
   PauseIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+  RefreshCwIcon,
+  MoveIcon,
 } from "lucide-react";
 
 function DataStructurePage() {
@@ -33,9 +37,13 @@ function DataStructurePage() {
   const [enableMemoryVisualization, setEnableMemoryVisualization] =
     useState(true);
   const [snapshotMode, setSnapshotMode] = useState(true);
+  // Track zoom state with all transform properties
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   const svgRef = useRef(null);
   const autoPlayRef = useRef(null);
+  const zoomRef = useRef(null);
+  const visualizationContainerRef = useRef(null);
 
   // Helper function to check if a value is an address
   const isAddress = (value) => {
@@ -193,19 +201,51 @@ function DataStructurePage() {
 
     console.log("SVG dimensions for rendering:", { width, height });
 
-    // Debug SVG setup with a background rect
-    svg
+    // First, create a fixed background layer that doesn't move or zoom
+    const backgroundLayer = svg.append("g").attr("class", "fixed-background");
+
+    // Add the gray background rectangle that stays fixed
+    backgroundLayer
       .append("rect")
       .attr("width", width)
       .attr("height", height)
       .attr("fill", "#f8fafc")
       .attr("stroke", "#d1d5db");
 
+    // Now create a content layer that will be zoomable and pannable
+    const contentGroup = svg.append("g").attr("class", "zoom-container");
+
+    // Set up the zoom behavior for mouse interaction only
+    const zoom = d3
+      .zoom()
+      .scaleExtent([0.1, 5]) // Min/max zoom levels
+      .translateExtent([
+        [-width * 3, -height * 3],
+        [width * 3, height * 3],
+      ]) // Extra generous panning area
+      .on("zoom", (event) => {
+        // Apply the transform directly to the content group
+        contentGroup.attr("transform", event.transform);
+
+        // Update zoom level for display
+        setZoomLevel(event.transform.k);
+        console.log("Zoom event:", event.transform.k);
+      });
+
+    // Store zoom for reference and manual control
+    zoomRef.current = zoom;
+
+    // Apply zoom behavior to the SVG
+    svg.call(zoom);
+
+    // Initialize with identity transform
+    svg.call(zoom.transform, d3.zoomIdentity);
+
     // Get the current operation
     const operation = operations[currentHistoryIndex];
     if (!operation) {
       console.error("No operation available at index", currentHistoryIndex);
-      svg
+      contentGroup
         .append("text")
         .attr("x", width / 2)
         .attr("y", height / 2)
@@ -222,7 +262,7 @@ function DataStructurePage() {
     console.log("Operations array length:", operations.length);
 
     // Add debug info on the visualization
-    svg
+    contentGroup
       .append("text")
       .attr("x", 10)
       .attr("y", height - 10)
@@ -269,7 +309,7 @@ function DataStructurePage() {
       if (structureType === "WEB_BROWSER") {
         console.log("Rendering WEB_BROWSER visualization");
         renderWebBrowserVisualization(
-          svg,
+          contentGroup,
           width,
           height,
           operation,
@@ -322,7 +362,7 @@ function DataStructurePage() {
 
       if (!memorySnapshot) {
         // No snapshot and no operation state, show error message
-        svg
+        contentGroup
           .append("text")
           .attr("x", width / 2)
           .attr("y", height / 2)
@@ -358,7 +398,7 @@ function DataStructurePage() {
       if (structureType === "WEB_BROWSER") {
         console.log("Rendering WEB_BROWSER visualization with memory snapshot");
         renderWebBrowserVisualization(
-          svg,
+          contentGroup,
           width,
           height,
           effectiveOperation,
@@ -408,7 +448,7 @@ function DataStructurePage() {
       console.error("Error in renderVisualization:", error);
 
       // Add error information to SVG
-      svg
+      contentGroup
         .append("text")
         .attr("x", width / 2)
         .attr("y", height / 2)
@@ -417,7 +457,7 @@ function DataStructurePage() {
         .attr("fill", "#ef4444")
         .text("Error rendering visualization");
 
-      svg
+      contentGroup
         .append("text")
         .attr("x", width / 2)
         .attr("y", height / 2 + 25)
@@ -476,7 +516,7 @@ function DataStructurePage() {
 
   // Add this new function for web browser visualization
   const renderWebBrowserVisualization = (
-    svg,
+    container,
     width,
     height,
     operation,
@@ -562,7 +602,7 @@ function DataStructurePage() {
     };
 
     // Add title for the visualization
-    svg
+    container
       .append("text")
       .attr("x", width / 2)
       .attr("y", 30)
@@ -577,7 +617,7 @@ function DataStructurePage() {
       const operationName =
         operation.operation || operation.operationName || "Unknown operation";
 
-      svg
+      container
         .append("text")
         .attr("x", width / 2)
         .attr("y", 55)
@@ -594,7 +634,7 @@ function DataStructurePage() {
     }
 
     // Add arrowhead definitions for connections
-    const defs = svg.append("defs");
+    const defs = container.append("defs");
 
     // Next pointer (blue)
     defs
@@ -639,7 +679,7 @@ function DataStructurePage() {
       .attr("fill", styles.connection.currentColor);
 
     // 1. Render Local Variables Box
-    const localVarsBox = svg.append("g").attr("class", "local-variables");
+    const localVarsBox = container.append("g").attr("class", "local-variables");
 
     // Adjust height based on number of variables
     const localVarCount = Object.keys(localVariables).length;
@@ -735,7 +775,9 @@ function DataStructurePage() {
     });
 
     // 2. Render Instance Variables Box
-    const instanceVarsBox = svg.append("g").attr("class", "instance-variables");
+    const instanceVarsBox = container
+      .append("g")
+      .attr("class", "instance-variables");
 
     // Adjust height based on number of variables
     const instanceVarCount = Object.keys(instanceVariables).length;
@@ -939,7 +981,7 @@ function DataStructurePage() {
 
     // 5. Render all page nodes
     pageNodes.forEach((node) => {
-      const pageGroup = svg
+      const pageGroup = container
         .append("g")
         .attr("class", "page-node")
         .attr("transform", `translate(${node.x}, ${node.y})`);
@@ -1111,7 +1153,9 @@ function DataStructurePage() {
     // 6. Render Address Object Map Box
     // Only if there's space at the bottom and not too many pages
     if (pageNodes.length <= 5) {
-      const addressMapBox = svg.append("g").attr("class", "address-object-map");
+      const addressMapBox = container
+        .append("g")
+        .attr("class", "address-object-map");
 
       const mapBoxY = height - 120;
       const mapBoxHeight = 160;
@@ -1186,7 +1230,7 @@ function DataStructurePage() {
     }
 
     // 7. Render connections between nodes
-    const connectionsGroup = svg.append("g").attr("class", "connections");
+    const connectionsGroup = container.append("g").attr("class", "connections");
 
     connections.forEach((conn) => {
       let sourcePoint, targetPoint;
@@ -1597,6 +1641,52 @@ function DataStructurePage() {
     }
   };
 
+  // Direct zoom controls that manipulate both the zoom behavior and content group
+  const zoomIn = () => {
+    console.log("Zoom in clicked");
+
+    if (svgRef.current && zoomRef.current) {
+      try {
+        // Directly use D3's scaleBy with a simple approach
+        const svg = d3.select(svgRef.current);
+        svg.call(zoomRef.current.scaleBy, 1.3);
+        console.log("Zoom in applied");
+      } catch (error) {
+        console.error("Error during zoom in:", error);
+      }
+    }
+  };
+
+  const zoomOut = () => {
+    console.log("Zoom out clicked");
+
+    if (svgRef.current && zoomRef.current) {
+      try {
+        // Directly use D3's scaleBy with a simple approach
+        const svg = d3.select(svgRef.current);
+        svg.call(zoomRef.current.scaleBy, 0.7);
+        console.log("Zoom out applied");
+      } catch (error) {
+        console.error("Error during zoom out:", error);
+      }
+    }
+  };
+
+  const resetZoom = () => {
+    console.log("Reset zoom clicked");
+
+    if (svgRef.current && zoomRef.current) {
+      try {
+        // Directly reset to identity transform
+        const svg = d3.select(svgRef.current);
+        svg.call(zoomRef.current.transform, d3.zoomIdentity);
+        console.log("Zoom reset applied");
+      } catch (error) {
+        console.error("Error during zoom reset:", error);
+      }
+    }
+  };
+
   return (
     <div className="h-full overflow-hidden flex flex-col">
       {loading ? (
@@ -1759,13 +1849,48 @@ function DataStructurePage() {
 
             {/* Visualization area */}
             <div className="md:col-span-3 bg-white rounded shadow-md p-2 flex flex-col h-full overflow-hidden">
-              <h2 className="text-md font-bold mb-2 flex-shrink-0">
-                Visualization
-              </h2>
+              <div className="flex justify-between items-center mb-2 flex-shrink-0">
+                <h2 className="text-md font-bold">Visualization</h2>
+                {/* Zoom Controls */}
+                <div className="flex space-x-1">
+                  <div className="text-xs mr-2 text-gray-600">
+                    Zoom: {(zoomLevel * 100).toFixed(0)}%
+                  </div>
+                  <button
+                    onClick={zoomIn}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                    title="Zoom In"
+                  >
+                    <ZoomInIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={zoomOut}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                    title="Zoom Out"
+                  >
+                    <ZoomOutIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={resetZoom}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                    title="Reset Zoom"
+                  >
+                    <RefreshCwIcon className="w-4 h-4" />
+                  </button>
+                  <div
+                    className="p-1 rounded text-gray-700 flex items-center cursor-pointer"
+                    title="Pan by dragging the visualization"
+                  >
+                    <MoveIcon className="w-4 h-4" />
+                    <span className="text-xs ml-1">Pan</span>
+                  </div>
+                </div>
+              </div>
 
               <div
                 className="flex-1 overflow-hidden relative"
                 style={{ minHeight: "500px" }}
+                ref={visualizationContainerRef}
               >
                 <svg
                   ref={svgRef}
