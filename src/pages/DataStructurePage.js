@@ -640,17 +640,6 @@ function DataStructurePage() {
       console.log("Web Browser data from operation state:", browserData);
     }
 
-    // Get the last snapshot of the last operation history if available
-    const lastOpIndex = operations.length - 1;
-    const lastOp = operations[lastOpIndex];
-    const lastSnapshotIndex = lastOp?.memorySnapshots?.length - 1 || 0;
-    const lastSnapshot = lastOp?.memorySnapshots?.[lastSnapshotIndex];
-
-    if (lastSnapshot) {
-      browserData = lastSnapshot;
-      console.log("Using last snapshot of last operation:", browserData);
-    }
-
     // Extract the browser components
     const localVariables = browserData.localVariables || {};
     const instanceVariables = browserData.instanceVariables || {};
@@ -1222,7 +1211,7 @@ function DataStructurePage() {
 
     // 6. Render Address Object Map Box
     // Only if there's space at the bottom and not too many pages
-    if (pageNodes.length <= 5) {
+    if (false) {
       const addressMapBox = container
         .append("g")
         .attr("class", "address-object-map");
@@ -1671,8 +1660,10 @@ function DataStructurePage() {
 
       // If operation has snapshots, get the last one
       let snapshotIndex = -1;
+      let snapshot = null;
       if (operation.memorySnapshots && operation.memorySnapshots.length > 0) {
         snapshotIndex = operation.memorySnapshots.length - 1;
+        snapshot = operation.memorySnapshots[snapshotIndex];
       }
 
       // Clear the existing visualization
@@ -1680,21 +1671,27 @@ function DataStructurePage() {
         d3.select(svgRef.current).selectAll("*").remove();
       }
 
+      // Save selected operation and snapshot in refs for direct access
+      selectedOperationRef.current = operation;
+      selectedSnapshotRef.current = snapshot;
+
       // Update state in one go
       setCurrentHistoryIndex(index);
       setCurrentSnapshotIndex(snapshotIndex);
       setSnapshotMode(snapshotIndex >= 0);
 
-      // Update visualState to keep track of the selected operation
+      // Update visualState to keep track of the selected operation and snapshot
       setVisualState((prev) => ({
         ...prev,
         operationIndex: index,
+        snapshotIndex: snapshotIndex,
+        operation: operation,
+        snapshot: snapshot,
       }));
 
       // Force render
       setTimeout(() => {
         if (snapshotIndex >= 0) {
-          const snapshot = operation.memorySnapshots[snapshotIndex];
           renderVisualization(operation, snapshot);
         } else {
           renderVisualization(operation, null);
