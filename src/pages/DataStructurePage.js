@@ -643,7 +643,7 @@ function DataStructurePage() {
 
     // Adjust height based on number of variables
     const localVarCount = Object.keys(localVariables).length;
-    const localVarsHeight = Math.max(80, 40 + localVarCount * 30 + 20); // Add more bottom padding to match node boxes
+    const localVarsHeight = Math.max(65, 25 + 5 + localVarCount * 30); // Header (25px) + small gap (5px) + variables
     styles.localVars.height = localVarsHeight;
 
     // Box container
@@ -739,7 +739,7 @@ function DataStructurePage() {
 
     // Adjust height based on number of variables
     const instanceVarCount = Object.keys(instanceVariables).length;
-    const instanceVarsHeight = Math.max(80, 40 + instanceVarCount * 30 + 20); // Add more bottom padding to match node boxes
+    const instanceVarsHeight = Math.max(65, 25 + 5 + instanceVarCount * 30); // Header (25px) + small gap (5px) + variables
     styles.instanceVars.height = instanceVarsHeight;
 
     // Box container
