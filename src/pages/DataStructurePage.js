@@ -238,7 +238,7 @@ function DataStructurePage() {
     // Apply zoom behavior to the SVG
     svg.call(zoom);
 
-    // Initialize with identity transform
+    // Initialize with identity transform (will be adjusted after content is rendered)
     svg.call(zoom.transform, d3.zoomIdentity);
 
     // Get the current operation
@@ -315,6 +315,9 @@ function DataStructurePage() {
           operation,
           memorySnapshot
         );
+
+        // Auto-fit the visualization after rendering
+        autoFitVisualization(svg, contentGroup, zoom, width, height);
         return;
       }
 
@@ -444,6 +447,9 @@ function DataStructurePage() {
             renderDefaultVisualization(svg, width, height, effectiveOperation);
         }
       }
+
+      // Auto-fit visualization after rendering
+      autoFitVisualization(svg, contentGroup, zoom, width, height);
     } catch (error) {
       console.error("Error in renderVisualization:", error);
 
@@ -474,41 +480,100 @@ function DataStructurePage() {
     enableMemoryVisualization,
   ]);
 
+  // Add a new function to automatically fit the visualization to the view
+  const autoFitVisualization = (
+    svg,
+    contentGroup,
+    zoom,
+    viewWidth,
+    viewHeight
+  ) => {
+    try {
+      // Give the browser a moment to render the SVG content
+      setTimeout(() => {
+        // Get the bounding box of all content in the content group
+        const contentNode = contentGroup.node();
+        if (!contentNode) return;
+
+        // Check if we have any content to fit
+        if (contentNode.children.length === 0) return;
+
+        // Get the bounding box of the content
+        const contentBBox = contentNode.getBBox();
+
+        // Add some padding
+        const padding = 40;
+        const paddedWidth = contentBBox.width + padding * 2;
+        const paddedHeight = contentBBox.height + padding * 2;
+
+        // Calculate the scale to fit the content
+        const scaleX = viewWidth / paddedWidth;
+        const scaleY = viewHeight / paddedHeight;
+        const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in past 1
+
+        // Calculate the translation to center the content
+        const translateX =
+          (viewWidth - contentBBox.width * scale) / 2 - contentBBox.x * scale;
+        const translateY =
+          (viewHeight - contentBBox.height * scale) / 2 - contentBBox.y * scale;
+
+        // Apply the transform
+        console.log("Auto-fitting visualization:", {
+          contentBBox,
+          scale,
+          translateX,
+          translateY,
+        });
+
+        svg
+          .transition()
+          .duration(500)
+          .call(
+            zoom.transform,
+            d3.zoomIdentity.translate(translateX, translateY).scale(scale)
+          );
+      }, 100); // Short delay to ensure the DOM has rendered
+    } catch (error) {
+      console.error("Error in autoFitVisualization:", error);
+    }
+  };
+
   // Helper to generate curved path between two points
   const generateCurvedPath = (source, target) => {
-    // Calculate horizontal and vertical distance between points
+    // Calculate the vector between points
     const dx = target.x - source.x;
     const dy = target.y - source.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // Determine direction to adjust control points
-    const isRightToLeft = target.x < source.x;
-    const isTopToBottom = target.y > source.y;
+    // Determine if connection is horizontal/vertical/diagonal
+    const isMainlyHorizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
+    const isMainlyVertical = Math.abs(dy) > Math.abs(dx) * 1.5;
 
-    // Adjust control point distances based on total distance
-    const controlPointDistance = Math.min(100, distance * 0.5);
+    // Base control point distance - make more subtle curves
+    const distanceTotal = Math.sqrt(dx * dx + dy * dy);
+    const controlDistance = Math.min(distanceTotal * 0.4, 80);
 
-    // Position control points based on direction
+    // Calculate control points based on direction and orientation
     let cp1x, cp1y, cp2x, cp2y;
 
-    if (Math.abs(dx) > Math.abs(dy) * 2) {
-      // Mostly horizontal path
-      cp1x = source.x + (isRightToLeft ? -0.2 : 0.2) * distance;
+    if (isMainlyHorizontal) {
+      // For horizontal connections (left-to-right or right-to-left)
+      cp1x = source.x + Math.sign(dx) * controlDistance;
       cp1y = source.y;
-      cp2x = target.x + (isRightToLeft ? 0.2 : -0.2) * distance;
+      cp2x = target.x - Math.sign(dx) * controlDistance;
       cp2y = target.y;
-    } else if (Math.abs(dy) > Math.abs(dx) * 2) {
-      // Mostly vertical path
+    } else if (isMainlyVertical) {
+      // For vertical connections (top-to-bottom or bottom-to-top)
       cp1x = source.x;
-      cp1y = source.y + (isTopToBottom ? 0.2 : -0.2) * distance;
+      cp1y = source.y + Math.sign(dy) * controlDistance;
       cp2x = target.x;
-      cp2y = target.y + (isTopToBottom ? -0.2 : 0.2) * distance;
+      cp2y = target.y - Math.sign(dy) * controlDistance;
     } else {
-      // Diagonal path
-      cp1x = source.x + (isRightToLeft ? -0.2 : 0.2) * distance;
-      cp1y = source.y + (isTopToBottom ? 0.2 : -0.2) * distance;
-      cp2x = target.x + (isRightToLeft ? 0.2 : -0.2) * distance;
-      cp2y = target.y + (isTopToBottom ? -0.2 : 0.2) * distance;
+      // For diagonal connections, create a more gentle curve
+      // Use an offset to create more space between arrows
+      cp1x = source.x + Math.sign(dx) * controlDistance;
+      cp1y = source.y + Math.sign(dy) * controlDistance * 0.3;
+      cp2x = target.x - Math.sign(dx) * controlDistance;
+      cp2y = target.y - Math.sign(dy) * controlDistance * 0.3;
     }
 
     return `M ${source.x} ${source.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
@@ -1232,37 +1297,112 @@ function DataStructurePage() {
     // 7. Render connections between nodes
     const connectionsGroup = container.append("g").attr("class", "connections");
 
+    // Helper function to determine the best exit/entry points for arrows
+    const getConnectionPoints = (sourceNode, targetNode, connectionType) => {
+      const source = pagePositions[sourceNode];
+      const target = pagePositions[targetNode];
+
+      if (!source || !target) {
+        return { sourcePoint: null, targetPoint: null };
+      }
+
+      // Determine if nodes are in same row or column
+      const isHorizontal = Math.abs(source.y - target.y) < 50;
+      const isVertical = Math.abs(source.x - target.x) < 50;
+      const isLeftToRight = source.x < target.x;
+      const isTopToBottom = source.y < target.y;
+
+      let sourcePoint, targetPoint;
+
+      // Calculate edge points based on connection type and relative positions
+      if (connectionType === "next") {
+        // For next pointers - prefer right-to-left connections
+        if (isLeftToRight) {
+          // Source at right edge of "next" field
+          sourcePoint = {
+            x: source.x + styles.page.width,
+            y: source.y + 100, // Near the next field
+          };
+          // Target at left edge
+          targetPoint = {
+            x: target.x,
+            y: target.y + 25, // Top section of target
+          };
+        } else {
+          // If target is to the left, exit from bottom
+          sourcePoint = {
+            x: source.x + styles.page.width - 50,
+            y: source.y + styles.page.height,
+          };
+          // Enter from bottom right
+          targetPoint = {
+            x: target.x + styles.page.width - 50,
+            y: target.y + styles.page.height,
+          };
+        }
+      } else if (connectionType === "prev") {
+        // For prev pointers - similar to next pointers but reversed direction
+        if (!isLeftToRight) {
+          // Source at left edge of "prev" field
+          sourcePoint = {
+            x: source.x,
+            y: source.y + 70, // Near the prev field
+          };
+          // Target at right edge, at the header/address section
+          targetPoint = {
+            x: target.x + styles.page.width,
+            y: target.y + 12, // Target the header/address area
+          };
+        } else {
+          // If target is to the right, use different exit/entry points
+          sourcePoint = {
+            x: source.x,
+            y: source.y + 70, // Near the prev field
+          };
+          // Enter at address/header section from left
+          targetPoint = {
+            x: target.x,
+            y: target.y + 12, // Target the header/address area
+          };
+        }
+      } else {
+        // Default - connect centers
+        sourcePoint = {
+          x: source.x + styles.page.width / 2,
+          y: source.y + styles.page.height / 2,
+        };
+        targetPoint = {
+          x: target.x + styles.page.width / 2,
+          y: target.y + styles.page.height / 2,
+        };
+      }
+
+      return { sourcePoint, targetPoint };
+    };
+
     connections.forEach((conn) => {
       let sourcePoint, targetPoint;
 
       // Special case for 'current' source
       if (conn.source === "current") {
         sourcePoint = conn.sourcePoint;
-      } else {
-        const sourcePos = pagePositions[conn.source];
-        if (!sourcePos) return;
 
-        sourcePoint = {
-          x: sourcePos.x + styles.page.width / 2,
-          y: sourcePos.y + styles.page.height / 2,
+        // Get target position
+        const targetPos = pagePositions[conn.target];
+        if (!targetPos) return;
+
+        // Current pointer should connect to the top of the box
+        targetPoint = {
+          x: targetPos.x + styles.page.width / 2,
+          y: targetPos.y,
         };
-      }
+      } else {
+        // Use the helper function to get optimal connection points
+        const points = getConnectionPoints(conn.source, conn.target, conn.type);
+        if (!points.sourcePoint || !points.targetPoint) return;
 
-      const targetPos = pagePositions[conn.target];
-      if (!targetPos) return;
-
-      targetPoint = {
-        x: targetPos.x + styles.page.width / 2,
-        y: targetPos.y + styles.page.height / 2,
-      };
-
-      // Adjust source and target points based on connection type
-      if (conn.type === "next") {
-        sourcePoint.x = sourcePoint.x + styles.page.width / 2;
-        targetPoint.x = targetPoint.x - styles.page.width / 2;
-      } else if (conn.type === "prev") {
-        sourcePoint.x = sourcePoint.x - styles.page.width / 2;
-        targetPoint.x = targetPoint.x + styles.page.width / 2;
+        sourcePoint = points.sourcePoint;
+        targetPoint = points.targetPoint;
       }
 
       // Generate curved path
@@ -1296,7 +1436,9 @@ function DataStructurePage() {
         .attr("stroke", color)
         .attr("stroke-width", styles.connection.width)
         .attr("marker-end", marker)
-        .attr("opacity", 0.8);
+        .attr("stroke-opacity", 0.8)
+        .attr("stroke-linecap", "round")
+        .attr("stroke-linejoin", "round");
 
       // Add label if needed
       if (conn.label) {
@@ -1877,13 +2019,6 @@ function DataStructurePage() {
                   >
                     <RefreshCwIcon className="w-4 h-4" />
                   </button>
-                  <div
-                    className="p-1 rounded text-gray-700 flex items-center cursor-pointer"
-                    title="Pan by dragging the visualization"
-                  >
-                    <MoveIcon className="w-4 h-4" />
-                    <span className="text-xs ml-1">Pan</span>
-                  </div>
                 </div>
               </div>
 
