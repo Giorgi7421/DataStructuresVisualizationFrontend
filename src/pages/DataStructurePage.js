@@ -1039,7 +1039,7 @@ function DataStructurePage() {
         type: "current",
         sourcePoint: {
           x: width - 50 - styles.instanceVars.width / 2,
-          y: 80 + styles.instanceVars.height + 5,
+          y: 80 + styles.instanceVars.height, // Remove the gap of 5px
         },
       });
     }
@@ -1394,7 +1394,7 @@ function DataStructurePage() {
         // Current pointer should connect to the top of the box
         targetPoint = {
           x: targetPos.x + styles.page.width / 2,
-          y: targetPos.y,
+          y: targetPos.y + 0.5, // Adjust to eliminate any gap - connect directly to the box
         };
       } else {
         // Use the helper function to get optimal connection points
