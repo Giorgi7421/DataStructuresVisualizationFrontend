@@ -39,11 +39,24 @@ function DataStructurePage() {
   const [snapshotMode, setSnapshotMode] = useState(true);
   // Track zoom state with all transform properties
   const [zoomLevel, setZoomLevel] = useState(1);
+  // Add a forceRender state to help with UI updates
+  const [forceRender, setForceRender] = useState(0);
+
+  // Create completely separate visualization state
+  const [visualState, setVisualState] = useState({
+    operationIndex: null,
+    snapshotIndex: null,
+    operation: null,
+    snapshot: null,
+  });
 
   const svgRef = useRef(null);
   const autoPlayRef = useRef(null);
   const zoomRef = useRef(null);
   const visualizationContainerRef = useRef(null);
+  // Add refs to track the selected operation and snapshot
+  const selectedOperationRef = useRef(null);
+  const selectedSnapshotRef = useRef(null);
 
   // Helper function to check if a value is an address
   const isAddress = (value) => {
@@ -176,292 +189,333 @@ function DataStructurePage() {
     }
   }, [dsDetails]);
 
-  // Find the renderVisualization function
-  const renderVisualization = useCallback(() => {
-    console.log("Starting renderVisualization");
-
-    if (!svgRef.current) {
-      console.error("SVG reference is not available");
-      return;
-    }
-
-    if (!dataStructure) {
-      console.error("Data structure is not available");
-      return;
-    }
-
-    // Clear existing visualization
-    d3.select(svgRef.current).selectAll("*").remove();
-    console.log("Cleared previous visualization");
-
-    // Create a new SVG
-    const svg = d3.select(svgRef.current);
-    const width = parseInt(svg.style("width")) || 800;
-    const height = parseInt(svg.style("height")) || 600;
-
-    console.log("SVG dimensions for rendering:", { width, height });
-
-    // First, create a fixed background layer that doesn't move or zoom
-    const backgroundLayer = svg.append("g").attr("class", "fixed-background");
-
-    // Add the gray background rectangle that stays fixed
-    backgroundLayer
-      .append("rect")
-      .attr("width", width)
-      .attr("height", height)
-      .attr("fill", "#f8fafc")
-      .attr("stroke", "#d1d5db");
-
-    // Now create a content layer that will be zoomable and pannable
-    const contentGroup = svg.append("g").attr("class", "zoom-container");
-
-    // Set up the zoom behavior for mouse interaction only
-    const zoom = d3
-      .zoom()
-      .scaleExtent([0.1, 5]) // Min/max zoom levels
-      .translateExtent([
-        [-width * 3, -height * 3],
-        [width * 3, height * 3],
-      ]) // Extra generous panning area
-      .on("zoom", (event) => {
-        // Apply the transform directly to the content group
-        contentGroup.attr("transform", event.transform);
-
-        // Update zoom level for display
-        setZoomLevel(event.transform.k);
-        console.log("Zoom event:", event.transform.k);
-      });
-
-    // Store zoom for reference and manual control
-    zoomRef.current = zoom;
-
-    // Apply zoom behavior to the SVG
-    svg.call(zoom);
-
-    // Initialize with identity transform (will be adjusted after content is rendered)
-    svg.call(zoom.transform, d3.zoomIdentity);
-
-    // Get the current operation
-    const operation = operations[currentHistoryIndex];
-    if (!operation) {
-      console.error("No operation available at index", currentHistoryIndex);
-      contentGroup
-        .append("text")
-        .attr("x", width / 2)
-        .attr("y", height / 2)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "16px")
-        .text("No operation data available");
-      return;
-    }
-
-    console.log("Current Operation:", operation);
-    console.log("Structure Type:", dataStructure.type);
-    console.log("Current History Index:", currentHistoryIndex);
-    console.log("Current Snapshot Index:", currentSnapshotIndex);
-    console.log("Operations array length:", operations.length);
-
-    // Get the specific memorySnapshot from the operation
-    let memorySnapshot = null;
-    if (operation.memorySnapshots && operation.memorySnapshots.length > 0) {
-      const validSnapshotIndex = Math.min(
-        Math.max(0, currentSnapshotIndex),
-        operation.memorySnapshots.length - 1
-      );
-
-      memorySnapshot = operation.memorySnapshots[validSnapshotIndex];
+  // Find and modify the renderVisualization function to properly handle operation selection
+  const renderVisualization = useCallback(
+    (directOperation = null, directSnapshot = null) => {
       console.log(
-        `Rendering snapshot ${validSnapshotIndex + 1}/${
-          operation.memorySnapshots.length
-        } of operation ${operation.operationName || operation.operation}`
+        "Starting renderVisualization with forceRender:",
+        forceRender
       );
-    } else {
-      console.log(
-        `No memory snapshots available for operation ${
-          operation.operationName || operation.operation
-        }`
-      );
-    }
+      console.log("Direct operation:", directOperation);
+      console.log("Direct snapshot:", directSnapshot);
 
-    console.log("Memory Snapshot:", memorySnapshot);
-
-    try {
-      const structureType = (dataStructure.type || "").toUpperCase();
-
-      // Special case for web browser visualization
-      if (structureType === "WEB_BROWSER") {
-        console.log("Rendering WEB_BROWSER visualization");
-        renderWebBrowserVisualization(
-          contentGroup,
-          width,
-          height,
-          operation,
-          memorySnapshot
-        );
-
-        // Auto-fit the visualization after rendering
-        autoFitVisualization(svg, contentGroup, zoom, width, height);
+      if (!svgRef.current) {
+        console.error("SVG reference is not available");
         return;
       }
 
-      // FALLBACK: If there's no specific selected memory snapshot, use the operation state directly
-      if (!memorySnapshot && operation.state) {
+      if (!dataStructure) {
+        console.error("Data structure is not available");
+        return;
+      }
+
+      // Clear existing visualization
+      d3.select(svgRef.current).selectAll("*").remove();
+      console.log("Cleared previous visualization");
+
+      // Create a new SVG
+      const svg = d3.select(svgRef.current);
+      const width = parseInt(svg.style("width")) || 800;
+      const height = parseInt(svg.style("height")) || 600;
+
+      console.log("SVG dimensions for rendering:", { width, height });
+
+      // First, create a fixed background layer that doesn't move or zoom
+      const backgroundLayer = svg.append("g").attr("class", "fixed-background");
+
+      // Add the gray background rectangle that stays fixed
+      backgroundLayer
+        .append("rect")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("fill", "#f8fafc")
+        .attr("stroke", "#d1d5db");
+
+      // Now create a content layer that will be zoomable and pannable
+      const contentGroup = svg.append("g").attr("class", "zoom-container");
+
+      // Set up the zoom behavior for mouse interaction only
+      const zoom = d3
+        .zoom()
+        .scaleExtent([0.1, 5]) // Min/max zoom levels
+        .translateExtent([
+          [-width * 3, -height * 3],
+          [width * 3, height * 3],
+        ]) // Extra generous panning area
+        .on("zoom", (event) => {
+          // Apply the transform directly to the content group
+          contentGroup.attr("transform", event.transform);
+
+          // Update zoom level for display
+          setZoomLevel(event.transform.k);
+          console.log("Zoom event:", event.transform.k);
+        });
+
+      // Store zoom for reference and manual control
+      zoomRef.current = zoom;
+
+      // Initialize zoom on the SVG
+      svg.call(zoom);
+
+      // Reset zoom to initial position
+      svg.call(zoom.transform, d3.zoomIdentity);
+
+      // Determine which operation to render:
+      // 1. If provided directly as parameter, use that
+      // 2. Otherwise use current state
+      let operation;
+      let memorySnapshot = null;
+
+      // Priority 1: Use direct parameters if provided
+      if (directOperation) {
+        operation = directOperation;
+        memorySnapshot = directSnapshot;
+        console.log("Using directly provided operation and snapshot");
+      }
+      // Priority 2: Use current state
+      else if (
+        currentHistoryIndex >= 0 &&
+        currentHistoryIndex < operations.length
+      ) {
+        operation = operations[currentHistoryIndex];
         console.log(
-          "Using operation state directly since no memory snapshot is available"
+          `Rendering operation ${currentHistoryIndex + 1}/${operations.length}`
         );
 
-        // Create a modified operation object with the current snapshot data
-        const newOperation = { ...operation };
+        // Always use the memory snapshot if we're in snapshot mode and it's available
+        if (
+          snapshotMode &&
+          operation.memorySnapshots &&
+          operation.memorySnapshots.length > 0
+        ) {
+          const validSnapshotIndex = Math.min(
+            Math.max(0, currentSnapshotIndex),
+            operation.memorySnapshots.length - 1
+          );
 
-        // Determine visualization method based on structure type
-        console.log("Structure type for visualization:", structureType);
+          memorySnapshot = operation.memorySnapshots[validSnapshotIndex];
+          console.log(
+            `Rendering snapshot ${validSnapshotIndex + 1}/${
+              operation.memorySnapshots.length
+            } of operation ${operation.operationName || operation.operation}`
+          );
+        }
+      } else {
+        console.error("No valid operation to render");
+        return;
+      }
+
+      if (
+        !memorySnapshot &&
+        operation.memorySnapshots &&
+        operation.memorySnapshots.length > 0
+      ) {
+        // No memory snapshot specified yet, default to the last one
+        memorySnapshot =
+          operation.memorySnapshots[operation.memorySnapshots.length - 1];
+        console.log("Defaulting to last snapshot for operation");
+      } else if (!memorySnapshot) {
+        console.log(
+          `No memory snapshots available for operation ${
+            operation.operationName || operation.operation
+          }`
+        );
+      }
+
+      console.log("Memory Snapshot for rendering:", memorySnapshot);
+
+      try {
+        const structureType = (dataStructure.type || "").toUpperCase();
+
+        // Special case for web browser visualization
+        if (structureType === "WEB_BROWSER") {
+          console.log("Rendering WEB_BROWSER visualization");
+          renderWebBrowserVisualization(
+            contentGroup,
+            width,
+            height,
+            operation,
+            memorySnapshot
+          );
+
+          // Auto-fit the visualization after rendering
+          autoFitVisualization(svg, contentGroup, zoom, width, height);
+          return;
+        }
+
+        // FALLBACK: If there's no specific selected memory snapshot, use the operation state directly
+        if (!memorySnapshot && operation.state) {
+          console.log(
+            "Using operation state directly since no memory snapshot is available"
+          );
+
+          // Create a modified operation object with the current snapshot data
+          const newOperation = { ...operation };
+
+          // Determine visualization method based on structure type
+          console.log("Structure type for visualization:", structureType);
+
+          // Select the appropriate visualization method
+          if (enableMemoryVisualization) {
+            console.log("Using memory visualization (no snapshots)");
+            renderMemoryVisualization(newOperation, svgRef);
+          } else {
+            switch (structureType) {
+              case "VECTOR":
+                console.log("Using array visualization (no snapshots)");
+                renderArrayVisualization(svg, width, height, newOperation);
+                break;
+              case "LINKED_LIST":
+                renderLinkedListVisualization(svg, width, height, newOperation);
+                break;
+              case "TREE":
+                renderTreeVisualization(svg, width, height, newOperation);
+                break;
+              case "STACK":
+              case "QUEUE":
+                renderStackQueueVisualization(svg, width, height, newOperation);
+                break;
+              case "MAP":
+                renderHashMapVisualization(svg, width, height, newOperation);
+                break;
+              default:
+                renderDefaultVisualization(svg, width, height, newOperation);
+            }
+          }
+          return;
+        }
+
+        if (!memorySnapshot) {
+          // No snapshot and no operation state, show error message
+          contentGroup
+            .append("text")
+            .attr("x", width / 2)
+            .attr("y", height / 2)
+            .attr("text-anchor", "middle")
+            .text("No memory data available to visualize");
+          console.error("No memory snapshot or state data available");
+          return;
+        }
+
+        // Create a modified operation object with the current snapshot data
+        const effectiveOperation = { ...operation };
+
+        // Override operation state with snapshot data
+        effectiveOperation.state = {
+          ...effectiveOperation.state,
+          instanceVariables: memorySnapshot.instanceVariables || {},
+          localVariables: memorySnapshot.localVariables || {},
+          addressObjectMap: memorySnapshot.addressObjectMap || {},
+          elements: extractElementsFromSnapshot(
+            memorySnapshot,
+            dataStructure.type
+          ),
+          result: memorySnapshot.getResult,
+          message: memorySnapshot.message,
+        };
+
+        console.log(
+          "Effective operation state for rendering:",
+          effectiveOperation.state
+        );
+
+        // Special case for web browser visualization
+        if (structureType === "WEB_BROWSER") {
+          console.log(
+            "Rendering WEB_BROWSER visualization with memory snapshot"
+          );
+          renderWebBrowserVisualization(
+            contentGroup,
+            width,
+            height,
+            effectiveOperation,
+            memorySnapshot
+          );
+          return;
+        }
 
         // Select the appropriate visualization method
         if (enableMemoryVisualization) {
-          console.log("Using memory visualization (no snapshots)");
-          renderMemoryVisualization(newOperation, svgRef);
+          console.log("Using memory visualization");
+          renderMemoryVisualization(effectiveOperation, svgRef);
         } else {
           switch (structureType) {
             case "VECTOR":
-              console.log("Using array visualization (no snapshots)");
-              renderArrayVisualization(svg, width, height, newOperation);
+              console.log("Using array visualization");
+              renderArrayVisualization(svg, width, height, effectiveOperation);
               break;
             case "LINKED_LIST":
-              renderLinkedListVisualization(svg, width, height, newOperation);
+              renderLinkedListVisualization(
+                svg,
+                width,
+                height,
+                effectiveOperation
+              );
               break;
             case "TREE":
-              renderTreeVisualization(svg, width, height, newOperation);
+              renderTreeVisualization(svg, width, height, effectiveOperation);
               break;
             case "STACK":
             case "QUEUE":
-              renderStackQueueVisualization(svg, width, height, newOperation);
+              renderStackQueueVisualization(
+                svg,
+                width,
+                height,
+                effectiveOperation
+              );
               break;
             case "MAP":
-              renderHashMapVisualization(svg, width, height, newOperation);
+              renderHashMapVisualization(
+                svg,
+                width,
+                height,
+                effectiveOperation
+              );
               break;
             default:
-              renderDefaultVisualization(svg, width, height, newOperation);
+              renderDefaultVisualization(
+                svg,
+                width,
+                height,
+                effectiveOperation
+              );
           }
         }
-        return;
-      }
 
-      if (!memorySnapshot) {
-        // No snapshot and no operation state, show error message
+        // Auto-fit visualization after rendering
+        autoFitVisualization(svg, contentGroup, zoom, width, height);
+      } catch (error) {
+        console.error("Error in renderVisualization:", error);
+
+        // Add error information to SVG
         contentGroup
           .append("text")
           .attr("x", width / 2)
           .attr("y", height / 2)
           .attr("text-anchor", "middle")
-          .text("No memory data available to visualize");
-        console.error("No memory snapshot or state data available");
-        return;
+          .attr("font-size", "16px")
+          .attr("fill", "#ef4444")
+          .text("Error rendering visualization");
+
+        contentGroup
+          .append("text")
+          .attr("x", width / 2)
+          .attr("y", height / 2 + 25)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "12px")
+          .attr("fill", "#ef4444")
+          .text(error.message);
       }
-
-      // Create a modified operation object with the current snapshot data
-      const effectiveOperation = { ...operation };
-
-      // Override operation state with snapshot data
-      effectiveOperation.state = {
-        ...effectiveOperation.state,
-        instanceVariables: memorySnapshot.instanceVariables || {},
-        localVariables: memorySnapshot.localVariables || {},
-        addressObjectMap: memorySnapshot.addressObjectMap || {},
-        elements: extractElementsFromSnapshot(
-          memorySnapshot,
-          dataStructure.type
-        ),
-        result: memorySnapshot.getResult,
-        message: memorySnapshot.message,
-      };
-
-      console.log(
-        "Effective operation state for rendering:",
-        effectiveOperation.state
-      );
-
-      // Special case for web browser visualization
-      if (structureType === "WEB_BROWSER") {
-        console.log("Rendering WEB_BROWSER visualization with memory snapshot");
-        renderWebBrowserVisualization(
-          contentGroup,
-          width,
-          height,
-          effectiveOperation,
-          memorySnapshot
-        );
-        return;
-      }
-
-      // Select the appropriate visualization method
-      if (enableMemoryVisualization) {
-        console.log("Using memory visualization");
-        renderMemoryVisualization(effectiveOperation, svgRef);
-      } else {
-        switch (structureType) {
-          case "VECTOR":
-            console.log("Using array visualization");
-            renderArrayVisualization(svg, width, height, effectiveOperation);
-            break;
-          case "LINKED_LIST":
-            renderLinkedListVisualization(
-              svg,
-              width,
-              height,
-              effectiveOperation
-            );
-            break;
-          case "TREE":
-            renderTreeVisualization(svg, width, height, effectiveOperation);
-            break;
-          case "STACK":
-          case "QUEUE":
-            renderStackQueueVisualization(
-              svg,
-              width,
-              height,
-              effectiveOperation
-            );
-            break;
-          case "MAP":
-            renderHashMapVisualization(svg, width, height, effectiveOperation);
-            break;
-          default:
-            renderDefaultVisualization(svg, width, height, effectiveOperation);
-        }
-      }
-
-      // Auto-fit visualization after rendering
-      autoFitVisualization(svg, contentGroup, zoom, width, height);
-    } catch (error) {
-      console.error("Error in renderVisualization:", error);
-
-      // Add error information to SVG
-      contentGroup
-        .append("text")
-        .attr("x", width / 2)
-        .attr("y", height / 2)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "16px")
-        .attr("fill", "#ef4444")
-        .text("Error rendering visualization");
-
-      contentGroup
-        .append("text")
-        .attr("x", width / 2)
-        .attr("y", height / 2 + 25)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "12px")
-        .attr("fill", "#ef4444")
-        .text(error.message);
-    }
-  }, [
-    operations,
-    currentHistoryIndex,
-    currentSnapshotIndex,
-    dataStructure,
-    enableMemoryVisualization,
-  ]);
+    },
+    [
+      dataStructure,
+      currentHistoryIndex,
+      currentSnapshotIndex,
+      enableMemoryVisualization,
+      snapshotMode,
+      forceRender, // Add dependency on forceRender
+    ]
+  );
 
   // Add a new function to automatically fit the visualization to the view
   const autoFitVisualization = (
@@ -1605,17 +1659,50 @@ function DataStructurePage() {
     }
   };
 
-  // Select a specific operation from the history list
+  // Modify the selectOperation function to be more robust
   const selectOperation = (index) => {
-    setCurrentHistoryIndex(index);
-
-    // Reset snapshot index to the last snapshot of this operation
-    if (operations[index]?.memorySnapshots?.length > 0) {
-      setCurrentSnapshotIndex(operations[index].memorySnapshots.length - 1);
+    if (index < 0 || index >= operations.length) {
+      return;
     }
 
-    // Exit snapshot mode when selecting a different operation
-    setSnapshotMode(false);
+    try {
+      // Get the operation
+      const operation = operations[index];
+
+      // If operation has snapshots, get the last one
+      let snapshotIndex = -1;
+      if (operation.memorySnapshots && operation.memorySnapshots.length > 0) {
+        snapshotIndex = operation.memorySnapshots.length - 1;
+      }
+
+      // Clear the existing visualization
+      if (svgRef.current) {
+        d3.select(svgRef.current).selectAll("*").remove();
+      }
+
+      // Update state in one go
+      setCurrentHistoryIndex(index);
+      setCurrentSnapshotIndex(snapshotIndex);
+      setSnapshotMode(snapshotIndex >= 0);
+
+      // Update visualState to keep track of the selected operation
+      setVisualState((prev) => ({
+        ...prev,
+        operationIndex: index,
+      }));
+
+      // Force render
+      setTimeout(() => {
+        if (snapshotIndex >= 0) {
+          const snapshot = operation.memorySnapshots[snapshotIndex];
+          renderVisualization(operation, snapshot);
+        } else {
+          renderVisualization(operation, null);
+        }
+      }, 50);
+    } catch (error) {
+      console.error("Error in selectOperation:", error);
+    }
   };
 
   // Get operation options based on the data structure type
@@ -1780,6 +1867,249 @@ function DataStructurePage() {
     }
   };
 
+  // Add a specific useEffect to handle snapshot index updates
+  useEffect(() => {
+    if (dataStructure && operations.length > 0) {
+      // This effect will run when snapshotIndex changes
+      renderVisualization();
+    }
+  }, [dataStructure, currentSnapshotIndex, renderVisualization, operations]);
+
+  // Add a new function to force render with specific operation and snapshot
+  const forceRenderWithOperation = (operationIndex, snapshotIndex) => {
+    try {
+      if (
+        operationIndex < 0 ||
+        operationIndex >= operations.length ||
+        !operations[operationIndex]
+      ) {
+        console.error(`Invalid operation index: ${operationIndex}`);
+        return;
+      }
+
+      const operation = operations[operationIndex];
+
+      // Always completely clear the DOM first
+      const visualizationContainer = d3.select("#visualization-container");
+      visualizationContainer.selectAll("*").remove();
+
+      // Set a timeout to ensure DOM is ready
+      setTimeout(() => {
+        // Determine if we should use a snapshot or the operation state
+        if (
+          snapshotIndex >= 0 &&
+          operation.memorySnapshots &&
+          snapshotIndex < operation.memorySnapshots.length
+        ) {
+          const snapshot = operation.memorySnapshots[snapshotIndex];
+          console.log(`Rendering with snapshot at index ${snapshotIndex}`);
+
+          // Render the visualization with the operation and snapshot
+          renderVisualization(operation, snapshot);
+
+          // Update state for consistency (but rendering is already done)
+          setCurrentHistoryIndex(operationIndex);
+          setCurrentSnapshotIndex(snapshotIndex);
+          setSnapshotMode(true);
+        } else {
+          console.log("Rendering with operation state (no snapshot)");
+
+          // Render the visualization with the operation alone
+          renderVisualization(operation, null);
+
+          // Update state for consistency (but rendering is already done)
+          setCurrentHistoryIndex(operationIndex);
+          setCurrentSnapshotIndex(-1);
+          setSnapshotMode(false);
+        }
+      }, 50);
+    } catch (error) {
+      console.error("Error in forceRenderWithOperation:", error);
+    }
+  };
+
+  // Create a separate render function specifically for clicked operations
+  const renderSelectedOperation = useCallback(() => {
+    console.log("Rendering selected operation:", visualState);
+    if (!visualState.operation || !visualState.snapshot) {
+      console.log("No visualization state set");
+      return;
+    }
+
+    if (!svgRef.current) {
+      console.error("SVG reference is not available");
+      return;
+    }
+
+    // Clear existing visualization
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove();
+    console.log("Cleared previous visualization for direct rendering");
+
+    const width = parseInt(svg.style("width")) || 800;
+    const height = parseInt(svg.style("height")) || 600;
+
+    // Create background and content layers
+    const backgroundLayer = svg.append("g").attr("class", "fixed-background");
+    backgroundLayer
+      .append("rect")
+      .attr("width", width)
+      .attr("height", height)
+      .attr("fill", "#f8fafc")
+      .attr("stroke", "#d1d5db");
+
+    const contentGroup = svg.append("g").attr("class", "zoom-container");
+
+    // Set up zoom behavior
+    const zoom = d3
+      .zoom()
+      .scaleExtent([0.1, 5])
+      .translateExtent([
+        [-width * 3, -height * 3],
+        [width * 3, height * 3],
+      ])
+      .on("zoom", (event) => {
+        contentGroup.attr("transform", event.transform);
+        setZoomLevel(event.transform.k);
+      });
+
+    zoomRef.current = zoom;
+    svg.call(zoom);
+    svg.call(zoom.transform, d3.zoomIdentity);
+
+    console.log("Direct rendering operation:", visualState.operation);
+    console.log("Direct rendering snapshot:", visualState.snapshot);
+
+    try {
+      const structureType = (dataStructure.type || "").toUpperCase();
+
+      // Create an effective operation with the snapshot data
+      const effectiveOperation = { ...visualState.operation };
+      const memorySnapshot = visualState.snapshot;
+
+      // Override operation state with snapshot data
+      effectiveOperation.state = {
+        ...effectiveOperation.state,
+        instanceVariables: memorySnapshot.instanceVariables || {},
+        localVariables: memorySnapshot.localVariables || {},
+        addressObjectMap: memorySnapshot.addressObjectMap || {},
+        elements: extractElementsFromSnapshot(
+          memorySnapshot,
+          dataStructure.type
+        ),
+        result: memorySnapshot.getResult,
+        message: memorySnapshot.message,
+      };
+
+      // Special case for web browser visualization
+      if (structureType === "WEB_BROWSER") {
+        console.log("Direct rendering WEB_BROWSER visualization");
+        renderWebBrowserVisualization(
+          contentGroup,
+          width,
+          height,
+          effectiveOperation,
+          memorySnapshot
+        );
+
+        // Auto-fit the visualization
+        autoFitVisualization(svg, contentGroup, zoom, width, height);
+        return;
+      }
+
+      // For other data structures
+      if (enableMemoryVisualization) {
+        console.log("Direct rendering using memory visualization");
+        renderMemoryVisualization(effectiveOperation, svgRef);
+      } else {
+        switch (structureType) {
+          case "VECTOR":
+            console.log("Direct rendering array visualization");
+            renderArrayVisualization(svg, width, height, effectiveOperation);
+            break;
+          case "LINKED_LIST":
+            renderLinkedListVisualization(
+              svg,
+              width,
+              height,
+              effectiveOperation
+            );
+            break;
+          case "TREE":
+            renderTreeVisualization(svg, width, height, effectiveOperation);
+            break;
+          case "STACK":
+          case "QUEUE":
+            renderStackQueueVisualization(
+              svg,
+              width,
+              height,
+              effectiveOperation
+            );
+            break;
+          case "MAP":
+            renderHashMapVisualization(svg, width, height, effectiveOperation);
+            break;
+          default:
+            renderDefaultVisualization(svg, width, height, effectiveOperation);
+        }
+      }
+
+      // Auto-fit the visualization
+      autoFitVisualization(svg, contentGroup, zoom, width, height);
+    } catch (error) {
+      console.error("Error in renderSelectedOperation:", error);
+
+      // Show error message
+      const contentGroup = svg.append("g");
+      contentGroup
+        .append("text")
+        .attr("x", width / 2)
+        .attr("y", height / 2)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#ef4444")
+        .text("Error rendering visualization");
+
+      contentGroup
+        .append("text")
+        .attr("x", width / 2)
+        .attr("y", height / 2 + 25)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
+        .attr("fill", "#ef4444")
+        .text(error.message);
+    }
+  }, [visualState, dataStructure, enableMemoryVisualization]);
+
+  // Effect to render selected operation when visual state changes
+  useEffect(() => {
+    if (visualState.operation && visualState.snapshot) {
+      renderSelectedOperation();
+    }
+  }, [visualState, renderSelectedOperation]);
+
+  // Add a standalone function to render a specific operation and snapshot directly
+  const renderSpecificOperationDirectly = (operationObj, snapshotObj) => {
+    console.log("Direct rendering operation:", operationObj);
+    console.log("With snapshot:", snapshotObj);
+
+    try {
+      // First select the visualization SVG and clear it
+      const svg = d3.select(svgRef.current);
+      svg.selectAll("*").remove();
+
+      // Force a slight delay to ensure DOM updates have completed
+      setTimeout(() => {
+        // Use our improved renderVisualization function with direct params
+        renderVisualization(operationObj, snapshotObj);
+        console.log("Direct visualization completed using renderVisualization");
+      }, 50); // Small delay to ensure DOM is ready
+    } catch (error) {
+      console.error("Error rendering visualization directly:", error);
+    }
+  };
+
   return (
     <div className="h-full overflow-hidden flex flex-col">
       {loading ? (
@@ -1895,14 +2225,15 @@ function DataStructurePage() {
                           // Calculate the original index since we reversed the array
                           const originalIndex = operations.length - 1 - index;
                           return (
-                            <li
+                            <div
                               key={originalIndex}
-                              className={`py-2 px-1 text-xs ${
+                              className={`w-full text-left py-2 px-1 text-xs ${
                                 originalIndex === currentHistoryIndex
-                                  ? "bg-blue-100"
-                                  : ""
+                                  ? "bg-blue-100 font-bold"
+                                  : "hover:bg-blue-50"
                               }`}
                               onClick={() => selectOperation(originalIndex)}
+                              style={{ cursor: "pointer" }}
                             >
                               <div className="font-semibold text-blue-700">
                                 {op.operation}
@@ -1926,7 +2257,7 @@ function DataStructurePage() {
                                   </span>
                                 </div>
                               )}
-                            </li>
+                            </div>
                           );
                         })}
                       </ul>
