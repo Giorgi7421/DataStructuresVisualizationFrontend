@@ -945,11 +945,29 @@ function DataStructurePage() {
 
     // Find starting point (page with no previous)
     let startAddress = null;
+    const processedAddresses = new Set();
+    const nodesToProcess = [];
+
+    // First try to find a node with no previous that has a next (real start of a chain)
     for (const addr of addresses) {
       const page = addressObjectMap[addr];
-      if (!isValidAddress(page.previousAddress)) {
+      if (
+        !isValidAddress(page.previousAddress) &&
+        isValidAddress(page.nextAddress)
+      ) {
         startAddress = addr;
         break;
+      }
+    }
+
+    // If no proper chain start found, then any node with no previous
+    if (!startAddress) {
+      for (const addr of addresses) {
+        const page = addressObjectMap[addr];
+        if (!isValidAddress(page.previousAddress)) {
+          startAddress = addr;
+          break;
+        }
       }
     }
 
@@ -963,7 +981,11 @@ function DataStructurePage() {
     let xPos = width / 2 - styles.page.width / 2;
     let nextX = 100;
 
-    while (isValidAddress(currentAddr)) {
+    // First process the main chain
+    while (
+      isValidAddress(currentAddr) &&
+      !processedAddresses.has(currentAddr)
+    ) {
       const page = addressObjectMap[currentAddr];
       const yCenter = height / 2;
 
@@ -984,10 +1006,64 @@ function DataStructurePage() {
         y: yCenter - styles.page.height / 2,
       };
 
+      // Mark as processed
+      processedAddresses.add(currentAddr);
+
       // Move to next page
       currentAddr = page.nextAddress;
       nextX += styles.page.width + 50;
     }
+
+    // Now process any isolated nodes that weren't part of the main chain
+    let isolatedNodeX = nextX;
+    const isolatedNodeY = height / 2 + 150; // Place isolated nodes below the main chain
+    let hasIsolatedNodes = false;
+
+    addresses.forEach((addr) => {
+      if (!processedAddresses.has(addr)) {
+        hasIsolatedNodes = true;
+        const page = addressObjectMap[addr];
+
+        // Add isolated node to pageNodes
+        pageNodes.push({
+          address: addr,
+          value: page.value,
+          previousAddress: page.previousAddress,
+          nextAddress: page.nextAddress,
+          isCurrent: addr === currentPageAddress,
+          x: isolatedNodeX,
+          y: isolatedNodeY,
+          isIsolated: true, // Mark as isolated for visual distinction
+        });
+
+        // Save position
+        pagePositions[addr] = {
+          x: isolatedNodeX,
+          y: isolatedNodeY,
+          width: styles.page.width,
+          height: 130,
+        };
+
+        // Mark as processed
+        processedAddresses.add(addr);
+
+        // Move to next position
+        isolatedNodeX += styles.page.width + 50;
+      }
+    });
+
+    // Add helper text when isolated nodes are present
+    // if (hasIsolatedNodes) {
+    //   container
+    //     .append("text")
+    //     .attr("x", width / 2)
+    //     .attr("y", height / 2 + 130)
+    //     .attr("text-anchor", "middle")
+    //     .attr("font-size", "13px")
+    //     .attr("fill", "#9c5805")
+    //     .attr("font-weight", "bold")
+    //     .text("Isolated Nodes (not yet connected to main chain):");
+    // }
 
     // Center the pages horizontally if there's more than one
     if (pageNodes.length > 1) {
@@ -1055,25 +1131,38 @@ function DataStructurePage() {
         .attr("height", nodeHeight)
         .attr(
           "fill",
-          node.isCurrent ? styles.page.currentFill : styles.page.fill
+          node.isCurrent
+            ? styles.page.currentFill
+            : node.isIsolated
+            ? "#fcf5e5"
+            : styles.page.fill // Light yellow for isolated nodes
         )
         .attr(
           "stroke",
-          node.isCurrent ? styles.page.currentStroke : styles.page.stroke
+          node.isCurrent
+            ? styles.page.currentStroke
+            : node.isIsolated
+            ? "#eab308"
+            : styles.page.stroke // Amber for isolated nodes
         )
-        .attr("stroke-width", node.isCurrent ? 2 : 1)
+        .attr("stroke-width", node.isCurrent ? 2 : node.isIsolated ? 2 : 1)
+        .attr("stroke-dasharray", node.isIsolated ? "5,5" : "none") // Dashed border for isolated
         .attr("rx", 5);
 
-      // Title section
+      // Title section background
       pageGroup
         .append("rect")
         .attr("width", styles.page.width)
         .attr("height", 25)
         .attr(
           "fill",
-          node.isCurrent ? styles.page.currentStroke : styles.page.stroke
+          node.isCurrent
+            ? styles.page.currentStroke
+            : node.isIsolated
+            ? "#eab308"
+            : styles.page.stroke
         )
-        .attr("fill-opacity", 0.3)
+        .attr("fill-opacity", node.isIsolated ? 0.2 : 0.3)
         .attr("rx", 5)
         .attr("ry", 0);
 
