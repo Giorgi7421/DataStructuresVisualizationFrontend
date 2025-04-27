@@ -363,7 +363,13 @@ function DataStructurePage() {
             switch (structureType) {
               case "VECTOR":
                 console.log("Using array visualization (no snapshots)");
-                renderArrayVisualization(svg, width, height, newOperation);
+                renderArrayVisualization(
+                  svg,
+                  width,
+                  height,
+                  newOperation,
+                  null
+                );
                 break;
               case "LINKED_LIST":
                 renderLinkedListVisualization(svg, width, height, newOperation);
@@ -442,7 +448,13 @@ function DataStructurePage() {
           switch (structureType) {
             case "VECTOR":
               console.log("Using array visualization");
-              renderArrayVisualization(svg, width, height, effectiveOperation);
+              renderArrayVisualization(
+                svg,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot
+              );
               break;
             case "LINKED_LIST":
               renderLinkedListVisualization(
@@ -1671,7 +1683,15 @@ function DataStructurePage() {
       snapshotMode &&
       operations[currentHistoryIndex]?.memorySnapshots?.length > 0
     ) {
-      setCurrentSnapshotIndex(0);
+      const newIndex = 0;
+      setCurrentSnapshotIndex(newIndex);
+
+      // Directly trigger rendering with the new snapshot
+      const operation = operations[currentHistoryIndex];
+      const snapshot = operation.memorySnapshots[newIndex];
+      setTimeout(() => {
+        renderVisualization(operation, snapshot);
+      }, 10);
     }
   };
 
@@ -1681,16 +1701,31 @@ function DataStructurePage() {
       snapshotMode &&
       operations[currentHistoryIndex]?.memorySnapshots?.length > 0
     ) {
-      setCurrentSnapshotIndex(
-        operations[currentHistoryIndex].memorySnapshots.length - 1
-      );
+      const newIndex =
+        operations[currentHistoryIndex].memorySnapshots.length - 1;
+      setCurrentSnapshotIndex(newIndex);
+
+      // Directly trigger rendering with the new snapshot
+      const operation = operations[currentHistoryIndex];
+      const snapshot = operation.memorySnapshots[newIndex];
+      setTimeout(() => {
+        renderVisualization(operation, snapshot);
+      }, 10);
     }
   };
 
   const goToPrevious = () => {
     // Only operate in snapshot mode and only within the current operation
     if (snapshotMode && currentSnapshotIndex > 0) {
-      setCurrentSnapshotIndex(currentSnapshotIndex - 1);
+      const newIndex = currentSnapshotIndex - 1;
+      setCurrentSnapshotIndex(newIndex);
+
+      // Directly trigger rendering with the new snapshot
+      const operation = operations[currentHistoryIndex];
+      const snapshot = operation.memorySnapshots[newIndex];
+      setTimeout(() => {
+        renderVisualization(operation, snapshot);
+      }, 10);
     }
   };
 
@@ -1700,7 +1735,15 @@ function DataStructurePage() {
       const maxSnapshot =
         operations[currentHistoryIndex]?.memorySnapshots?.length - 1;
       if (currentSnapshotIndex < maxSnapshot) {
-        setCurrentSnapshotIndex(currentSnapshotIndex + 1);
+        const newIndex = currentSnapshotIndex + 1;
+        setCurrentSnapshotIndex(newIndex);
+
+        // Directly trigger rendering with the new snapshot
+        const operation = operations[currentHistoryIndex];
+        const snapshot = operation.memorySnapshots[newIndex];
+        setTimeout(() => {
+          renderVisualization(operation, snapshot);
+        }, 10);
       }
     }
   };
@@ -1717,7 +1760,21 @@ function DataStructurePage() {
       operations[currentHistoryIndex]?.memorySnapshots?.length > 0
     ) {
       // When entering snapshot mode, start at first snapshot
-      setCurrentSnapshotIndex(0);
+      const newIndex = 0;
+      setCurrentSnapshotIndex(newIndex);
+
+      // Directly trigger rendering with the snapshot
+      const operation = operations[currentHistoryIndex];
+      const snapshot = operation.memorySnapshots[newIndex];
+      setTimeout(() => {
+        renderVisualization(operation, snapshot);
+      }, 10);
+    } else if (!newMode) {
+      // When exiting snapshot mode, render the operation without a snapshot
+      const operation = operations[currentHistoryIndex];
+      setTimeout(() => {
+        renderVisualization(operation, null);
+      }, 10);
     }
   };
 
@@ -2095,7 +2152,13 @@ function DataStructurePage() {
         switch (structureType) {
           case "VECTOR":
             console.log("Direct rendering array visualization");
-            renderArrayVisualization(svg, width, height, effectiveOperation);
+            renderArrayVisualization(
+              svg,
+              width,
+              height,
+              effectiveOperation,
+              memorySnapshot
+            );
             break;
           case "LINKED_LIST":
             renderLinkedListVisualization(
@@ -2202,10 +2265,30 @@ function DataStructurePage() {
 
     const structureType = (dataStructure.type || "").toUpperCase();
 
+    // Try to get the memory snapshot if available
+    let memorySnapshot = null;
+    if (operation.memorySnapshots && operation.memorySnapshots.length > 0) {
+      if (
+        snapshotMode &&
+        currentSnapshotIndex >= 0 &&
+        currentSnapshotIndex < operation.memorySnapshots.length
+      ) {
+        memorySnapshot = operation.memorySnapshots[currentSnapshotIndex];
+        console.log(
+          "Memory visualization using specific snapshot:",
+          currentSnapshotIndex
+        );
+      } else {
+        memorySnapshot =
+          operation.memorySnapshots[operation.memorySnapshots.length - 1];
+        console.log("Memory visualization using last snapshot");
+      }
+    }
+
     // Simply delegate to the appropriate visualization based on structure type
     switch (structureType) {
       case "VECTOR":
-        renderArrayVisualization(svg, width, height, operation);
+        renderArrayVisualization(svg, width, height, operation, memorySnapshot);
         break;
       case "LINKED_LIST":
         renderLinkedListVisualization(svg, width, height, operation);
@@ -2263,253 +2346,293 @@ function DataStructurePage() {
   };
 
   // Function to render Array/Vector visualization
-  const renderArrayVisualization = (svg, width, height, operation) => {
-    console.log("Rendering Array/Vector visualization");
-    console.log("Operation:", operation);
+  const renderArrayVisualization = (
+    svg,
+    width,
+    height,
+    operation,
+    memorySnapshot = null
+  ) => {
+    console.log("Rendering array visualization with operation:", operation);
+    console.log("With memory snapshot:", memorySnapshot);
 
-    // Create a content group for the visualization
-    const contentGroup = svg.select(".zoom-container");
-    if (!contentGroup.empty()) {
-      // Clear any existing content
-      contentGroup.selectAll("*").remove();
+    // Clear any existing content - but maintain the zoom container structure
+    svg.selectAll("*").remove();
+
+    // First, create a fixed background layer that doesn't move or zoom
+    const backgroundLayer = svg.append("g").attr("class", "fixed-background");
+
+    // Add the gray background rectangle that stays fixed
+    backgroundLayer
+      .append("rect")
+      .attr("width", width)
+      .attr("height", height)
+      .attr("fill", "#f8fafc")
+      .attr("stroke", "#d1d5db");
+
+    // Now create a content layer that will be zoomable and pannable
+    const contentGroup = svg.append("g").attr("class", "zoom-container");
+
+    // Set up the zoom behavior
+    const zoom = d3
+      .zoom()
+      .scaleExtent([0.1, 5]) // Min/max zoom levels
+      .translateExtent([
+        [-width * 3, -height * 3],
+        [width * 3, height * 3],
+      ]) // Extra generous panning area
+      .on("zoom", (event) => {
+        // Apply the transform directly to the content group
+        contentGroup.attr("transform", event.transform);
+
+        // Update zoom level for display
+        setZoomLevel(event.transform.k);
+        console.log("Zoom event:", event.transform.k);
+      });
+
+    // Store zoom for reference and manual control
+    zoomRef.current = zoom;
+
+    // Initialize zoom on the SVG
+    svg.call(zoom);
+
+    // Reset zoom to initial position
+    svg.call(zoom.transform, d3.zoomIdentity);
+
+    // Add arrow marker definitions
+    const svgDefs = svg.append("defs");
+    svgDefs
+      .append("marker")
+      .attr("id", "array-arrow")
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 8)
+      .attr("refY", 0)
+      .attr("markerWidth", 8)
+      .attr("markerHeight", 8)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-5L10,0L0,5")
+      .attr("fill", "#0284c7");
+
+    svgDefs
+      .append("marker")
+      .attr("id", "var-ref-arrow")
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 8)
+      .attr("refY", 0)
+      .attr("markerWidth", 8)
+      .attr("markerHeight", 8)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-5L10,0L0,5")
+      .attr("fill", "#334155");
+
+    // Extract data from operation or memory snapshot
+    let arrayData = {};
+
+    // First try to get data from memory snapshot
+    if (memorySnapshot) {
+      // Use memory snapshot directly
+      arrayData = memorySnapshot;
+      console.log("Array data from memory snapshot:", arrayData);
+    } else if (operation.state) {
+      // Fallback to operation state
+      arrayData = operation.state;
+      console.log("Array data from operation state:", arrayData);
     }
 
-    // Add arrow marker definition for array pointer
-    let arrowDefs = svg.select("defs");
-    if (arrowDefs.empty()) {
-      arrowDefs = svg.append("defs");
-    }
-
-    // Check if marker already exists
-    if (arrowDefs.select("#array-arrow").empty()) {
-      arrowDefs
-        .append("marker")
-        .attr("id", "array-arrow")
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 8)
-        .attr("refY", 0)
-        .attr("markerWidth", 6)
-        .attr("markerHeight", 6)
-        .attr("orient", "auto")
-        .append("path")
-        .attr("d", "M0,-5L10,0L0,5")
-        .attr("fill", "#0284c7");
-    }
-
-    // Get address object map from the operation state, if any
-    const addressObjectMap = operation.state?.addressObjectMap || {};
-    console.log("Address object map:", addressObjectMap);
-
-    // Get instance variables
-    const instanceVariables = operation.state?.instanceVariables || {};
-    console.log("Instance variables:", instanceVariables);
-
-    // Get local variables
-    const localVariables = operation.state?.localVariables || {};
-    console.log("Local variables:", localVariables);
-
-    // Determine the array data
-    let arrayElements = [];
+    // Extract the array components
+    const localVariables = arrayData.localVariables || {};
+    const instanceVariables = arrayData.instanceVariables || {};
+    const addressObjectMap = arrayData.addressObjectMap || {};
     const arrayAddress = instanceVariables.array;
+
+    console.log("Local variables:", localVariables);
+    console.log("Instance variables:", instanceVariables);
+    console.log("Address object map:", addressObjectMap);
     console.log("Array address:", arrayAddress);
 
-    // Try to get the array data from the address object map first (preferred)
+    // Determine array dimensions
+    const size = instanceVariables.count || instanceVariables.size || 0;
+    const capacity = instanceVariables.capacity || 0;
+    console.log("Size:", size, "Capacity:", capacity);
+
+    // Get array elements
+    let arrayElements = [];
     if (arrayAddress && addressObjectMap[arrayAddress]) {
-      arrayElements = addressObjectMap[arrayAddress];
-      console.log(
-        "Found array elements at address:",
-        arrayAddress,
-        arrayElements
-      );
-    } else {
-      // Fallback to elements directly in operation state
-      arrayElements = operation.state?.elements || [];
-      console.log("Using elements from operation state:", arrayElements);
+      const elements = addressObjectMap[arrayAddress];
+      if (Array.isArray(elements)) {
+        arrayElements = elements.slice(0, size || elements.length);
+        console.log("Array elements from address map:", arrayElements);
+      }
+    } else if (operation.state && operation.state.elements) {
+      arrayElements = operation.state.elements;
+      console.log("Array elements from operation state:", arrayElements);
     }
 
-    // Get size and capacity from instance variables
-    const size =
-      instanceVariables.count !== undefined
-        ? instanceVariables.count
-        : instanceVariables.size || 0;
-    const capacity = instanceVariables.capacity || arrayElements.length || 0;
-
-    console.log("Array size:", size, "capacity:", capacity);
-
-    // Entity styles - match web browser visualization styles
+    // Entity styles
     const styles = {
       array: {
-        width: 60,
-        height: 60,
+        elementWidth: 60,
+        elementHeight: 60,
         fill: "#ffffff",
+        unusedFill: "#f8fafc",
         stroke: "#94a3b8",
         textColor: "#334155",
-        unusedFill: "#f1f5f9",
       },
       localVars: {
         width: 200,
-        height: 30, // Will be adjusted based on content
-        fill: "#ffffff",
+        fill: "#f8fafc",
         stroke: "#94a3b8",
         textColor: "#334155",
       },
       instanceVars: {
         width: 200,
-        height: 30, // Will be adjusted based on content
-        fill: "#ffffff",
-        stroke: "#94a3b8",
+        fill: "#f1f5f9",
+        stroke: "#64748b",
         textColor: "#334155",
+      },
+      connection: {
+        stroke: "#64748b",
+        width: 2,
+        varRefColor: "#334155",
       },
     };
 
-    // Calculate dimensions for array visualization
-    const cellSize = styles.array.width;
-    const cellPadding = 5;
-    const cellsPerRow = Math.min(15, capacity); // Limit to 15 cells per row for readability
-    const totalArrayWidth =
-      (cellSize + cellPadding) * Math.min(cellsPerRow, capacity);
-    const startX = (width - totalArrayWidth) / 2;
-    const startY =
-      height / 2 -
-      (Math.ceil(capacity / cellsPerRow) * (cellSize + cellPadding)) / 2;
+    // Position tracking for connections
+    const pagePositions = {};
 
-    // Optional: Display operation title at the top
-    contentGroup
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", 30)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "16px")
-      .attr("font-weight", "bold")
-      .attr("fill", "#475569")
-      .text(
-        `${operation.operation || "Initial State"}${
-          operation.parameters
-            ? `(${JSON.stringify(operation.parameters).replace(/[{}]/g, "")})`
-            : ""
-        }`
-      );
+    // Layout parameters
+    const cellSize = styles.array.elementWidth;
+    // Remove padding between cells to make them joined
+    const cellPadding = 0;
+    const realCapacity = Math.max(capacity, arrayElements.length, size || 0, 1);
+    // Display all elements in a single row - don't limit to 8 per row
+    const cellsPerRow = realCapacity;
+    const startX = Math.max(250, (width - cellsPerRow * cellSize) / 2);
+    const startY = 160;
 
     // 1. Render Local Variables Box
     const localVarsBox = contentGroup
       .append("g")
       .attr("class", "local-variables");
+    const localVarCount = Object.keys(localVariables).length;
+    const localVarsHeight = Math.max(65, 25 + 5 + localVarCount * 30);
 
-    // Only show if there are local variables
-    if (Object.keys(localVariables).length > 0) {
-      // Adjust height based on number of variables
-      const localVarCount = Object.keys(localVariables).length;
-      const localVarsHeight = Math.max(65, 25 + 5 + localVarCount * 30); // Header (25px) + small gap (5px) + variables
-      styles.localVars.height = localVarsHeight;
+    // Box container
+    localVarsBox
+      .append("rect")
+      .attr("x", 50)
+      .attr("y", 20)
+      .attr("width", styles.localVars.width)
+      .attr("height", localVarsHeight)
+      .attr("fill", styles.localVars.fill)
+      .attr("stroke", styles.localVars.stroke)
+      .attr("stroke-width", 1)
+      .attr("rx", 5);
 
-      // Box container
+    // Title
+    localVarsBox
+      .append("rect")
+      .attr("x", 50)
+      .attr("y", 20)
+      .attr("width", styles.localVars.width)
+      .attr("height", 25)
+      .attr("fill", styles.localVars.stroke)
+      .attr("fill-opacity", 0.3)
+      .attr("stroke", "none")
+      .attr("rx", 5)
+      .attr("ry", 0);
+
+    localVarsBox
+      .append("text")
+      .attr("x", 50 + styles.localVars.width / 2)
+      .attr("y", 20 + 17)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "13px")
+      .attr("font-weight", "bold")
+      .attr("fill", styles.localVars.textColor)
+      .text("Local Variables");
+
+    // Divider line
+    localVarsBox
+      .append("line")
+      .attr("x1", 50)
+      .attr("y1", 20 + 25)
+      .attr("x2", 50 + styles.localVars.width)
+      .attr("y2", 20 + 25)
+      .attr("stroke", styles.localVars.stroke)
+      .attr("stroke-width", 1);
+
+    // Variables
+    let yOffset = 30;
+    Object.entries(localVariables).forEach(([key, value], index) => {
+      // Variable container
       localVarsBox
         .append("rect")
-        .attr("x", 50)
-        .attr("y", 80)
-        .attr("width", styles.localVars.width)
-        .attr("height", styles.localVars.height)
-        .attr("fill", "#ffffff")
-        .attr("stroke", "#94a3b8")
-        .attr("stroke-width", 1)
-        .attr("rx", 5);
-
-      // Title
-      localVarsBox
-        .append("rect")
-        .attr("x", 50)
-        .attr("y", 80)
-        .attr("width", styles.localVars.width)
+        .attr("x", 50 + 10)
+        .attr("y", 20 + yOffset)
+        .attr("width", styles.localVars.width - 20)
         .attr("height", 25)
-        .attr("fill", "#94a3b8")
-        .attr("fill-opacity", 0.3)
-        .attr("stroke", "none")
-        .attr("rx", 5)
-        .attr("ry", 0);
+        .attr("fill", "white")
+        .attr("stroke", "#e2e8f0")
+        .attr("stroke-width", 1)
+        .attr("rx", 3);
 
+      // Name
       localVarsBox
         .append("text")
-        .attr("x", 50 + styles.localVars.width / 2)
-        .attr("y", 80 + 17)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "13px")
+        .attr("x", 50 + 20)
+        .attr("y", 20 + yOffset + 17)
+        .attr("font-size", "12px")
         .attr("font-weight", "bold")
-        .attr("fill", "#334155")
-        .text("Local Variables");
+        .attr("fill", styles.localVars.textColor)
+        .text(key + ":");
 
-      // Divider line
+      // Value
+      const isRef = isAddress(value);
       localVarsBox
-        .append("line")
-        .attr("x1", 50)
-        .attr("y1", 80 + 25)
-        .attr("x2", 50 + styles.localVars.width)
-        .attr("y2", 80 + 25)
-        .attr("stroke", "#94a3b8")
-        .attr("stroke-width", 1);
+        .append("text")
+        .attr("x", 50 + styles.localVars.width - 20)
+        .attr("y", 20 + yOffset + 17)
+        .attr("text-anchor", "end")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", isRef ? "#0284c7" : styles.localVars.textColor)
+        .text(
+          String(value).length > 10
+            ? String(value).substring(0, 9) + "..."
+            : value
+        );
 
-      // Local Variables
-      const localEntries = Object.entries(localVariables);
-      localEntries.forEach(([key, value], index) => {
-        const rowY = 80 + 30 + index * 30; // Starting y position (box top + header height + index * row height)
+      // Store position for connections
+      pagePositions[`local_${key}`] = {
+        x: 50,
+        y: 20 + yOffset,
+        width: styles.localVars.width,
+        height: 25,
+        value: value,
+      };
 
-        // Add field container for local variables
-        localVarsBox
-          .append("rect")
-          .attr("x", 50 + 10) // Same padding as page nodes (10px)
-          .attr("y", rowY)
-          .attr("width", styles.localVars.width - 20)
-          .attr("height", 25) // Same as page nodes
-          .attr("fill", "white")
-          .attr("stroke", "#e2e8f0")
-          .attr("stroke-width", 1)
-          .attr("rx", 3);
-
-        // Variable name (like "value:" in node boxes)
-        localVarsBox
-          .append("text")
-          .attr("x", 50 + 20) // Same as page nodes
-          .attr("y", rowY + 17) // Center in the row like page nodes
-          .attr("font-size", "12px")
-          .attr("font-weight", "bold")
-          .attr("fill", "#334155")
-          .text(key + ":");
-
-        // Variable value (like the values in node boxes)
-        localVarsBox
-          .append("text")
-          .attr("x", 50 + styles.localVars.width - 20) // Same as page nodes
-          .attr("y", rowY + 17) // Center in the row like page nodes
-          .attr("text-anchor", "end")
-          .attr("font-size", "12px")
-          .attr("font-weight", "bold")
-          .attr("fill", "#334155")
-          .text(
-            String(value).length > 10
-              ? String(value).substring(0, 9) + "..."
-              : value
-          );
-      });
-    }
+      yOffset += 30;
+    });
 
     // 2. Render Instance Variables Box
     const instanceVarsBox = contentGroup
       .append("g")
       .attr("class", "instance-variables");
-
-    // Adjust height based on number of variables
     const instanceVarCount = Object.keys(instanceVariables).length;
-    const instanceVarsHeight = Math.max(65, 25 + 5 + instanceVarCount * 30); // Header (25px) + small gap (5px) + variables
-    styles.instanceVars.height = instanceVarsHeight;
+    const instanceVarsHeight = Math.max(65, 25 + 5 + instanceVarCount * 30);
 
     // Box container
     instanceVarsBox
       .append("rect")
       .attr("x", width - 50 - styles.instanceVars.width)
-      .attr("y", 80)
+      .attr("y", 20)
       .attr("width", styles.instanceVars.width)
-      .attr("height", styles.instanceVars.height)
-      .attr("fill", "#ffffff")
-      .attr("stroke", "#94a3b8")
+      .attr("height", instanceVarsHeight)
+      .attr("fill", styles.instanceVars.fill)
+      .attr("stroke", styles.instanceVars.stroke)
       .attr("stroke-width", 1)
       .attr("rx", 5);
 
@@ -2517,10 +2640,10 @@ function DataStructurePage() {
     instanceVarsBox
       .append("rect")
       .attr("x", width - 50 - styles.instanceVars.width)
-      .attr("y", 80)
+      .attr("y", 20)
       .attr("width", styles.instanceVars.width)
       .attr("height", 25)
-      .attr("fill", "#94a3b8")
+      .attr("fill", styles.instanceVars.stroke)
       .attr("fill-opacity", 0.3)
       .attr("stroke", "none")
       .attr("rx", 5)
@@ -2529,74 +2652,84 @@ function DataStructurePage() {
     instanceVarsBox
       .append("text")
       .attr("x", width - 50 - styles.instanceVars.width / 2)
-      .attr("y", 80 + 17)
+      .attr("y", 20 + 17)
       .attr("text-anchor", "middle")
       .attr("font-size", "13px")
       .attr("font-weight", "bold")
-      .attr("fill", "#334155")
+      .attr("fill", styles.instanceVars.textColor)
       .text("Instance Variables");
 
     // Divider line
     instanceVarsBox
       .append("line")
       .attr("x1", width - 50 - styles.instanceVars.width)
-      .attr("y1", 80 + 25)
+      .attr("y1", 20 + 25)
       .attr("x2", width - 50)
-      .attr("y2", 80 + 25)
-      .attr("stroke", "#94a3b8")
+      .attr("y2", 20 + 25)
+      .attr("stroke", styles.instanceVars.stroke)
       .attr("stroke-width", 1);
 
-    // Instance Variables (includes array)
-    const instanceEntries = Object.entries(instanceVariables);
-    instanceEntries.forEach(([key, value], index) => {
-      const rowY = 80 + 30 + index * 30; // Starting y position (box top + header height + index * row height)
-
-      // Add field container for instance variables
+    // Variables
+    yOffset = 30;
+    Object.entries(instanceVariables).forEach(([key, value], index) => {
+      // Variable container
       instanceVarsBox
         .append("rect")
-        .attr("x", width - 50 - styles.instanceVars.width + 10) // Same padding as page nodes (10px)
-        .attr("y", rowY)
+        .attr("x", width - 50 - styles.instanceVars.width + 10)
+        .attr("y", 20 + yOffset)
         .attr("width", styles.instanceVars.width - 20)
-        .attr("height", 25) // Same as page nodes
+        .attr("height", 25)
         .attr("fill", "white")
         .attr("stroke", "#e2e8f0")
         .attr("stroke-width", 1)
         .attr("rx", 3);
 
-      // Variable name (like "value:" in node boxes)
+      // Name
       instanceVarsBox
         .append("text")
-        .attr("x", width - 50 - styles.instanceVars.width + 20) // Same as page nodes
-        .attr("y", rowY + 17) // Center in the row like page nodes
+        .attr("x", width - 50 - styles.instanceVars.width + 20)
+        .attr("y", 20 + yOffset + 17)
         .attr("font-size", "12px")
         .attr("font-weight", "bold")
-        .attr("fill", "#334155")
+        .attr("fill", styles.instanceVars.textColor)
         .text(key + ":");
 
-      // Variable value (like the values in node boxes)
+      // Value
+      const isRef = isAddress(value) || key === "array";
       instanceVarsBox
         .append("text")
-        .attr("x", width - 70) // Same as page nodes
-        .attr("y", rowY + 17) // Center in the row like page nodes
+        .attr("x", width - 70)
+        .attr("y", 20 + yOffset + 17)
         .attr("text-anchor", "end")
         .attr("font-size", "12px")
         .attr("font-weight", "bold")
-        .attr("fill", key === "array" ? "#0284c7" : "#334155") // Highlight array address in blue
+        .attr("fill", isRef ? "#0284c7" : styles.instanceVars.textColor)
         .text(
           String(value).length > 10
             ? String(value).substring(0, 9) + "..."
             : value
         );
+
+      // Store position for connections
+      pagePositions[`instance_${key}`] = {
+        x: width - 50 - styles.instanceVars.width,
+        y: 20 + yOffset,
+        width: styles.instanceVars.width,
+        height: 25,
+        value: value,
+      };
+
+      yOffset += 30;
     });
 
-    // 3. Draw the array object (if there's an array address)
+    // 3. Draw the array reference box (if array address exists)
     if (arrayAddress) {
       // Create array reference box
       const arrayRefBox = contentGroup
         .append("g")
         .attr("class", "array-reference");
 
-      // Draw the array reference box
+      // Draw the box
       arrayRefBox
         .append("rect")
         .attr("x", startX - 120)
@@ -2608,7 +2741,7 @@ function DataStructurePage() {
         .attr("stroke-width", 1)
         .attr("rx", 4);
 
-      // Add a title/label
+      // Title area
       arrayRefBox
         .append("rect")
         .attr("x", startX - 120)
@@ -2621,6 +2754,7 @@ function DataStructurePage() {
         .attr("rx", 4)
         .attr("ry", 0);
 
+      // Title text
       arrayRefBox
         .append("text")
         .attr("x", startX - 65)
@@ -2631,7 +2765,7 @@ function DataStructurePage() {
         .attr("fill", "#334155")
         .text("array");
 
-      // Show address value
+      // Address value
       arrayRefBox
         .append("text")
         .attr("x", startX - 65)
@@ -2641,7 +2775,7 @@ function DataStructurePage() {
         .attr("fill", "#0284c7")
         .text(arrayAddress.substring(0, 8));
 
-      // Draw arrow from array to first element
+      // Arrow to first element
       arrayRefBox
         .append("path")
         .attr(
@@ -2654,19 +2788,31 @@ function DataStructurePage() {
         .attr("stroke-width", 1.5)
         .attr("fill", "none")
         .attr("marker-end", "url(#array-arrow)");
+
+      // Store position for connections
+      pagePositions["array_ref"] = {
+        x: startX - 120,
+        y: startY,
+        width: 110,
+        height: cellSize,
+        value: arrayAddress,
+      };
     }
 
     // 4. Draw array cells
     const arrayCells = contentGroup.append("g").attr("class", "array-cells");
 
-    // Draw capacity boxes
-    for (let i = 0; i < capacity; i++) {
+    // Calculate rows and columns
+    const rows = Math.ceil(realCapacity / cellsPerRow);
+
+    // Draw cells
+    for (let i = 0; i < realCapacity; i++) {
       const row = Math.floor(i / cellsPerRow);
       const col = i % cellsPerRow;
-      const x = startX + col * (cellSize + cellPadding);
-      const y = startY + row * (cellSize + cellPadding);
+      const x = startX + col * cellSize;
+      const y = startY + row * cellSize;
 
-      // Draw cell container
+      // Cell box
       arrayCells
         .append("rect")
         .attr("x", x)
@@ -2678,7 +2824,7 @@ function DataStructurePage() {
         .attr("stroke-width", 1)
         .attr("rx", 4);
 
-      // Draw title/index area
+      // Index header
       arrayCells
         .append("rect")
         .attr("x", x)
@@ -2691,7 +2837,7 @@ function DataStructurePage() {
         .attr("rx", 4)
         .attr("ry", 0);
 
-      // Draw index label
+      // Index number
       arrayCells
         .append("text")
         .attr("x", x + cellSize / 2)
@@ -2702,7 +2848,7 @@ function DataStructurePage() {
         .attr("fill", "#475569")
         .text(i);
 
-      // Draw divider line
+      // Divider
       arrayCells
         .append("line")
         .attr("x1", x)
@@ -2712,26 +2858,36 @@ function DataStructurePage() {
         .attr("stroke", styles.array.stroke)
         .attr("stroke-width", 1);
 
-      // Draw value if available
+      // Value (if available)
       if (i < arrayElements.length) {
         const value = arrayElements[i];
+        const isRef = isAddress(value);
         arrayCells
           .append("text")
           .attr("x", x + cellSize / 2)
           .attr("y", y + cellSize / 2 + 10)
           .attr("text-anchor", "middle")
           .attr("font-size", "14px")
-          .attr("fill", "#0f172a")
+          .attr("fill", isRef ? "#0284c7" : "#0f172a")
           .text(value !== undefined && value !== null ? value : "null");
+
+        // Store position for connections
+        pagePositions[`array_cell_${i}`] = {
+          x: x,
+          y: y,
+          width: cellSize,
+          height: cellSize,
+          value: value,
+        };
       }
     }
 
     // 5. Draw size indicator
-    if (size <= capacity) {
+    if (size <= realCapacity) {
       const row = Math.floor(size / cellsPerRow);
       const col = size % cellsPerRow;
-      const x = startX + col * (cellSize + cellPadding);
-      const y = startY + row * (cellSize + cellPadding);
+      const x = startX + col * cellSize;
+      const y = startY + row * cellSize;
 
       // Size indicator arrow
       arrayCells
@@ -2755,91 +2911,252 @@ function DataStructurePage() {
         .text("size");
     }
 
-    // 6. Optional: Draw Address Object Map visualization
-    const hasAddressObjects =
-      Object.keys(addressObjectMap).length > 0 && arrayAddress;
+    // 6. Draw connections between variables and array elements
+    const connectionsGroup = contentGroup
+      .append("g")
+      .attr("class", "connections");
+    const connections = [];
 
-    if (false) {
-      // Completely disabled per user request
-      const addressMapBox = container
-        .append("g")
-        .attr("class", "address-object-map");
+    // Helper function to determine if an address is valid
+    const isValidAddress = (addr) =>
+      addr && addr !== "null" && addr !== "0x0" && addr in addressObjectMap;
 
-      const mapBoxY = height - 120;
-      const mapBoxHeight = 160;
-      const mapBoxWidth = width - 100;
+    // Find connections from local variables to array or its elements
+    Object.entries(localVariables).forEach(([key, value]) => {
+      if (isAddress(value)) {
+        // Connect to array if pointing to it
+        if (value === arrayAddress) {
+          connections.push({
+            source: `local_${key}`,
+            target: "array_ref",
+            type: "reference",
+          });
+        }
+        // Connect to array elements if pointing to them
+        else if (isValidAddress(value)) {
+          // Check if any array element has this address as its value
+          for (let i = 0; i < arrayElements.length; i++) {
+            if (arrayElements[i] === value) {
+              connections.push({
+                source: `local_${key}`,
+                target: `array_cell_${i}`,
+                type: "reference",
+              });
+            }
+          }
 
-      // Box container
-      addressMapBox
-        .append("rect")
-        .attr("x", 50)
-        .attr("y", mapBoxY)
-        .attr("width", mapBoxWidth)
-        .attr("height", mapBoxHeight)
-        .attr("fill", "#f8fafc")
-        .attr("stroke", "#cbd5e1")
-        .attr("stroke-width", 1)
-        .attr("rx", 5);
+          // Connect to object in address map directly
+          if (pagePositions[value]) {
+            connections.push({
+              source: `local_${key}`,
+              target: value,
+              type: "reference",
+            });
+          }
+        }
+      }
+    });
 
-      // Title
-      addressMapBox
-        .append("rect")
-        .attr("x", 50)
-        .attr("y", mapBoxY)
-        .attr("width", mapBoxWidth)
-        .attr("height", 30)
-        .attr("fill", "#94a3b8")
-        .attr("fill-opacity", 0.3)
-        .attr("stroke", "none")
-        .attr("rx", 5)
-        .attr("ry", 0);
+    // Find connections from instance variables to array or its elements
+    Object.entries(instanceVariables).forEach(([key, value]) => {
+      if (isAddress(value) || key === "array") {
+        // Connect to array if pointing to it
+        if (value === arrayAddress || key === "array") {
+          connections.push({
+            source: `instance_${key}`,
+            target: "array_ref",
+            type: "reference",
+          });
+        }
+        // Connect to array elements if pointing to them
+        else if (isValidAddress(value)) {
+          // Check if any array element has this address as its value
+          for (let i = 0; i < arrayElements.length; i++) {
+            if (arrayElements[i] === value) {
+              connections.push({
+                source: `instance_${key}`,
+                target: `array_cell_${i}`,
+                type: "reference",
+              });
+            }
+          }
 
-      addressMapBox
-        .append("text")
-        .attr("x", 50 + mapBoxWidth / 2)
-        .attr("y", mapBoxY + 20)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "14px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#475569")
-        .text("Address Object Map");
+          // Connect to object in address map directly
+          if (pagePositions[value]) {
+            connections.push({
+              source: `instance_${key}`,
+              target: value,
+              type: "reference",
+            });
+          }
+        }
+      }
+    });
 
-      // Address entries
-      const entryWidth = 180;
-      const entriesPerRow = Math.floor(mapBoxWidth / entryWidth);
-
-      addresses.forEach((address, index) => {
-        const row = Math.floor(index / entriesPerRow);
-        const col = index % entriesPerRow;
-
-        const entryX = 50 + col * entryWidth + 10;
-        const entryY = mapBoxY + 40 + row * 40;
-
-        // Address
-        addressMapBox
-          .append("text")
-          .attr("x", entryX)
-          .attr("y", entryY)
-          .attr("font-size", "12px")
-          .attr("font-weight", "bold")
-          .attr("fill", "#475569")
-          .text(address.substring(0, 8) + ":");
-
-        // Value
-        const value = addressObjectMap[address]?.value;
-        addressMapBox
-          .append("text")
-          .attr("x", entryX + 80)
-          .attr("y", entryY)
-          .attr("font-size", "12px")
-          .attr("fill", "#475569")
-          .text(value || "null");
-      });
+    // Find connections from array elements to other objects
+    for (let i = 0; i < arrayElements.length; i++) {
+      const value = arrayElements[i];
+      if (isAddress(value) && isValidAddress(value)) {
+        // Connect to object in address map
+        if (pagePositions[value]) {
+          connections.push({
+            source: `array_cell_${i}`,
+            target: value,
+            type: "reference",
+          });
+        }
+      }
     }
+
+    // Helper to get connection points
+    const getConnectionPoints = (sourceNode, targetNode) => {
+      const source = pagePositions[sourceNode];
+      const target = pagePositions[targetNode];
+
+      if (!source || !target) {
+        console.log("Missing position for", !source ? sourceNode : targetNode);
+        return { sourcePoint: null, targetPoint: null };
+      }
+
+      let sourcePoint, targetPoint;
+
+      // Source point based on node type
+      if (sourceNode.startsWith("local_")) {
+        // Exit from right side of local var box
+        sourcePoint = {
+          x: source.x + source.width,
+          y: source.y + source.height / 2,
+        };
+      } else if (sourceNode.startsWith("instance_")) {
+        // Exit from left side of instance var box
+        sourcePoint = {
+          x: source.x,
+          y: source.y + source.height / 2,
+        };
+      } else if (sourceNode.startsWith("array_cell_")) {
+        // Exit from right side of array cell
+        sourcePoint = {
+          x: source.x + source.width,
+          y: source.y + source.height / 2,
+        };
+      } else {
+        // Default center
+        sourcePoint = {
+          x: source.x + source.width / 2,
+          y: source.y + source.height / 2,
+        };
+      }
+
+      // Target point based on node type
+      if (targetNode === "array_ref") {
+        // Enter at top of array reference box
+        targetPoint = {
+          x: target.x + target.width / 2,
+          y: target.y,
+        };
+      } else if (targetNode.startsWith("array_cell_")) {
+        // Enter at top of array cell
+        targetPoint = {
+          x: target.x + target.width / 2,
+          y: target.y,
+        };
+      } else {
+        // Default center
+        targetPoint = {
+          x: target.x + target.width / 2,
+          y: target.y + target.height / 2,
+        };
+      }
+
+      return { sourcePoint, targetPoint };
+    };
+
+    // Draw all connections
+    connections.forEach((conn) => {
+      const points = getConnectionPoints(conn.source, conn.target);
+      if (!points.sourcePoint || !points.targetPoint) return;
+
+      // Generate curved path
+      const path = generateCurvedPath(points.sourcePoint, points.targetPoint);
+
+      // Draw connection
+      connectionsGroup
+        .append("path")
+        .attr("d", path)
+        .attr("fill", "none")
+        .attr("stroke", styles.connection.varRefColor)
+        .attr("stroke-width", styles.connection.width)
+        .attr("marker-end", "url(#var-ref-arrow)")
+        .attr("stroke-opacity", 0.8)
+        .attr("stroke-linecap", "round")
+        .attr("stroke-linejoin", "round");
+    });
 
     // Auto-fit the visualization to the view
     autoFitVisualization(svg, contentGroup, zoomRef.current, width, height);
   };
+
+  // Effect to monitor snapshot index changes and update the visualization
+  useEffect(() => {
+    // Only run this effect when we're in snapshot mode and have a valid operation
+    if (snapshotMode && operations[currentHistoryIndex]) {
+      const operation = operations[currentHistoryIndex];
+
+      // Make sure we have snapshots and a valid index
+      if (
+        operation.memorySnapshots &&
+        currentSnapshotIndex >= 0 &&
+        currentSnapshotIndex < operation.memorySnapshots.length
+      ) {
+        const snapshot = operation.memorySnapshots[currentSnapshotIndex];
+        console.log(
+          `Snapshot navigation: Rendering snapshot ${
+            currentSnapshotIndex + 1
+          }/${operation.memorySnapshots.length}`
+        );
+
+        // Update visualization state
+        setVisualState({
+          operationIndex: currentHistoryIndex,
+          snapshotIndex: currentSnapshotIndex,
+          operation: operation,
+          snapshot: snapshot,
+        });
+
+        // Directly render the visualization with the current snapshot
+        renderVisualization(operation, snapshot);
+      }
+    }
+  }, [
+    currentSnapshotIndex,
+    snapshotMode,
+    operations,
+    currentHistoryIndex,
+    renderVisualization,
+  ]);
+
+  useEffect(() => {
+    if (autoPlay) {
+      autoPlayRef.current = setInterval(() => {
+        setCurrentHistoryIndex((prevIndex) => {
+          if (prevIndex < operations.length - 1) {
+            return prevIndex + 1;
+          } else {
+            setAutoPlay(false);
+            return prevIndex;
+          }
+        });
+      }, autoPlaySpeed);
+    } else if (autoPlayRef.current) {
+      clearInterval(autoPlayRef.current);
+    }
+
+    return () => {
+      if (autoPlayRef.current) {
+        clearInterval(autoPlayRef.current);
+      }
+    };
+  }, [autoPlay, autoPlaySpeed, operations.length]);
 
   return (
     <div className="h-full overflow-hidden flex flex-col">
