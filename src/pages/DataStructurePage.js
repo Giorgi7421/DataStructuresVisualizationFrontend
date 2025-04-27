@@ -35,7 +35,7 @@ function DataStructurePage() {
   const [autoPlay, setAutoPlay] = useState(false);
   const [autoPlaySpeed, setAutoPlaySpeed] = useState(1000); // ms
   const [enableMemoryVisualization, setEnableMemoryVisualization] =
-    useState(true);
+    useState(false);
   const [snapshotMode, setSnapshotMode] = useState(true);
   // Track zoom state with all transform properties
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -1301,6 +1301,7 @@ function DataStructurePage() {
     // 6. Render Address Object Map Box
     // Only if there's space at the bottom and not too many pages
     if (false) {
+      // Completely disabled per user request
       const addressMapBox = container
         .append("g")
         .attr("class", "address-object-map");
@@ -2177,6 +2178,667 @@ function DataStructurePage() {
     } catch (error) {
       console.error("Error rendering visualization directly:", error);
     }
+  };
+
+  // Function to handle memory visualization (used when enableMemoryVisualization is true)
+  const renderMemoryVisualization = (operation, svgRef) => {
+    console.log("Rendering memory-based visualization");
+
+    if (!svgRef.current) {
+      console.error("SVG reference is not available");
+      return;
+    }
+
+    // Get the SVG and dimensions
+    const svg = d3.select(svgRef.current);
+    const width = parseInt(svg.style("width")) || 800;
+    const height = parseInt(svg.style("height")) || 600;
+
+    // Use the standard visualization methods based on the structure type
+    if (!dataStructure) {
+      console.error("Data structure information is missing");
+      return;
+    }
+
+    const structureType = (dataStructure.type || "").toUpperCase();
+
+    // Simply delegate to the appropriate visualization based on structure type
+    switch (structureType) {
+      case "VECTOR":
+        renderArrayVisualization(svg, width, height, operation);
+        break;
+      case "LINKED_LIST":
+        renderLinkedListVisualization(svg, width, height, operation);
+        break;
+      case "TREE":
+        renderTreeVisualization(svg, width, height, operation);
+        break;
+      case "STACK":
+      case "QUEUE":
+        renderStackQueueVisualization(svg, width, height, operation);
+        break;
+      case "MAP":
+        renderHashMapVisualization(svg, width, height, operation);
+        break;
+      default:
+        renderDefaultVisualization(svg, width, height, operation);
+    }
+  };
+
+  const showNotImplementedMessage = (svg, width, height, structureType) => {
+    const contentGroup = svg.select(".zoom-container");
+    contentGroup
+      .append("text")
+      .attr("x", width / 2)
+      .attr("y", height / 2)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "16px")
+      .attr("fill", "#475569")
+      .text(`${structureType} visualization not implemented yet`);
+  };
+
+  const renderLinkedListVisualization = (svg, width, height, operation) => {
+    showNotImplementedMessage(svg, width, height, "Linked List");
+  };
+
+  const renderTreeVisualization = (svg, width, height, operation) => {
+    showNotImplementedMessage(svg, width, height, "Tree");
+  };
+
+  const renderStackQueueVisualization = (svg, width, height, operation) => {
+    showNotImplementedMessage(svg, width, height, "Stack/Queue");
+  };
+
+  const renderHashMapVisualization = (svg, width, height, operation) => {
+    showNotImplementedMessage(svg, width, height, "HashMap");
+  };
+
+  const renderDefaultVisualization = (svg, width, height, operation) => {
+    showNotImplementedMessage(
+      svg,
+      width,
+      height,
+      dataStructure?.type || "Unknown"
+    );
+  };
+
+  // Function to render Array/Vector visualization
+  const renderArrayVisualization = (svg, width, height, operation) => {
+    console.log("Rendering Array/Vector visualization");
+    console.log("Operation:", operation);
+
+    // Create a content group for the visualization
+    const contentGroup = svg.select(".zoom-container");
+    if (!contentGroup.empty()) {
+      // Clear any existing content
+      contentGroup.selectAll("*").remove();
+    }
+
+    // Add arrow marker definition for array pointer
+    let arrowDefs = svg.select("defs");
+    if (arrowDefs.empty()) {
+      arrowDefs = svg.append("defs");
+    }
+
+    // Check if marker already exists
+    if (arrowDefs.select("#array-arrow").empty()) {
+      arrowDefs
+        .append("marker")
+        .attr("id", "array-arrow")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 8)
+        .attr("refY", 0)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", "#0284c7");
+    }
+
+    // Get address object map from the operation state, if any
+    const addressObjectMap = operation.state?.addressObjectMap || {};
+    console.log("Address object map:", addressObjectMap);
+
+    // Get instance variables
+    const instanceVariables = operation.state?.instanceVariables || {};
+    console.log("Instance variables:", instanceVariables);
+
+    // Get local variables
+    const localVariables = operation.state?.localVariables || {};
+    console.log("Local variables:", localVariables);
+
+    // Determine the array data
+    let arrayElements = [];
+    const arrayAddress = instanceVariables.array;
+    console.log("Array address:", arrayAddress);
+
+    // Try to get the array data from the address object map first (preferred)
+    if (arrayAddress && addressObjectMap[arrayAddress]) {
+      arrayElements = addressObjectMap[arrayAddress];
+      console.log(
+        "Found array elements at address:",
+        arrayAddress,
+        arrayElements
+      );
+    } else {
+      // Fallback to elements directly in operation state
+      arrayElements = operation.state?.elements || [];
+      console.log("Using elements from operation state:", arrayElements);
+    }
+
+    // Get size and capacity from instance variables
+    const size =
+      instanceVariables.count !== undefined
+        ? instanceVariables.count
+        : instanceVariables.size || 0;
+    const capacity = instanceVariables.capacity || arrayElements.length || 0;
+
+    console.log("Array size:", size, "capacity:", capacity);
+
+    // Entity styles - match web browser visualization styles
+    const styles = {
+      array: {
+        width: 60,
+        height: 60,
+        fill: "#ffffff",
+        stroke: "#94a3b8",
+        textColor: "#334155",
+        unusedFill: "#f1f5f9",
+      },
+      localVars: {
+        width: 200,
+        height: 30, // Will be adjusted based on content
+        fill: "#ffffff",
+        stroke: "#94a3b8",
+        textColor: "#334155",
+      },
+      instanceVars: {
+        width: 200,
+        height: 30, // Will be adjusted based on content
+        fill: "#ffffff",
+        stroke: "#94a3b8",
+        textColor: "#334155",
+      },
+    };
+
+    // Calculate dimensions for array visualization
+    const cellSize = styles.array.width;
+    const cellPadding = 5;
+    const cellsPerRow = Math.min(15, capacity); // Limit to 15 cells per row for readability
+    const totalArrayWidth =
+      (cellSize + cellPadding) * Math.min(cellsPerRow, capacity);
+    const startX = (width - totalArrayWidth) / 2;
+    const startY =
+      height / 2 -
+      (Math.ceil(capacity / cellsPerRow) * (cellSize + cellPadding)) / 2;
+
+    // Optional: Display operation title at the top
+    contentGroup
+      .append("text")
+      .attr("x", width / 2)
+      .attr("y", 30)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "16px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#475569")
+      .text(
+        `${operation.operation || "Initial State"}${
+          operation.parameters
+            ? `(${JSON.stringify(operation.parameters).replace(/[{}]/g, "")})`
+            : ""
+        }`
+      );
+
+    // 1. Render Local Variables Box
+    const localVarsBox = contentGroup
+      .append("g")
+      .attr("class", "local-variables");
+
+    // Only show if there are local variables
+    if (Object.keys(localVariables).length > 0) {
+      // Adjust height based on number of variables
+      const localVarCount = Object.keys(localVariables).length;
+      const localVarsHeight = Math.max(65, 25 + 5 + localVarCount * 30); // Header (25px) + small gap (5px) + variables
+      styles.localVars.height = localVarsHeight;
+
+      // Box container
+      localVarsBox
+        .append("rect")
+        .attr("x", 50)
+        .attr("y", 80)
+        .attr("width", styles.localVars.width)
+        .attr("height", styles.localVars.height)
+        .attr("fill", "#ffffff")
+        .attr("stroke", "#94a3b8")
+        .attr("stroke-width", 1)
+        .attr("rx", 5);
+
+      // Title
+      localVarsBox
+        .append("rect")
+        .attr("x", 50)
+        .attr("y", 80)
+        .attr("width", styles.localVars.width)
+        .attr("height", 25)
+        .attr("fill", "#94a3b8")
+        .attr("fill-opacity", 0.3)
+        .attr("stroke", "none")
+        .attr("rx", 5)
+        .attr("ry", 0);
+
+      localVarsBox
+        .append("text")
+        .attr("x", 50 + styles.localVars.width / 2)
+        .attr("y", 80 + 17)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "13px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#334155")
+        .text("Local Variables");
+
+      // Divider line
+      localVarsBox
+        .append("line")
+        .attr("x1", 50)
+        .attr("y1", 80 + 25)
+        .attr("x2", 50 + styles.localVars.width)
+        .attr("y2", 80 + 25)
+        .attr("stroke", "#94a3b8")
+        .attr("stroke-width", 1);
+
+      // Local Variables
+      const localEntries = Object.entries(localVariables);
+      localEntries.forEach(([key, value], index) => {
+        const rowY = 80 + 30 + index * 30; // Starting y position (box top + header height + index * row height)
+
+        // Add field container for local variables
+        localVarsBox
+          .append("rect")
+          .attr("x", 50 + 10) // Same padding as page nodes (10px)
+          .attr("y", rowY)
+          .attr("width", styles.localVars.width - 20)
+          .attr("height", 25) // Same as page nodes
+          .attr("fill", "white")
+          .attr("stroke", "#e2e8f0")
+          .attr("stroke-width", 1)
+          .attr("rx", 3);
+
+        // Variable name (like "value:" in node boxes)
+        localVarsBox
+          .append("text")
+          .attr("x", 50 + 20) // Same as page nodes
+          .attr("y", rowY + 17) // Center in the row like page nodes
+          .attr("font-size", "12px")
+          .attr("font-weight", "bold")
+          .attr("fill", "#334155")
+          .text(key + ":");
+
+        // Variable value (like the values in node boxes)
+        localVarsBox
+          .append("text")
+          .attr("x", 50 + styles.localVars.width - 20) // Same as page nodes
+          .attr("y", rowY + 17) // Center in the row like page nodes
+          .attr("text-anchor", "end")
+          .attr("font-size", "12px")
+          .attr("font-weight", "bold")
+          .attr("fill", "#334155")
+          .text(
+            String(value).length > 10
+              ? String(value).substring(0, 9) + "..."
+              : value
+          );
+      });
+    }
+
+    // 2. Render Instance Variables Box
+    const instanceVarsBox = contentGroup
+      .append("g")
+      .attr("class", "instance-variables");
+
+    // Adjust height based on number of variables
+    const instanceVarCount = Object.keys(instanceVariables).length;
+    const instanceVarsHeight = Math.max(65, 25 + 5 + instanceVarCount * 30); // Header (25px) + small gap (5px) + variables
+    styles.instanceVars.height = instanceVarsHeight;
+
+    // Box container
+    instanceVarsBox
+      .append("rect")
+      .attr("x", width - 50 - styles.instanceVars.width)
+      .attr("y", 80)
+      .attr("width", styles.instanceVars.width)
+      .attr("height", styles.instanceVars.height)
+      .attr("fill", "#ffffff")
+      .attr("stroke", "#94a3b8")
+      .attr("stroke-width", 1)
+      .attr("rx", 5);
+
+    // Title
+    instanceVarsBox
+      .append("rect")
+      .attr("x", width - 50 - styles.instanceVars.width)
+      .attr("y", 80)
+      .attr("width", styles.instanceVars.width)
+      .attr("height", 25)
+      .attr("fill", "#94a3b8")
+      .attr("fill-opacity", 0.3)
+      .attr("stroke", "none")
+      .attr("rx", 5)
+      .attr("ry", 0);
+
+    instanceVarsBox
+      .append("text")
+      .attr("x", width - 50 - styles.instanceVars.width / 2)
+      .attr("y", 80 + 17)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "13px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#334155")
+      .text("Instance Variables");
+
+    // Divider line
+    instanceVarsBox
+      .append("line")
+      .attr("x1", width - 50 - styles.instanceVars.width)
+      .attr("y1", 80 + 25)
+      .attr("x2", width - 50)
+      .attr("y2", 80 + 25)
+      .attr("stroke", "#94a3b8")
+      .attr("stroke-width", 1);
+
+    // Instance Variables (includes array)
+    const instanceEntries = Object.entries(instanceVariables);
+    instanceEntries.forEach(([key, value], index) => {
+      const rowY = 80 + 30 + index * 30; // Starting y position (box top + header height + index * row height)
+
+      // Add field container for instance variables
+      instanceVarsBox
+        .append("rect")
+        .attr("x", width - 50 - styles.instanceVars.width + 10) // Same padding as page nodes (10px)
+        .attr("y", rowY)
+        .attr("width", styles.instanceVars.width - 20)
+        .attr("height", 25) // Same as page nodes
+        .attr("fill", "white")
+        .attr("stroke", "#e2e8f0")
+        .attr("stroke-width", 1)
+        .attr("rx", 3);
+
+      // Variable name (like "value:" in node boxes)
+      instanceVarsBox
+        .append("text")
+        .attr("x", width - 50 - styles.instanceVars.width + 20) // Same as page nodes
+        .attr("y", rowY + 17) // Center in the row like page nodes
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#334155")
+        .text(key + ":");
+
+      // Variable value (like the values in node boxes)
+      instanceVarsBox
+        .append("text")
+        .attr("x", width - 70) // Same as page nodes
+        .attr("y", rowY + 17) // Center in the row like page nodes
+        .attr("text-anchor", "end")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", key === "array" ? "#0284c7" : "#334155") // Highlight array address in blue
+        .text(
+          String(value).length > 10
+            ? String(value).substring(0, 9) + "..."
+            : value
+        );
+    });
+
+    // 3. Draw the array object (if there's an array address)
+    if (arrayAddress) {
+      // Create array reference box
+      const arrayRefBox = contentGroup
+        .append("g")
+        .attr("class", "array-reference");
+
+      // Draw the array reference box
+      arrayRefBox
+        .append("rect")
+        .attr("x", startX - 120)
+        .attr("y", startY)
+        .attr("width", 110)
+        .attr("height", cellSize)
+        .attr("fill", "#f0f9ff")
+        .attr("stroke", "#94a3b8")
+        .attr("stroke-width", 1)
+        .attr("rx", 4);
+
+      // Add a title/label
+      arrayRefBox
+        .append("rect")
+        .attr("x", startX - 120)
+        .attr("y", startY)
+        .attr("width", 110)
+        .attr("height", 25)
+        .attr("fill", "#94a3b8")
+        .attr("fill-opacity", 0.3)
+        .attr("stroke", "none")
+        .attr("rx", 4)
+        .attr("ry", 0);
+
+      arrayRefBox
+        .append("text")
+        .attr("x", startX - 65)
+        .attr("y", startY + 17)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#334155")
+        .text("array");
+
+      // Show address value
+      arrayRefBox
+        .append("text")
+        .attr("x", startX - 65)
+        .attr("y", startY + 45)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "14px")
+        .attr("fill", "#0284c7")
+        .text(arrayAddress.substring(0, 8));
+
+      // Draw arrow from array to first element
+      arrayRefBox
+        .append("path")
+        .attr(
+          "d",
+          `M ${startX - 10} ${startY + cellSize / 2} L ${startX - 3} ${
+            startY + cellSize / 2
+          }`
+        )
+        .attr("stroke", "#0284c7")
+        .attr("stroke-width", 1.5)
+        .attr("fill", "none")
+        .attr("marker-end", "url(#array-arrow)");
+    }
+
+    // 4. Draw array cells
+    const arrayCells = contentGroup.append("g").attr("class", "array-cells");
+
+    // Draw capacity boxes
+    for (let i = 0; i < capacity; i++) {
+      const row = Math.floor(i / cellsPerRow);
+      const col = i % cellsPerRow;
+      const x = startX + col * (cellSize + cellPadding);
+      const y = startY + row * (cellSize + cellPadding);
+
+      // Draw cell container
+      arrayCells
+        .append("rect")
+        .attr("x", x)
+        .attr("y", y)
+        .attr("width", cellSize)
+        .attr("height", cellSize)
+        .attr("fill", i < size ? styles.array.fill : styles.array.unusedFill)
+        .attr("stroke", styles.array.stroke)
+        .attr("stroke-width", 1)
+        .attr("rx", 4);
+
+      // Draw title/index area
+      arrayCells
+        .append("rect")
+        .attr("x", x)
+        .attr("y", y)
+        .attr("width", cellSize)
+        .attr("height", 25)
+        .attr("fill", "#94a3b8")
+        .attr("fill-opacity", 0.3)
+        .attr("stroke", "none")
+        .attr("rx", 4)
+        .attr("ry", 0);
+
+      // Draw index label
+      arrayCells
+        .append("text")
+        .attr("x", x + cellSize / 2)
+        .attr("y", y + 17)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "11px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#475569")
+        .text(i);
+
+      // Draw divider line
+      arrayCells
+        .append("line")
+        .attr("x1", x)
+        .attr("y1", y + 25)
+        .attr("x2", x + cellSize)
+        .attr("y2", y + 25)
+        .attr("stroke", styles.array.stroke)
+        .attr("stroke-width", 1);
+
+      // Draw value if available
+      if (i < arrayElements.length) {
+        const value = arrayElements[i];
+        arrayCells
+          .append("text")
+          .attr("x", x + cellSize / 2)
+          .attr("y", y + cellSize / 2 + 10)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "14px")
+          .attr("fill", "#0f172a")
+          .text(value !== undefined && value !== null ? value : "null");
+      }
+    }
+
+    // 5. Draw size indicator
+    if (size <= capacity) {
+      const row = Math.floor(size / cellsPerRow);
+      const col = size % cellsPerRow;
+      const x = startX + col * (cellSize + cellPadding);
+      const y = startY + row * (cellSize + cellPadding);
+
+      // Size indicator arrow
+      arrayCells
+        .append("path")
+        .attr(
+          "d",
+          `M ${x} ${y - 15} L ${x} ${y - 5} L ${x - 5} ${y - 10} L ${x + 5} ${
+            y - 10
+          } Z`
+        )
+        .attr("fill", "#f97316");
+
+      arrayCells
+        .append("text")
+        .attr("x", x)
+        .attr("y", y - 20)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "10px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#f97316")
+        .text("size");
+    }
+
+    // 6. Optional: Draw Address Object Map visualization
+    const hasAddressObjects =
+      Object.keys(addressObjectMap).length > 0 && arrayAddress;
+
+    if (false) {
+      // Completely disabled per user request
+      const addressMapBox = container
+        .append("g")
+        .attr("class", "address-object-map");
+
+      const mapBoxY = height - 120;
+      const mapBoxHeight = 160;
+      const mapBoxWidth = width - 100;
+
+      // Box container
+      addressMapBox
+        .append("rect")
+        .attr("x", 50)
+        .attr("y", mapBoxY)
+        .attr("width", mapBoxWidth)
+        .attr("height", mapBoxHeight)
+        .attr("fill", "#f8fafc")
+        .attr("stroke", "#cbd5e1")
+        .attr("stroke-width", 1)
+        .attr("rx", 5);
+
+      // Title
+      addressMapBox
+        .append("rect")
+        .attr("x", 50)
+        .attr("y", mapBoxY)
+        .attr("width", mapBoxWidth)
+        .attr("height", 30)
+        .attr("fill", "#94a3b8")
+        .attr("fill-opacity", 0.3)
+        .attr("stroke", "none")
+        .attr("rx", 5)
+        .attr("ry", 0);
+
+      addressMapBox
+        .append("text")
+        .attr("x", 50 + mapBoxWidth / 2)
+        .attr("y", mapBoxY + 20)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "14px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#475569")
+        .text("Address Object Map");
+
+      // Address entries
+      const entryWidth = 180;
+      const entriesPerRow = Math.floor(mapBoxWidth / entryWidth);
+
+      addresses.forEach((address, index) => {
+        const row = Math.floor(index / entriesPerRow);
+        const col = index % entriesPerRow;
+
+        const entryX = 50 + col * entryWidth + 10;
+        const entryY = mapBoxY + 40 + row * 40;
+
+        // Address
+        addressMapBox
+          .append("text")
+          .attr("x", entryX)
+          .attr("y", entryY)
+          .attr("font-size", "12px")
+          .attr("font-weight", "bold")
+          .attr("fill", "#475569")
+          .text(address.substring(0, 8) + ":");
+
+        // Value
+        const value = addressObjectMap[address]?.value;
+        addressMapBox
+          .append("text")
+          .attr("x", entryX + 80)
+          .attr("y", entryY)
+          .attr("font-size", "12px")
+          .attr("fill", "#475569")
+          .text(value || "null");
+      });
+    }
+
+    // Auto-fit the visualization to the view
+    autoFitVisualization(svg, contentGroup, zoomRef.current, width, height);
   };
 
   return (
