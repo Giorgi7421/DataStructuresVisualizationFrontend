@@ -209,14 +209,18 @@ function DataStructurePage() {
         return;
       }
 
+      // Get the SVG element
+      const svg = d3.select(svgRef.current);
+
       // Clear existing visualization
-      d3.select(svgRef.current).selectAll("*").remove();
+      svg.selectAll("*").remove();
       console.log("Cleared previous visualization");
 
-      // Create a new SVG
-      const svg = d3.select(svgRef.current);
-      const width = parseInt(svg.style("width")) || 800;
-      const height = parseInt(svg.style("height")) || 600;
+      // Get dimensions from parent container, or use defaults
+      const parentContainer = svg.node().parentElement;
+      const width = parentContainer ? parentContainer.clientWidth : 800;
+      const height = parentContainer ? parentContainer.clientHeight : 600;
+      svg.attr("width", width).attr("height", height); // Ensure SVG has dimensions
 
       console.log("SVG dimensions for rendering:", { width, height });
 
@@ -245,8 +249,6 @@ function DataStructurePage() {
         .on("zoom", (event) => {
           // Apply the transform directly to the content group
           contentGroup.attr("transform", event.transform);
-
-          // Update zoom level for display
           setZoomLevel(event.transform.k);
           console.log("Zoom event:", event.transform.k);
         });
@@ -261,19 +263,14 @@ function DataStructurePage() {
       svg.call(zoom.transform, d3.zoomIdentity);
 
       // Determine which operation to render:
-      // 1. If provided directly as parameter, use that
-      // 2. Otherwise use current state
       let operation;
       let memorySnapshot = null;
 
-      // Priority 1: Use direct parameters if provided
       if (directOperation) {
         operation = directOperation;
         memorySnapshot = directSnapshot;
         console.log("Using directly provided operation and snapshot");
-      }
-      // Priority 2: Use current state
-      else if (
+      } else if (
         currentHistoryIndex >= 0 &&
         currentHistoryIndex < operations.length
       ) {
@@ -282,7 +279,6 @@ function DataStructurePage() {
           `Rendering operation ${currentHistoryIndex + 1}/${operations.length}`
         );
 
-        // Always use the memory snapshot if we're in snapshot mode and it's available
         if (
           snapshotMode &&
           operation.memorySnapshots &&
@@ -292,7 +288,6 @@ function DataStructurePage() {
             Math.max(0, currentSnapshotIndex),
             operation.memorySnapshots.length - 1
           );
-
           memorySnapshot = operation.memorySnapshots[validSnapshotIndex];
           console.log(
             `Rendering snapshot ${validSnapshotIndex + 1}/${
@@ -302,19 +297,26 @@ function DataStructurePage() {
         }
       } else {
         console.error("No valid operation to render");
+        contentGroup
+          .append("text")
+          .attr("x", width / 2)
+          .attr("y", height / 2)
+          .attr("text-anchor", "middle")
+          .text("No operation selected to visualize");
         return;
       }
 
       if (
         !memorySnapshot &&
+        operation && // Ensure operation is defined
         operation.memorySnapshots &&
         operation.memorySnapshots.length > 0
       ) {
-        // No memory snapshot specified yet, default to the last one
         memorySnapshot =
           operation.memorySnapshots[operation.memorySnapshots.length - 1];
         console.log("Defaulting to last snapshot for operation");
-      } else if (!memorySnapshot) {
+      } else if (!memorySnapshot && operation) {
+        // Ensure operation is defined
         console.log(
           `No memory snapshots available for operation ${
             operation.operationName || operation.operation
@@ -326,180 +328,170 @@ function DataStructurePage() {
 
       try {
         const structureType = (dataStructure.type || "").toUpperCase();
+        let effectiveOperation = operation ? { ...operation } : null;
 
-        // Special case for web browser visualization
-        if (structureType === "WEB_BROWSER") {
-          console.log("Rendering WEB_BROWSER visualization");
-          renderWebBrowserVisualization(
-            contentGroup,
-            width,
-            height,
-            operation,
-            memorySnapshot
-          );
-
-          // Auto-fit the visualization after rendering
-          autoFitVisualization(svg, contentGroup, zoom, width, height);
-          return;
-        }
-
-        // FALLBACK: If there's no specific selected memory snapshot, use the operation state directly
-        if (!memorySnapshot && operation.state) {
-          console.log(
-            "Using operation state directly since no memory snapshot is available"
-          );
-
-          // Create a modified operation object with the current snapshot data
-          const newOperation = { ...operation };
-
-          // Determine visualization method based on structure type
-          console.log("Structure type for visualization:", structureType);
-
-          // Select the appropriate visualization method
-          if (enableMemoryVisualization) {
-            console.log("Using memory visualization (no snapshots)");
-            renderMemoryVisualization(newOperation, svgRef);
-          } else {
-            switch (structureType) {
-              case "VECTOR":
-                console.log("Using array visualization (no snapshots)");
-                renderArrayVisualization(
-                  svg,
-                  width,
-                  height,
-                  newOperation,
-                  null
-                );
-                break;
-              case "LINKED_LIST":
-                renderLinkedListVisualization(svg, width, height, newOperation);
-                break;
-              case "TREE":
-                renderTreeVisualization(svg, width, height, newOperation);
-                break;
-              case "STACK":
-              case "QUEUE":
-                renderStackQueueVisualization(svg, width, height, newOperation);
-                break;
-              case "MAP":
-                renderHashMapVisualization(svg, width, height, newOperation);
-                break;
-              default:
-                renderDefaultVisualization(svg, width, height, newOperation);
-            }
-          }
-          return;
-        }
-
-        if (!memorySnapshot) {
-          // No snapshot and no operation state, show error message
+        if (!effectiveOperation) {
+          console.error("Effective operation is null, cannot render.");
           contentGroup
             .append("text")
             .attr("x", width / 2)
             .attr("y", height / 2)
             .attr("text-anchor", "middle")
-            .text("No memory data available to visualize");
-          console.error("No memory snapshot or state data available");
+            .text("Cannot determine operation to render.");
           return;
         }
 
-        // Create a modified operation object with the current snapshot data
-        const effectiveOperation = { ...operation };
-
-        // Override operation state with snapshot data
-        effectiveOperation.state = {
-          ...effectiveOperation.state,
-          instanceVariables: memorySnapshot.instanceVariables || {},
-          localVariables: memorySnapshot.localVariables || {},
-          addressObjectMap: memorySnapshot.addressObjectMap || {},
-          elements: extractElementsFromSnapshot(
-            memorySnapshot,
-            dataStructure.type
-          ),
-          result: memorySnapshot.getResult,
-          message: memorySnapshot.message,
-        };
-
-        console.log(
-          "Effective operation state for rendering:",
-          effectiveOperation.state
-        );
-
-        // Special case for web browser visualization
-        if (structureType === "WEB_BROWSER") {
+        // If a memory snapshot exists, use its data to override the operation's state.
+        // Otherwise, the visualization will use the base operation.state if available.
+        if (memorySnapshot) {
+          effectiveOperation.state = {
+            ...(effectiveOperation.state || {}), // Preserve existing state if any
+            instanceVariables: memorySnapshot.instanceVariables || {},
+            localVariables: memorySnapshot.localVariables || {},
+            addressObjectMap: memorySnapshot.addressObjectMap || {},
+            elements: extractElementsFromSnapshot(
+              memorySnapshot,
+              dataStructure.type
+            ),
+            result: memorySnapshot.getResult,
+            message: memorySnapshot.message,
+          };
           console.log(
-            "Rendering WEB_BROWSER visualization with memory snapshot"
+            "Effective operation state (from snapshot) for rendering:",
+            effectiveOperation.state
           );
-          renderWebBrowserVisualization(
+        } else if (effectiveOperation.state) {
+          console.log(
+            "Effective operation state (from operation) for rendering:",
+            effectiveOperation.state
+          );
+        } else {
+          console.log(
+            "No snapshot and no base state in operation. Visualization might be empty or show an error."
+          );
+          contentGroup
+            .append("text")
+            .attr("x", width / 2)
+            .attr("y", height / 2)
+            .attr("text-anchor", "middle")
+            .text(
+              "No data available to visualize for this operation/snapshot."
+            );
+          // Potentially return here or let individual renderers handle it
+        }
+
+        if (enableMemoryVisualization) {
+          console.log("Using memory visualization");
+          // Assuming renderMemoryVisualization is also refactored to use contentGroup
+          renderMemoryVisualization(
+            effectiveOperation,
             contentGroup,
             width,
             height,
-            effectiveOperation,
             memorySnapshot
           );
-          return;
-        }
-
-        // Select the appropriate visualization method
-        if (enableMemoryVisualization) {
-          console.log("Using memory visualization");
-          renderMemoryVisualization(effectiveOperation, svgRef);
         } else {
-          switch (structureType) {
-            case "VECTOR":
-              console.log("Using array visualization");
-              renderArrayVisualization(
-                svg,
+          const type = (dataStructure.type || "").toUpperCase();
+          const impl = (dataStructure.implementation || "").toUpperCase();
+          let combinedType;
+
+          if (impl && impl !== "NULL" && impl !== "") {
+            combinedType = `${impl}_${type}`;
+          } else {
+            combinedType = type;
+          }
+          console.log("Combined structure type for switch:", combinedType);
+
+          switch (combinedType) {
+            case "WEB_BROWSER":
+              console.log("Rendering WEB_BROWSER visualization");
+              renderWebBrowserVisualization(
+                contentGroup,
                 width,
                 height,
                 effectiveOperation,
                 memorySnapshot
               );
               break;
-            case "LINKED_LIST":
+            case "ARRAY_VECTOR":
+              console.log("Using array visualization for ARRAY_VECTOR");
+              renderArrayVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot
+              );
+              break;
+            case "LINKED_LIST_VECTOR":
+              console.log(
+                "Using linked list visualization for LINKED_LIST_VECTOR (stub)"
+              );
               renderLinkedListVisualization(
-                svg,
+                contentGroup,
                 width,
                 height,
-                effectiveOperation
+                effectiveOperation,
+                memorySnapshot
               );
               break;
-            case "TREE":
-              renderTreeVisualization(svg, width, height, effectiveOperation);
-              break;
-            case "STACK":
-            case "QUEUE":
-              renderStackQueueVisualization(
-                svg,
+
+            // Cases for which we show "not implemented"
+            case "ARRAY_STACK":
+            case "LINKED_LIST_STACK":
+            case "TWO_QUEUE_STACK":
+            case "ARRAY_QUEUE":
+            case "LINKED_LIST_QUEUE":
+            case "ARRAY_MAP":
+            case "HASH_MAP":
+            case "TREE_MAP":
+            case "GRID":
+            case "DEQUEUE":
+            case "BS_TREE":
+            case "AVL_TREE":
+            case "EXPRESSION_TREE":
+            case "HASH_SET":
+            case "TREE_SET":
+            case "SMALL_INT_SET":
+            case "MOVE_TO_FRONT_SET":
+            case "UNSORTED_VECTOR_PRIORITY_QUEUE":
+            case "SORTED_LINKED_LIST_PRIORITY_QUEUE":
+            case "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE":
+            case "BINARY_HEAP_PRIORITY_QUEUE":
+            case "BIG_INTEGER":
+            case "FILE_SYSTEM":
+            case "ARRAY_EDITOR_BUFFER":
+            case "TWO_STACK_EDITOR_BUFFER":
+            case "LINKED_LIST_EDITOR_BUFFER":
+            case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
+              console.log(
+                `No specific implementation for ${combinedType}, showing message.`
+              );
+              showNotImplementedMessage(
+                contentGroup,
                 width,
                 height,
-                effectiveOperation
+                combinedType
               );
               break;
-            case "MAP":
-              renderHashMapVisualization(
-                svg,
-                width,
-                height,
-                effectiveOperation
-              );
-              break;
+
             default:
-              renderDefaultVisualization(
-                svg,
+              console.log(
+                `Default: No specific implementation for ${combinedType}, showing message.`
+              );
+              showNotImplementedMessage(
+                contentGroup,
                 width,
                 height,
-                effectiveOperation
+                combinedType
               );
           }
         }
-
-        // Auto-fit visualization after rendering
+        // Auto-fit visualization after rendering completes
         autoFitVisualization(svg, contentGroup, zoom, width, height);
       } catch (error) {
         console.error("Error in renderVisualization:", error);
-
-        // Add error information to SVG
+        contentGroup.selectAll("*").remove(); // Clear potentially broken content
         contentGroup
           .append("text")
           .attr("x", width / 2)
@@ -508,7 +500,6 @@ function DataStructurePage() {
           .attr("font-size", "16px")
           .attr("fill", "#ef4444")
           .text("Error rendering visualization");
-
         contentGroup
           .append("text")
           .attr("x", width / 2)
@@ -521,11 +512,14 @@ function DataStructurePage() {
     },
     [
       dataStructure,
+      operations, // Added operations as a dependency
       currentHistoryIndex,
       currentSnapshotIndex,
       enableMemoryVisualization,
       snapshotMode,
-      forceRender, // Add dependency on forceRender
+      forceRender,
+      // Removed extractElementsFromSnapshot from here, it's used internally
+      // Removed specific render functions from here, they are called internally
     ]
   );
 
@@ -2149,42 +2143,90 @@ function DataStructurePage() {
         console.log("Direct rendering using memory visualization");
         renderMemoryVisualization(effectiveOperation, svgRef);
       } else {
-        switch (structureType) {
-          case "VECTOR":
-            console.log("Direct rendering array visualization");
+        const type = (dataStructure.type || "").toUpperCase();
+        const impl = (dataStructure.implementation || "").toUpperCase();
+        let combinedType;
+
+        if (impl && impl !== "NULL" && impl !== "") {
+          combinedType = `${impl}_${type}`;
+        } else {
+          combinedType = type;
+        }
+        console.log("Combined structure type for switch:", combinedType);
+
+        switch (combinedType) {
+          case "ARRAY_VECTOR":
+            console.log("Using array visualization for ARRAY_VECTOR");
             renderArrayVisualization(
-              svg,
+              contentGroup,
               width,
               height,
               effectiveOperation,
               memorySnapshot
             );
             break;
-          case "LINKED_LIST":
+          case "LINKED_LIST_VECTOR":
+            console.log(
+              "Using linked list visualization for LINKED_LIST_VECTOR (stub)"
+            );
             renderLinkedListVisualization(
-              svg,
+              contentGroup,
               width,
               height,
-              effectiveOperation
+              effectiveOperation,
+              memorySnapshot
             );
             break;
-          case "TREE":
-            renderTreeVisualization(svg, width, height, effectiveOperation);
-            break;
-          case "STACK":
-          case "QUEUE":
-            renderStackQueueVisualization(
-              svg,
+
+          // Cases for which we show "not implemented"
+          case "ARRAY_STACK":
+          case "LINKED_LIST_STACK":
+          case "TWO_QUEUE_STACK":
+          case "ARRAY_QUEUE":
+          case "LINKED_LIST_QUEUE":
+          case "ARRAY_MAP":
+          case "HASH_MAP":
+          case "TREE_MAP":
+          case "GRID":
+          case "DEQUEUE":
+          case "BS_TREE":
+          case "AVL_TREE":
+          case "EXPRESSION_TREE":
+          case "HASH_SET":
+          case "TREE_SET":
+          case "SMALL_INT_SET":
+          case "MOVE_TO_FRONT_SET":
+          case "UNSORTED_VECTOR_PRIORITY_QUEUE":
+          case "SORTED_LINKED_LIST_PRIORITY_QUEUE":
+          case "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE":
+          case "BINARY_HEAP_PRIORITY_QUEUE":
+          case "BIG_INTEGER":
+          case "FILE_SYSTEM":
+          case "ARRAY_EDITOR_BUFFER":
+          case "TWO_STACK_EDITOR_BUFFER":
+          case "LINKED_LIST_EDITOR_BUFFER":
+          case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
+            console.log(
+              `No specific implementation for ${combinedType}, showing message.`
+            );
+            showNotImplementedMessage(
+              contentGroup,
               width,
               height,
-              effectiveOperation
+              combinedType
             );
             break;
-          case "MAP":
-            renderHashMapVisualization(svg, width, height, effectiveOperation);
-            break;
+
           default:
-            renderDefaultVisualization(svg, width, height, effectiveOperation);
+            console.log(
+              `Default: No specific implementation for ${combinedType}, showing message.`
+            );
+            showNotImplementedMessage(
+              contentGroup,
+              width,
+              height,
+              combinedType
+            );
         }
       }
 
@@ -2308,8 +2350,14 @@ function DataStructurePage() {
     }
   };
 
-  const showNotImplementedMessage = (svg, width, height, structureType) => {
-    const contentGroup = svg.select(".zoom-container");
+  const showNotImplementedMessage = (
+    contentGroup,
+    width,
+    height,
+    structureType
+  ) => {
+    // contentGroup is already a D3 selection
+    contentGroup.selectAll("*").remove(); // Clear previous message if any
     contentGroup
       .append("text")
       .attr("x", width / 2)
@@ -2320,34 +2368,69 @@ function DataStructurePage() {
       .text(`${structureType} visualization not implemented yet`);
   };
 
-  const renderLinkedListVisualization = (svg, width, height, operation) => {
-    showNotImplementedMessage(svg, width, height, "Linked List");
+  const renderLinkedListVisualization = (
+    contentGroup, // Changed from svg
+    width,
+    height,
+    operation, // Added operation
+    memorySnapshot // Added memorySnapshot
+  ) => {
+    console.log("Render Linked List (stub) for op:", operation);
+    showNotImplementedMessage(contentGroup, width, height, "Linked List");
   };
 
-  const renderTreeVisualization = (svg, width, height, operation) => {
-    showNotImplementedMessage(svg, width, height, "Tree");
+  const renderTreeVisualization = (
+    contentGroup, // Changed from svg
+    width,
+    height,
+    operation, // Added operation
+    memorySnapshot // Added memorySnapshot
+  ) => {
+    console.log("Render Tree (stub) for op:", operation);
+    showNotImplementedMessage(contentGroup, width, height, "Tree");
   };
 
-  const renderStackQueueVisualization = (svg, width, height, operation) => {
-    showNotImplementedMessage(svg, width, height, "Stack/Queue");
+  const renderStackQueueVisualization = (
+    contentGroup, // Changed from svg
+    width,
+    height,
+    operation, // Added operation
+    memorySnapshot // Added memorySnapshot
+  ) => {
+    console.log("Render Stack/Queue (stub) for op:", operation);
+    showNotImplementedMessage(contentGroup, width, height, "Stack/Queue");
   };
 
-  const renderHashMapVisualization = (svg, width, height, operation) => {
-    showNotImplementedMessage(svg, width, height, "HashMap");
+  const renderHashMapVisualization = (
+    contentGroup, // Changed from svg
+    width,
+    height,
+    operation, // Added operation
+    memorySnapshot // Added memorySnapshot
+  ) => {
+    console.log("Render HashMap (stub) for op:", operation);
+    showNotImplementedMessage(contentGroup, width, height, "HashMap");
   };
 
-  const renderDefaultVisualization = (svg, width, height, operation) => {
+  const renderDefaultVisualization = (
+    contentGroup, // Changed from svg
+    width,
+    height,
+    operation, // Added operation
+    memorySnapshot // Added memorySnapshot
+  ) => {
+    console.log("Render Default (stub) for op:", operation);
     showNotImplementedMessage(
-      svg,
+      contentGroup,
       width,
       height,
-      dataStructure?.type || "Unknown"
+      operation?.state?.structureType || dataStructure?.type || "Unknown"
     );
   };
 
   // Function to render Array/Vector visualization
   const renderArrayVisualization = (
-    svg,
+    contentGroup,
     width,
     height,
     operation,
@@ -2356,121 +2439,75 @@ function DataStructurePage() {
     console.log("Rendering array visualization with operation:", operation);
     console.log("With memory snapshot:", memorySnapshot);
 
-    // Clear any existing content - but maintain the zoom container structure
-    svg.selectAll("*").remove();
-
-    // First, create a fixed background layer that doesn't move or zoom
-    const backgroundLayer = svg.append("g").attr("class", "fixed-background");
-
-    // Add the gray background rectangle that stays fixed
-    backgroundLayer
-      .append("rect")
-      .attr("width", width)
-      .attr("height", height)
-      .attr("fill", "#f8fafc")
-      .attr("stroke", "#d1d5db");
-
-    // Now create a content layer that will be zoomable and pannable
-    const contentGroup = svg.append("g").attr("class", "zoom-container");
-
-    // Set up the zoom behavior
-    const zoom = d3
-      .zoom()
-      .scaleExtent([0.1, 5]) // Min/max zoom levels
-      .translateExtent([
-        [-width * 3, -height * 3],
-        [width * 3, height * 3],
-      ]) // Extra generous panning area
-      .on("zoom", (event) => {
-        // Apply the transform directly to the content group
-        contentGroup.attr("transform", event.transform);
-
-        // Update zoom level for display
-        setZoomLevel(event.transform.k);
-        console.log("Zoom event:", event.transform.k);
-      });
-
-    // Store zoom for reference and manual control
-    zoomRef.current = zoom;
-
-    // Initialize zoom on the SVG
-    svg.call(zoom);
-
-    // Reset zoom to initial position
-    svg.call(zoom.transform, d3.zoomIdentity);
-
-    // Add arrow marker definitions
-    const svgDefs = svg.append("defs");
-    svgDefs
-      .append("marker")
-      .attr("id", "array-arrow")
-      .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 8)
-      .attr("refY", 0)
-      .attr("markerWidth", 8)
-      .attr("markerHeight", 8)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M0,-5L10,0L0,5")
-      .attr("fill", "#0284c7");
-
-    svgDefs
-      .append("marker")
-      .attr("id", "var-ref-arrow")
-      .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 8)
-      .attr("refY", 0)
-      .attr("markerWidth", 8)
-      .attr("markerHeight", 8)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M0,-5L10,0L0,5")
-      .attr("fill", "#334155");
-
-    // Extract data from operation or memory snapshot
-    let arrayData = {};
-
-    // First try to get data from memory snapshot
-    if (memorySnapshot) {
-      // Use memory snapshot directly
-      arrayData = memorySnapshot;
-      console.log("Array data from memory snapshot:", arrayData);
-    } else if (operation.state) {
-      // Fallback to operation state
-      arrayData = operation.state;
-      console.log("Array data from operation state:", arrayData);
+    let svgDefs = d3.select(svgRef.current).select("defs");
+    if (svgDefs.empty()) {
+      svgDefs = d3.select(svgRef.current).append("defs");
+    }
+    if (svgDefs.select("#array-arrow").empty()) {
+      svgDefs
+        .append("marker")
+        .attr("id", "array-arrow")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 8)
+        .attr("refY", 0)
+        .attr("markerWidth", 8)
+        .attr("markerHeight", 8)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", "#0284c7");
+    }
+    if (svgDefs.select("#var-ref-arrow").empty()) {
+      svgDefs
+        .append("marker")
+        .attr("id", "var-ref-arrow")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 8)
+        .attr("refY", 0)
+        .attr("markerWidth", 8)
+        .attr("markerHeight", 8)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", "#334155");
     }
 
-    // Extract the array components
-    const localVariables = arrayData.localVariables || {};
-    const instanceVariables = arrayData.instanceVariables || {};
-    const addressObjectMap = arrayData.addressObjectMap || {};
+    const arrayState = operation.state || {};
+    const localVariables = arrayState.localVariables || {};
+    const instanceVariables = arrayState.instanceVariables || {};
+    const addressObjectMap = arrayState.addressObjectMap || {};
     const arrayAddress = instanceVariables.array;
 
-    console.log("Local variables:", localVariables);
-    console.log("Instance variables:", instanceVariables);
-    console.log("Address object map:", addressObjectMap);
-    console.log("Array address:", arrayAddress);
+    const size = instanceVariables.count ?? instanceVariables.size ?? 0;
+    let capacity = instanceVariables.capacity || 0;
 
-    // Determine array dimensions
-    const size = instanceVariables.count || instanceVariables.size || 0;
-    const capacity = instanceVariables.capacity || 0;
-    console.log("Size:", size, "Capacity:", capacity);
-
-    // Get array elements
     let arrayElements = [];
     if (arrayAddress && addressObjectMap[arrayAddress]) {
       const elements = addressObjectMap[arrayAddress];
       if (Array.isArray(elements)) {
-        arrayElements = elements.slice(0, size || elements.length);
-        console.log("Array elements from address map:", arrayElements);
+        arrayElements = elements.slice(0, size);
+        if (capacity === 0 && elements.length > 0) capacity = elements.length;
       }
-    } else if (operation.state && operation.state.elements) {
-      arrayElements = operation.state.elements;
-      console.log("Array elements from operation state:", arrayElements);
+    } else if (arrayState.elements) {
+      arrayElements = arrayState.elements.slice(0, size);
+      if (capacity === 0 && arrayState.elements.length > 0)
+        capacity = arrayState.elements.length;
     }
 
-    // Entity styles
+    const hasArrayObject = !!arrayAddress;
+    const displayCapacity = hasArrayObject ? Math.max(capacity, size, 0) : 0;
+    // If displayCapacity is still 0 but arrayAddress exists, it means an empty array object is present.
+    // We might want to show a small visual cue for the array object itself in this case, even if no cells.
+    // For now, if displayCapacity is 0, no cells will be drawn.
+
+    console.log("Array Info:", {
+      arrayAddress,
+      size,
+      capacity,
+      displayCapacity,
+      elementsLength: arrayElements.length,
+    });
+
     const styles = {
       array: {
         elementWidth: 60,
@@ -2492,25 +2529,14 @@ function DataStructurePage() {
         stroke: "#64748b",
         textColor: "#334155",
       },
-      connection: {
-        stroke: "#64748b",
-        width: 2,
-        varRefColor: "#334155",
-      },
+      connection: { stroke: "#64748b", width: 2, varRefColor: "#334155" },
     };
-
-    // Position tracking for connections
     const pagePositions = {};
-
-    // Layout parameters
     const cellSize = styles.array.elementWidth;
-    // Remove padding between cells to make them joined
-    const cellPadding = 0;
-    const realCapacity = Math.max(capacity, arrayElements.length, size || 0, 1);
-    // Display all elements in a single row - don't limit to 8 per row
-    const cellsPerRow = realCapacity;
-    const startX = Math.max(250, (width - cellsPerRow * cellSize) / 2);
-    const startY = 160;
+
+    const firstColX = 50;
+    const varBoxTopMargin = 20;
+    const varBoxSpacing = 20;
 
     // 1. Render Local Variables Box
     const localVarsBox = contentGroup
@@ -2518,24 +2544,20 @@ function DataStructurePage() {
       .attr("class", "local-variables");
     const localVarCount = Object.keys(localVariables).length;
     const localVarsHeight = Math.max(65, 25 + 5 + localVarCount * 30);
-
-    // Box container
     localVarsBox
       .append("rect")
-      .attr("x", 50)
-      .attr("y", 20)
+      .attr("x", firstColX)
+      .attr("y", varBoxTopMargin)
       .attr("width", styles.localVars.width)
       .attr("height", localVarsHeight)
       .attr("fill", styles.localVars.fill)
       .attr("stroke", styles.localVars.stroke)
       .attr("stroke-width", 1)
       .attr("rx", 5);
-
-    // Title
     localVarsBox
       .append("rect")
-      .attr("x", 50)
-      .attr("y", 20)
+      .attr("x", firstColX)
+      .attr("y", varBoxTopMargin)
       .attr("width", styles.localVars.width)
       .attr("height", 25)
       .attr("fill", styles.localVars.stroke)
@@ -2543,58 +2565,48 @@ function DataStructurePage() {
       .attr("stroke", "none")
       .attr("rx", 5)
       .attr("ry", 0);
-
     localVarsBox
       .append("text")
-      .attr("x", 50 + styles.localVars.width / 2)
-      .attr("y", 20 + 17)
+      .attr("x", firstColX + styles.localVars.width / 2)
+      .attr("y", varBoxTopMargin + 17)
       .attr("text-anchor", "middle")
       .attr("font-size", "13px")
       .attr("font-weight", "bold")
       .attr("fill", styles.localVars.textColor)
       .text("Local Variables");
-
-    // Divider line
     localVarsBox
       .append("line")
-      .attr("x1", 50)
-      .attr("y1", 20 + 25)
-      .attr("x2", 50 + styles.localVars.width)
-      .attr("y2", 20 + 25)
+      .attr("x1", firstColX)
+      .attr("y1", varBoxTopMargin + 25)
+      .attr("x2", firstColX + styles.localVars.width)
+      .attr("y2", varBoxTopMargin + 25)
       .attr("stroke", styles.localVars.stroke)
       .attr("stroke-width", 1);
-
-    // Variables
     let yOffset = 30;
     Object.entries(localVariables).forEach(([key, value], index) => {
-      // Variable container
       localVarsBox
         .append("rect")
-        .attr("x", 50 + 10)
-        .attr("y", 20 + yOffset)
+        .attr("x", firstColX + 10)
+        .attr("y", varBoxTopMargin + yOffset)
         .attr("width", styles.localVars.width - 20)
         .attr("height", 25)
         .attr("fill", "white")
         .attr("stroke", "#e2e8f0")
         .attr("stroke-width", 1)
         .attr("rx", 3);
-
-      // Name
       localVarsBox
         .append("text")
-        .attr("x", 50 + 20)
-        .attr("y", 20 + yOffset + 17)
+        .attr("x", firstColX + 20)
+        .attr("y", varBoxTopMargin + yOffset + 17)
         .attr("font-size", "12px")
         .attr("font-weight", "bold")
         .attr("fill", styles.localVars.textColor)
         .text(key + ":");
-
-      // Value
       const isRef = isAddress(value);
       localVarsBox
         .append("text")
-        .attr("x", 50 + styles.localVars.width - 20)
-        .attr("y", 20 + yOffset + 17)
+        .attr("x", firstColX + styles.localVars.width - 20)
+        .attr("y", varBoxTopMargin + yOffset + 17)
         .attr("text-anchor", "end")
         .attr("font-size", "12px")
         .attr("font-weight", "bold")
@@ -2604,43 +2616,38 @@ function DataStructurePage() {
             ? String(value).substring(0, 9) + "..."
             : value
         );
-
-      // Store position for connections
       pagePositions[`local_${key}`] = {
-        x: 50,
-        y: 20 + yOffset,
+        x: firstColX,
+        y: varBoxTopMargin + yOffset,
         width: styles.localVars.width,
         height: 25,
         value: value,
       };
-
       yOffset += 30;
     });
 
-    // 2. Render Instance Variables Box
+    // 2. Render Instance Variables Box (Below Local Variables)
+    const instanceVarsStartY =
+      varBoxTopMargin + localVarsHeight + varBoxSpacing;
     const instanceVarsBox = contentGroup
       .append("g")
       .attr("class", "instance-variables");
     const instanceVarCount = Object.keys(instanceVariables).length;
     const instanceVarsHeight = Math.max(65, 25 + 5 + instanceVarCount * 30);
-
-    // Box container
     instanceVarsBox
       .append("rect")
-      .attr("x", width - 50 - styles.instanceVars.width)
-      .attr("y", 20)
+      .attr("x", firstColX)
+      .attr("y", instanceVarsStartY)
       .attr("width", styles.instanceVars.width)
       .attr("height", instanceVarsHeight)
       .attr("fill", styles.instanceVars.fill)
       .attr("stroke", styles.instanceVars.stroke)
       .attr("stroke-width", 1)
       .attr("rx", 5);
-
-    // Title
     instanceVarsBox
       .append("rect")
-      .attr("x", width - 50 - styles.instanceVars.width)
-      .attr("y", 20)
+      .attr("x", firstColX)
+      .attr("y", instanceVarsStartY)
       .attr("width", styles.instanceVars.width)
       .attr("height", 25)
       .attr("fill", styles.instanceVars.stroke)
@@ -2648,58 +2655,48 @@ function DataStructurePage() {
       .attr("stroke", "none")
       .attr("rx", 5)
       .attr("ry", 0);
-
     instanceVarsBox
       .append("text")
-      .attr("x", width - 50 - styles.instanceVars.width / 2)
-      .attr("y", 20 + 17)
+      .attr("x", firstColX + styles.instanceVars.width / 2)
+      .attr("y", instanceVarsStartY + 17)
       .attr("text-anchor", "middle")
       .attr("font-size", "13px")
       .attr("font-weight", "bold")
       .attr("fill", styles.instanceVars.textColor)
       .text("Instance Variables");
-
-    // Divider line
     instanceVarsBox
       .append("line")
-      .attr("x1", width - 50 - styles.instanceVars.width)
-      .attr("y1", 20 + 25)
-      .attr("x2", width - 50)
-      .attr("y2", 20 + 25)
+      .attr("x1", firstColX)
+      .attr("y1", instanceVarsStartY + 25)
+      .attr("x2", firstColX + styles.instanceVars.width)
+      .attr("y2", instanceVarsStartY + 25)
       .attr("stroke", styles.instanceVars.stroke)
       .attr("stroke-width", 1);
-
-    // Variables
     yOffset = 30;
     Object.entries(instanceVariables).forEach(([key, value], index) => {
-      // Variable container
       instanceVarsBox
         .append("rect")
-        .attr("x", width - 50 - styles.instanceVars.width + 10)
-        .attr("y", 20 + yOffset)
+        .attr("x", firstColX + 10)
+        .attr("y", instanceVarsStartY + yOffset)
         .attr("width", styles.instanceVars.width - 20)
         .attr("height", 25)
         .attr("fill", "white")
         .attr("stroke", "#e2e8f0")
         .attr("stroke-width", 1)
         .attr("rx", 3);
-
-      // Name
       instanceVarsBox
         .append("text")
-        .attr("x", width - 50 - styles.instanceVars.width + 20)
-        .attr("y", 20 + yOffset + 17)
+        .attr("x", firstColX + 20)
+        .attr("y", instanceVarsStartY + yOffset + 17)
         .attr("font-size", "12px")
         .attr("font-weight", "bold")
         .attr("fill", styles.instanceVars.textColor)
         .text(key + ":");
-
-      // Value
       const isRef = isAddress(value) || key === "array";
       instanceVarsBox
         .append("text")
-        .attr("x", width - 70)
-        .attr("y", 20 + yOffset + 17)
+        .attr("x", firstColX + styles.instanceVars.width - 20)
+        .attr("y", instanceVarsStartY + yOffset + 17)
         .attr("text-anchor", "end")
         .attr("font-size", "12px")
         .attr("font-weight", "bold")
@@ -2707,379 +2704,259 @@ function DataStructurePage() {
         .text(
           String(value).length > 10
             ? String(value).substring(0, 9) + "..."
-            : value
+            : String(value)
         );
-
-      // Store position for connections
       pagePositions[`instance_${key}`] = {
-        x: width - 50 - styles.instanceVars.width,
-        y: 20 + yOffset,
+        x: firstColX,
+        y: instanceVarsStartY + yOffset,
         width: styles.instanceVars.width,
         height: 25,
         value: value,
       };
-
       yOffset += 30;
     });
 
-    // 3. Draw the array reference box (if array address exists)
-    if (arrayAddress) {
-      // Create array reference box
+    // Position Array and Array Ref Box to the right of the variable boxes
+    const arrayRefBoxWidth = 110;
+    const arrayRefBoxX = firstColX + styles.localVars.width + 50;
+    const arrayStartX =
+      arrayRefBoxX + (hasArrayObject ? arrayRefBoxWidth + 20 : 0); // Start cells after ref box if it exists
+    // const arraySectionY = varBoxTopMargin; // Align top of array stuff with top of local vars
+    const arraySectionY = instanceVarsStartY; // Align top of array stuff with top of instance vars
+
+    // 3. Draw the array reference box (if array object exists)
+    if (hasArrayObject) {
       const arrayRefBox = contentGroup
         .append("g")
         .attr("class", "array-reference");
-
-      // Draw the box
       arrayRefBox
         .append("rect")
-        .attr("x", startX - 120)
-        .attr("y", startY)
-        .attr("width", 110)
+        .attr("x", arrayRefBoxX)
+        .attr("y", arraySectionY)
+        .attr("width", arrayRefBoxWidth)
         .attr("height", cellSize)
         .attr("fill", "#f0f9ff")
         .attr("stroke", "#94a3b8")
         .attr("stroke-width", 1)
         .attr("rx", 4);
-
-      // Title area
       arrayRefBox
         .append("rect")
-        .attr("x", startX - 120)
-        .attr("y", startY)
-        .attr("width", 110)
+        .attr("x", arrayRefBoxX)
+        .attr("y", arraySectionY)
+        .attr("width", arrayRefBoxWidth)
         .attr("height", 25)
         .attr("fill", "#94a3b8")
         .attr("fill-opacity", 0.3)
         .attr("stroke", "none")
         .attr("rx", 4)
         .attr("ry", 0);
-
-      // Title text
       arrayRefBox
         .append("text")
-        .attr("x", startX - 65)
-        .attr("y", startY + 17)
+        .attr("x", arrayRefBoxX + arrayRefBoxWidth / 2)
+        .attr("y", arraySectionY + 17)
         .attr("text-anchor", "middle")
         .attr("font-size", "12px")
         .attr("font-weight", "bold")
         .attr("fill", "#334155")
         .text("array");
-
-      // Address value
       arrayRefBox
         .append("text")
-        .attr("x", startX - 65)
-        .attr("y", startY + 45)
+        .attr("x", arrayRefBoxX + arrayRefBoxWidth / 2)
+        .attr("y", arraySectionY + 45)
         .attr("text-anchor", "middle")
         .attr("font-size", "14px")
         .attr("fill", "#0284c7")
         .text(arrayAddress.substring(0, 8));
-
-      // Arrow to first element
-      arrayRefBox
-        .append("path")
-        .attr(
-          "d",
-          `M ${startX - 10} ${startY + cellSize / 2} L ${startX - 3} ${
-            startY + cellSize / 2
-          }`
-        )
-        .attr("stroke", "#0284c7")
-        .attr("stroke-width", 1.5)
-        .attr("fill", "none")
-        .attr("marker-end", "url(#array-arrow)");
-
-      // Store position for connections
+      if (displayCapacity > 0) {
+        arrayRefBox
+          .append("path")
+          .attr(
+            "d",
+            `M ${arrayRefBoxX + arrayRefBoxWidth} ${
+              arraySectionY + cellSize / 2
+            } L ${arrayStartX - 3} ${arraySectionY + cellSize / 2}`
+          )
+          .attr("stroke", "#0284c7")
+          .attr("stroke-width", 1.5)
+          .attr("fill", "none")
+          .attr("marker-end", "url(#array-arrow)");
+      }
       pagePositions["array_ref"] = {
-        x: startX - 120,
-        y: startY,
-        width: 110,
+        x: arrayRefBoxX,
+        y: arraySectionY,
+        width: arrayRefBoxWidth,
         height: cellSize,
         value: arrayAddress,
       };
     }
 
-    // 4. Draw array cells
-    const arrayCells = contentGroup.append("g").attr("class", "array-cells");
-
-    // Calculate rows and columns
-    const rows = Math.ceil(realCapacity / cellsPerRow);
-
-    // Draw cells
-    for (let i = 0; i < realCapacity; i++) {
-      const row = Math.floor(i / cellsPerRow);
-      const col = i % cellsPerRow;
-      const x = startX + col * cellSize;
-      const y = startY + row * cellSize;
-
-      // Cell box
-      arrayCells
-        .append("rect")
-        .attr("x", x)
-        .attr("y", y)
-        .attr("width", cellSize)
-        .attr("height", cellSize)
-        .attr("fill", i < size ? styles.array.fill : styles.array.unusedFill)
-        .attr("stroke", styles.array.stroke)
-        .attr("stroke-width", 1)
-        .attr("rx", 4);
-
-      // Index header
-      arrayCells
-        .append("rect")
-        .attr("x", x)
-        .attr("y", y)
-        .attr("width", cellSize)
-        .attr("height", 25)
-        .attr("fill", "#94a3b8")
-        .attr("fill-opacity", 0.3)
-        .attr("stroke", "none")
-        .attr("rx", 4)
-        .attr("ry", 0);
-
-      // Index number
-      arrayCells
-        .append("text")
-        .attr("x", x + cellSize / 2)
-        .attr("y", y + 17)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "11px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#475569")
-        .text(i);
-
-      // Divider
-      arrayCells
-        .append("line")
-        .attr("x1", x)
-        .attr("y1", y + 25)
-        .attr("x2", x + cellSize)
-        .attr("y2", y + 25)
-        .attr("stroke", styles.array.stroke)
-        .attr("stroke-width", 1);
-
-      // Value (if available)
-      if (i < arrayElements.length) {
-        const value = arrayElements[i];
-        const isRef = isAddress(value);
+    // 4. Draw array cells only if displayCapacity > 0
+    if (displayCapacity > 0) {
+      const arrayCells = contentGroup.append("g").attr("class", "array-cells");
+      for (let i = 0; i < displayCapacity; i++) {
+        const x = arrayStartX + i * cellSize;
+        const y = arraySectionY;
+        arrayCells
+          .append("rect")
+          .attr("x", x)
+          .attr("y", y)
+          .attr("width", cellSize)
+          .attr("height", cellSize)
+          .attr("fill", i < size ? styles.array.fill : styles.array.unusedFill)
+          .attr("stroke", styles.array.stroke)
+          .attr("stroke-width", 1)
+          .attr("rx", 4);
+        arrayCells
+          .append("rect")
+          .attr("x", x)
+          .attr("y", y)
+          .attr("width", cellSize)
+          .attr("height", 25)
+          .attr("fill", "#94a3b8")
+          .attr("fill-opacity", 0.3)
+          .attr("stroke", "none")
+          .attr("rx", 4)
+          .attr("ry", 0);
         arrayCells
           .append("text")
           .attr("x", x + cellSize / 2)
-          .attr("y", y + cellSize / 2 + 10)
+          .attr("y", y + 17)
           .attr("text-anchor", "middle")
-          .attr("font-size", "14px")
-          .attr("fill", isRef ? "#0284c7" : "#0f172a")
-          .text(value !== undefined && value !== null ? value : "null");
-
-        // Store position for connections
-        pagePositions[`array_cell_${i}`] = {
-          x: x,
-          y: y,
-          width: cellSize,
-          height: cellSize,
-          value: value,
-        };
+          .attr("font-size", "11px")
+          .attr("font-weight", "bold")
+          .attr("fill", "#475569")
+          .text(i);
+        arrayCells
+          .append("line")
+          .attr("x1", x)
+          .attr("y1", y + 25)
+          .attr("x2", x + cellSize)
+          .attr("y2", y + 25)
+          .attr("stroke", styles.array.stroke)
+          .attr("stroke-width", 1);
+        if (i < arrayElements.length) {
+          const value = arrayElements[i];
+          const isRef = isAddress(value);
+          arrayCells
+            .append("text")
+            .attr("x", x + cellSize / 2)
+            .attr("y", y + cellSize / 2 + 10)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "14px")
+            .attr("fill", isRef ? "#0284c7" : "#0f172a")
+            .text(
+              value !== undefined && value !== null ? String(value) : "null"
+            );
+          pagePositions[`array_cell_${i}`] = {
+            x: x,
+            y: y,
+            width: cellSize,
+            height: cellSize,
+            value: value,
+          };
+        }
       }
-    }
-
-    // 5. Draw size indicator
-    if (size <= realCapacity) {
-      const row = Math.floor(size / cellsPerRow);
-      const col = size % cellsPerRow;
-      const x = startX + col * cellSize;
-      const y = startY + row * cellSize;
-
-      // Size indicator arrow
-      arrayCells
-        .append("path")
-        .attr(
-          "d",
-          `M ${x} ${y - 15} L ${x} ${y - 5} L ${x - 5} ${y - 10} L ${x + 5} ${
-            y - 10
-          } Z`
-        )
-        .attr("fill", "#f97316");
-
-      arrayCells
+    } else if (hasArrayObject) {
+      // arrayAddress exists, but displayCapacity is 0 (empty array object)
+      contentGroup
         .append("text")
-        .attr("x", x)
-        .attr("y", y - 20)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "10px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#f97316")
-        .text("size");
+        .attr("x", arrayStartX)
+        .attr("y", arraySectionY + cellSize / 2)
+        .attr("text-anchor", "start")
+        .attr("font-style", "italic")
+        .attr("fill", "#6b7280")
+        .text("(empty array structure)");
     }
 
-    // 6. Draw connections between variables and array elements
+    // 5. Size indicator removed
+
+    // 6. Draw connections
     const connectionsGroup = contentGroup
       .append("g")
       .attr("class", "connections");
     const connections = [];
-
-    // Helper function to determine if an address is valid
     const isValidAddress = (addr) =>
       addr && addr !== "null" && addr !== "0x0" && addr in addressObjectMap;
 
-    // Find connections from local variables to array or its elements
     Object.entries(localVariables).forEach(([key, value]) => {
       if (isAddress(value)) {
-        // Connect to array if pointing to it
-        if (value === arrayAddress) {
+        if (value === arrayAddress)
           connections.push({
             source: `local_${key}`,
             target: "array_ref",
             type: "reference",
           });
-        }
-        // Connect to array elements if pointing to them
-        else if (isValidAddress(value)) {
-          // Check if any array element has this address as its value
-          for (let i = 0; i < arrayElements.length; i++) {
-            if (arrayElements[i] === value) {
-              connections.push({
-                source: `local_${key}`,
-                target: `array_cell_${i}`,
-                type: "reference",
-              });
-            }
-          }
-
-          // Connect to object in address map directly
-          if (pagePositions[value]) {
-            connections.push({
-              source: `local_${key}`,
-              target: value,
-              type: "reference",
-            });
-          }
-        }
+        else if (isValidAddress(value) && pagePositions[value])
+          connections.push({
+            source: `local_${key}`,
+            target: value,
+            type: "reference",
+          });
       }
     });
-
-    // Find connections from instance variables to array or its elements
     Object.entries(instanceVariables).forEach(([key, value]) => {
       if (isAddress(value) || key === "array") {
-        // Connect to array if pointing to it
-        if (value === arrayAddress || key === "array") {
+        if (value === arrayAddress || key === "array")
           connections.push({
             source: `instance_${key}`,
             target: "array_ref",
             type: "reference",
           });
-        }
-        // Connect to array elements if pointing to them
-        else if (isValidAddress(value)) {
-          // Check if any array element has this address as its value
-          for (let i = 0; i < arrayElements.length; i++) {
-            if (arrayElements[i] === value) {
-              connections.push({
-                source: `instance_${key}`,
-                target: `array_cell_${i}`,
-                type: "reference",
-              });
-            }
-          }
-
-          // Connect to object in address map directly
-          if (pagePositions[value]) {
-            connections.push({
-              source: `instance_${key}`,
-              target: value,
-              type: "reference",
-            });
-          }
-        }
-      }
-    });
-
-    // Find connections from array elements to other objects
-    for (let i = 0; i < arrayElements.length; i++) {
-      const value = arrayElements[i];
-      if (isAddress(value) && isValidAddress(value)) {
-        // Connect to object in address map
-        if (pagePositions[value]) {
+        else if (isValidAddress(value) && pagePositions[value])
           connections.push({
-            source: `array_cell_${i}`,
+            source: `instance_${key}`,
             target: value,
             type: "reference",
           });
-        }
       }
+    });
+    for (let i = 0; i < arrayElements.length; i++) {
+      const value = arrayElements[i];
+      if (isAddress(value) && isValidAddress(value) && pagePositions[value])
+        connections.push({
+          source: `array_cell_${i}`,
+          target: value,
+          type: "reference",
+        });
     }
 
-    // Helper to get connection points
     const getConnectionPoints = (sourceNode, targetNode) => {
       const source = pagePositions[sourceNode];
       const target = pagePositions[targetNode];
+      if (!source || !target) return { sourcePoint: null, targetPoint: null };
+      let sp, tp;
 
-      if (!source || !target) {
-        console.log("Missing position for", !source ? sourceNode : targetNode);
-        return { sourcePoint: null, targetPoint: null };
+      // Source points are always from the right side of variable/ref boxes for this layout
+      sp = { x: source.x + source.width, y: source.y + source.height / 2 };
+      if (sourceNode.startsWith("array_cell_")) {
+        // Except for array cells, from bottom
+        sp = { x: source.x + source.width / 2, y: source.y + source.height };
       }
 
-      let sourcePoint, targetPoint;
-
-      // Source point based on node type
-      if (sourceNode.startsWith("local_")) {
-        // Exit from right side of local var box
-        sourcePoint = {
-          x: source.x + source.width,
-          y: source.y + source.height / 2,
-        };
-      } else if (sourceNode.startsWith("instance_")) {
-        // Exit from left side of instance var box
-        sourcePoint = {
-          x: source.x,
-          y: source.y + source.height / 2,
-        };
-      } else if (sourceNode.startsWith("array_cell_")) {
-        // Exit from right side of array cell
-        sourcePoint = {
-          x: source.x + source.width,
-          y: source.y + source.height / 2,
-        };
-      } else {
-        // Default center
-        sourcePoint = {
-          x: source.x + source.width / 2,
-          y: source.y + source.height / 2,
-        };
-      }
-
-      // Target point based on node type
+      // Target points
       if (targetNode === "array_ref") {
-        // Enter at top of array reference box
-        targetPoint = {
-          x: target.x + target.width / 2,
-          y: target.y,
-        };
+        // To left of array_ref box
+        tp = { x: target.x, y: target.y + target.height / 2 };
       } else if (targetNode.startsWith("array_cell_")) {
-        // Enter at top of array cell
-        targetPoint = {
-          x: target.x + target.width / 2,
-          y: target.y,
-        };
+        // To top-center of cell
+        tp = { x: target.x + target.width / 2, y: target.y };
+      } else if (pagePositions[targetNode]) {
+        // To left of a generic box (another var box for example)
+        tp = { x: target.x, y: target.y + target.height / 2 };
       } else {
-        // Default center
-        targetPoint = {
+        // Default center (should not happen often with this layout)
+        tp = {
           x: target.x + target.width / 2,
           y: target.y + target.height / 2,
         };
       }
-
-      return { sourcePoint, targetPoint };
+      return { sourcePoint: sp, targetPoint: tp };
     };
 
-    // Draw all connections
     connections.forEach((conn) => {
       const points = getConnectionPoints(conn.source, conn.target);
       if (!points.sourcePoint || !points.targetPoint) return;
-
-      // Generate curved path
       const path = generateCurvedPath(points.sourcePoint, points.targetPoint);
-
-      // Draw connection
       connectionsGroup
         .append("path")
         .attr("d", path)
@@ -3091,9 +2968,6 @@ function DataStructurePage() {
         .attr("stroke-linecap", "round")
         .attr("stroke-linejoin", "round");
     });
-
-    // Auto-fit the visualization to the view
-    autoFitVisualization(svg, contentGroup, zoomRef.current, width, height);
   };
 
   // Effect to monitor snapshot index changes and update the visualization
