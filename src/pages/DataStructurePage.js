@@ -64,6 +64,21 @@ function DataStructurePage() {
     return typeof value === "string" && value.match(/^0x[0-9a-f]+$/i);
   };
 
+  // Helper function to truncate addresses for display
+  const truncateAddress = (address, length = 6) => {
+    if (!address) return "null";
+    const stringAddress = String(address);
+    if (isAddress(stringAddress)) {
+      return `${stringAddress.substring(0, 2 + length)}...`;
+    }
+    // If it's not a typical address (e.g. could be "null", a number, or other string)
+    // show a bit more if it's short, or truncate if long
+    if (stringAddress.length > 10) {
+      return `${stringAddress.substring(0, 8)}...`;
+    }
+    return stringAddress;
+  };
+
   // Extract elements from memory snapshot
   const extractElementsFromSnapshot = (snapshot, structureType) => {
     try {
@@ -582,41 +597,53 @@ function DataStructurePage() {
   };
 
   // Helper to generate curved path between two points
-  const generateCurvedPath = (source, target) => {
+  const generateCurvedPath = (
+    source,
+    target,
+    pathType = "default",
+    curveFactor = 0.4
+  ) => {
     // Calculate the vector between points
     const dx = target.x - source.x;
     const dy = target.y - source.y;
 
-    // Determine if connection is horizontal/vertical/diagonal
+    // Determine if connection is horizontal/vertical/diagonal for default behavior
     const isMainlyHorizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
     const isMainlyVertical = Math.abs(dy) > Math.abs(dx) * 1.5;
 
-    // Base control point distance - make more subtle curves
     const distanceTotal = Math.sqrt(dx * dx + dy * dy);
-    const controlDistance = Math.min(distanceTotal * 0.4, 80);
+    let controlDistance = Math.min(distanceTotal * curveFactor, 80); // Use curveFactor
 
-    // Calculate control points based on direction and orientation
     let cp1x, cp1y, cp2x, cp2y;
 
-    if (isMainlyHorizontal) {
-      // For horizontal connections (left-to-right or right-to-left)
-      cp1x = source.x + Math.sign(dx) * controlDistance;
-      cp1y = source.y;
-      cp2x = target.x - Math.sign(dx) * controlDistance;
-      cp2y = target.y;
-    } else if (isMainlyVertical) {
-      // For vertical connections (top-to-bottom or bottom-to-top)
-      cp1x = source.x;
-      cp1y = source.y + Math.sign(dy) * controlDistance;
-      cp2x = target.x;
-      cp2y = target.y - Math.sign(dy) * controlDistance;
+    if (pathType === "longArcDown") {
+      // Force a path that arcs downwards significantly
+      // Useful for end pointers that need to go under the list
+      const arcHeight = Math.max(50, distanceTotal * 0.2, Math.abs(dx) * 0.15); // Make arc proportional but with a minimum
+      cp1x = source.x + dx * 0.25; // Control point starts moving towards target x
+      cp1y = source.y + arcHeight; // But dips down
+      cp2x = target.x - dx * 0.25; // Control point ends moving from target x
+      cp2y = target.y + arcHeight; // And also dips down from target side
+      // If source.y and target.y are very different, this might need refinement
+      // For now, assuming source and target y are somewhat similar for this path type (e.g. var box to node row)
     } else {
-      // For diagonal connections, create a more gentle curve
-      // Use an offset to create more space between arrows
-      cp1x = source.x + Math.sign(dx) * controlDistance;
-      cp1y = source.y + Math.sign(dy) * controlDistance * 0.3;
-      cp2x = target.x - Math.sign(dx) * controlDistance;
-      cp2y = target.y - Math.sign(dy) * controlDistance * 0.3;
+      // Default pathing logic
+      if (isMainlyHorizontal) {
+        cp1x = source.x + Math.sign(dx) * controlDistance;
+        cp1y = source.y;
+        cp2x = target.x - Math.sign(dx) * controlDistance;
+        cp2y = target.y;
+      } else if (isMainlyVertical) {
+        cp1x = source.x;
+        cp1y = source.y + Math.sign(dy) * controlDistance;
+        cp2x = target.x;
+        cp2y = target.y - Math.sign(dy) * controlDistance;
+      } else {
+        cp1x = source.x + Math.sign(dx) * controlDistance;
+        cp1y = source.y + Math.sign(dy) * controlDistance * 0.3;
+        cp2x = target.x - Math.sign(dx) * controlDistance;
+        cp2y = target.y - Math.sign(dy) * controlDistance * 0.3;
+      }
     }
 
     return `M ${source.x} ${source.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
@@ -2352,20 +2379,27 @@ function DataStructurePage() {
 
   const showNotImplementedMessage = (
     contentGroup,
-    width,
+    width, // Original width and height might not be what we want for a targeted message
     height,
-    structureType
+    message,
+    xPosition, // Allow specifying position
+    yPosition // Allow specifying position
   ) => {
-    // contentGroup is already a D3 selection
-    contentGroup.selectAll("*").remove(); // Clear previous message if any
+    // Clear previous message if any - BE CAREFUL if contentGroup is shared and not specific to this message
+    // contentGroup.selectAll(".not-implemented-message").remove();
+
+    const displayX = xPosition !== undefined ? xPosition : width / 2;
+    const displayY = yPosition !== undefined ? yPosition : height / 2;
+
     contentGroup
       .append("text")
-      .attr("x", width / 2)
-      .attr("y", height / 2)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "16px")
+      .attr("class", "not-implemented-message") // Add class for potential selective clearing
+      .attr("x", displayX)
+      .attr("y", displayY)
+      .attr("text-anchor", xPosition !== undefined ? "start" : "middle")
+      .attr("font-size", "14px")
       .attr("fill", "#475569")
-      .text(`${structureType} visualization not implemented yet`);
+      .text(message);
   };
 
   const renderLinkedListVisualization = (
@@ -2375,8 +2409,754 @@ function DataStructurePage() {
     operation, // Added operation
     memorySnapshot // Added memorySnapshot
   ) => {
-    console.log("Render Linked List (stub) for op:", operation);
-    showNotImplementedMessage(contentGroup, width, height, "Linked List");
+    console.log(
+      "Starting renderLinkedListVisualization (Step 1: VarBoxes) with op:",
+      operation
+    );
+
+    const state = operation.state || {};
+    const localVariables = state.localVariables || {};
+    const instanceVariables = state.instanceVariables || {};
+    const addressObjectMap = state.addressObjectMap || {}; // Now needed for node data
+
+    // Define styles (scoped to this function for now)
+    const styles = {
+      varBox: {
+        // Styles adapted from webBrowserVisualization's localVars/instanceVars
+        width: 200,
+        headerHeight: 25,
+        fieldHeight: 25,
+        padding: 10,
+        fill: "#ffffff", // Main box fill is white like web-browser's var boxes
+        stroke: "#94a3b8", // Gray stroke like web-browser's localVars
+        titleFill: "#94a3b8", // Header fill like web-browser's var boxes
+        titleFillOpacity: 0.3,
+        textFill: "#334155", // Dark gray text
+        valueFill: "#0ea5e9", // Keep blue for addresses in var boxes
+        fieldRectFill: "white",
+        fieldRectStroke: "#e2e8f0",
+      },
+      node: {
+        // Styles adapted from webBrowserVisualization's page style
+        width: 200,
+        // Calculated height: header (25) + 2 fields (value, next) * 25 = 50. Padding: 10 (top) + 5 (between field & header) + 5 (between fields) + 10 (bottom) = 25+50+25 = 100
+        height: 105, // Adjusted: Header(25) + Pad1(10) + Field1(25) + Pad2(5) + Field2(25) + Pad3(10) = 100. Let's use 105 to match structure.
+        headerHeight: 25,
+        fieldHeight: 25,
+        padding: 10, // General padding (e.g. for text from edge, and bottom of node)
+        fieldVPadding: 5, // Vertical padding between header & first field, and between fields themselves
+        fill: "#ffffff", // White fill like a web page
+        stroke: "#94a3b8", // Gray stroke
+        textFill: "#334155", // Dark gray text for labels
+        valueTextFill: "#334155", // Dark gray for actual value data
+        addressTextFill: "#0284c7", // Blue for address text (like next pointers)
+        spacingX: 50, // Increased spacing between nodes
+        spacingY: 40, // Vertical space (if implementing grid/vertical)
+      },
+      connection: {
+        strokeWidth: 1.5, // Keep slightly thinner than web-browser's default 2
+        arrowSize: 7, // Slightly smaller arrow
+        instanceVarColor: "#334155", // Dark gray for pointers from instance vars (like 'head')
+        nextColor: "#2563eb", // Keep distinct blue for next pointers in list
+        // prevColor removed as per request
+      },
+    };
+
+    // Add arrowhead definitions
+    let defs = contentGroup.select("defs");
+    if (defs.empty()) {
+      defs = contentGroup.append("defs");
+    }
+    // Arrow for 'next' pointers - blue
+    if (defs.select("#ll-next-arrow").empty()) {
+      defs
+        .append("marker")
+        .attr("id", "ll-next-arrow")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", styles.connection.arrowSize - 1) // Adjust refX if arrow head seems detached
+        .attr("refY", 0)
+        .attr("markerWidth", styles.connection.arrowSize)
+        .attr("markerHeight", styles.connection.arrowSize)
+        .attr("orient", "auto-start-reverse")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", styles.connection.nextColor);
+    }
+    // Arrow for instance variable pointers (e.g. head) - dark gray
+    if (defs.select("#ll-instance-var-arrow").empty()) {
+      defs
+        .append("marker")
+        .attr("id", "ll-instance-var-arrow")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", styles.connection.arrowSize - 1)
+        .attr("refY", 0)
+        .attr("markerWidth", styles.connection.arrowSize)
+        .attr("markerHeight", styles.connection.arrowSize)
+        .attr("orient", "auto-start-reverse")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", styles.connection.instanceVarColor);
+    }
+
+    const firstColX = 30;
+    const varBoxTopMargin = 30;
+    let yOffset = varBoxTopMargin;
+
+    // --- 1. Render Local Variables Box (Styled like Web Browser) ---
+    const localVarsGroup = contentGroup
+      .append("g")
+      .attr("class", "local-variables-group");
+
+    if (Object.keys(localVariables).length > 0) {
+      const localVarCount = Object.keys(localVariables).length;
+      const localVarsInternalHeight =
+        localVarCount * styles.varBox.fieldHeight +
+        (localVarCount > 0 ? styles.varBox.padding * (localVarCount - 1) : 0);
+      const localVarsHeight =
+        styles.varBox.headerHeight +
+        (localVarCount > 0
+          ? styles.varBox.padding * 2 +
+            localVarCount * styles.varBox.fieldHeight
+          : styles.varBox.padding);
+
+      localVarsGroup
+        .append("rect") // Main box
+        .attr("x", firstColX)
+        .attr("y", yOffset)
+        .attr("width", styles.varBox.width)
+        .attr("height", localVarsHeight)
+        .attr("fill", styles.varBox.fill)
+        .attr("stroke", styles.varBox.stroke)
+        .attr("stroke-width", 1)
+        .attr("rx", 5);
+      localVarsGroup
+        .append("rect") // Titlebar
+        .attr("x", firstColX)
+        .attr("y", yOffset)
+        .attr("width", styles.varBox.width)
+        .attr("height", styles.varBox.headerHeight)
+        .attr("fill", styles.varBox.titleFill)
+        .attr("fill-opacity", styles.varBox.titleFillOpacity)
+        .attr("stroke", styles.varBox.stroke) // Match main stroke for consistency
+        .attr("stroke-width", 1) // Ensure title bar stroke is visible if fill is very light
+        .attr("rx", 5)
+        .attr("ry", 0);
+      localVarsGroup
+        .append("text") // Title text
+        .attr("x", firstColX + styles.varBox.width / 2)
+        .attr("y", yOffset + styles.varBox.headerHeight / 2 + 5)
+        .attr("text-anchor", "middle")
+        .attr("font-weight", "bold")
+        .attr("font-size", "13px")
+        .attr("fill", styles.varBox.textFill)
+        .text("Local Variables");
+
+      let fieldContentY =
+        yOffset + styles.varBox.headerHeight + styles.varBox.padding;
+      Object.entries(localVariables).forEach(([key, value]) => {
+        // Field container rect (like web browser)
+        localVarsGroup
+          .append("rect")
+          .attr("x", firstColX + styles.varBox.padding / 2)
+          .attr("y", fieldContentY - styles.varBox.padding / 2 + 2)
+          .attr("width", styles.varBox.width - styles.varBox.padding)
+          .attr("height", styles.varBox.fieldHeight)
+          .attr("fill", styles.varBox.fieldRectFill)
+          .attr("stroke", styles.varBox.fieldRectStroke)
+          .attr("rx", 3);
+
+        localVarsGroup // Key text
+          .append("text")
+          .attr("x", firstColX + styles.varBox.padding)
+          .attr("y", fieldContentY + styles.varBox.fieldHeight / 2 - 2)
+          .attr("font-size", "12px")
+          .attr("fill", styles.varBox.textFill)
+          .text(`${key}:`);
+        localVarsGroup // Value text
+          .append("text")
+          .attr("x", firstColX + styles.varBox.width - styles.varBox.padding)
+          .attr("y", fieldContentY + styles.varBox.fieldHeight / 2 - 2)
+          .attr("text-anchor", "end")
+          .attr("font-size", "12px")
+          .attr("font-weight", isAddress(value) ? "bold" : "normal")
+          .attr(
+            "fill",
+            isAddress(value) ? styles.varBox.valueFill : styles.varBox.textFill
+          )
+          .text(truncateAddress(String(value)));
+        fieldContentY += styles.varBox.fieldHeight + styles.varBox.padding / 2; // Add small gap between fields
+      });
+      yOffset += localVarsHeight + 20;
+    }
+
+    // --- 2. Render Instance Variables Box (Styled like Web Browser) ---
+    const instanceVarsGroup = contentGroup
+      .append("g")
+      .attr("class", "instance-variables-group");
+
+    if (Object.keys(instanceVariables).length > 0) {
+      const instanceVarCount = Object.keys(instanceVariables).length;
+      const instanceVarsHeight =
+        styles.varBox.headerHeight +
+        (instanceVarCount > 0
+          ? styles.varBox.padding * 2 +
+            instanceVarCount * styles.varBox.fieldHeight
+          : styles.varBox.padding);
+
+      instanceVarsGroup
+        .append("rect") // Main box
+        .attr("x", firstColX)
+        .attr("y", yOffset)
+        .attr("width", styles.varBox.width)
+        .attr("height", instanceVarsHeight)
+        // instanceVars in web-browser has a slightly different fill. Let's use a common fill for varBoxes now for simplicity or use a specific one.
+        // For now, using the same fill as localVars for internal consistency here.
+        .attr("fill", styles.varBox.fill)
+        .attr("stroke", styles.varBox.stroke) // But can use instanceVar specific stroke if desired, e.g. styles.instanceVars.stroke from web browser
+        .attr("stroke-width", 1)
+        .attr("rx", 5);
+      instanceVarsGroup
+        .append("rect") // Titlebar
+        .attr("x", firstColX)
+        .attr("y", yOffset)
+        .attr("width", styles.varBox.width)
+        .attr("height", styles.varBox.headerHeight)
+        .attr("fill", styles.varBox.titleFill)
+        .attr("fill-opacity", styles.varBox.titleFillOpacity)
+        .attr("stroke", styles.varBox.stroke)
+        .attr("stroke-width", 1)
+        .attr("rx", 5)
+        .attr("ry", 0);
+      instanceVarsGroup
+        .append("text") // Title text
+        .attr("x", firstColX + styles.varBox.width / 2)
+        .attr("y", yOffset + styles.varBox.headerHeight / 2 + 5)
+        .attr("text-anchor", "middle")
+        .attr("font-weight", "bold")
+        .attr("font-size", "13px")
+        .attr("fill", styles.varBox.textFill)
+        .text("Instance Variables");
+
+      let fieldContentY =
+        yOffset + styles.varBox.headerHeight + styles.varBox.padding;
+      Object.entries(instanceVariables).forEach(([key, value]) => {
+        // Field container rect
+        instanceVarsGroup
+          .append("rect")
+          .attr("x", firstColX + styles.varBox.padding / 2)
+          .attr("y", fieldContentY - styles.varBox.padding / 2 + 2)
+          .attr("width", styles.varBox.width - styles.varBox.padding)
+          .attr("height", styles.varBox.fieldHeight)
+          .attr("fill", styles.varBox.fieldRectFill)
+          .attr("stroke", styles.varBox.fieldRectStroke)
+          .attr("rx", 3);
+
+        instanceVarsGroup // Key text
+          .append("text")
+          .attr("x", firstColX + styles.varBox.padding)
+          .attr("y", fieldContentY + styles.varBox.fieldHeight / 2 - 2)
+          .attr("font-size", "12px")
+          .attr("fill", styles.varBox.textFill)
+          .text(`${key}:`);
+        instanceVarsGroup // Value text
+          .append("text")
+          .attr("x", firstColX + styles.varBox.width - styles.varBox.padding)
+          .attr("y", fieldContentY + styles.varBox.fieldHeight / 2 - 2)
+          .attr("text-anchor", "end")
+          .attr("font-size", "12px")
+          .attr("font-weight", isAddress(value) ? "bold" : "normal")
+          .attr(
+            "fill",
+            isAddress(value) ? styles.varBox.valueFill : styles.varBox.textFill
+          )
+          .text(truncateAddress(String(value)));
+        fieldContentY += styles.varBox.fieldHeight + styles.varBox.padding / 2;
+      });
+    }
+
+    // --- Prepare Linked List Node Data (Step 2a) ---
+    const nodes = [];
+    const nodePositions = {};
+    const visited = new Set();
+
+    let nodeStartX =
+      firstColX + styles.varBox.width + (styles.node.spacingX || 50) + 40;
+    let nodeStartY = varBoxTopMargin; // Align top of nodes with top of var boxes for a cleaner look
+
+    let currentX = nodeStartX;
+    let currentYNode = nodeStartY;
+
+    // Determine starting point (e.g., 'head', or first node found if no head)
+    let startAddress =
+      instanceVariables.start ||
+      instanceVariables.head ||
+      instanceVariables.front;
+    if (!startAddress || startAddress === "0x0" || startAddress === "null") {
+      const allNodeAddresses = Object.keys(addressObjectMap);
+      const pointedToAddresses = new Set();
+      allNodeAddresses.forEach((addr) => {
+        const obj = addressObjectMap[addr];
+        if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+          if (obj.next && obj.next !== "0x0" && obj.next !== "null")
+            pointedToAddresses.add(obj.next);
+          if (obj.prev && obj.prev !== "0x0" && obj.prev !== "null")
+            pointedToAddresses.add(obj.prev); // For doubly linked
+        }
+      });
+      const potentialStarts = allNodeAddresses.filter(
+        (addr) =>
+          addressObjectMap[addr] &&
+          typeof addressObjectMap[addr] === "object" &&
+          !Array.isArray(addressObjectMap[addr]) &&
+          !pointedToAddresses.has(addr)
+      );
+      if (potentialStarts.length > 0) {
+        startAddress = potentialStarts[0];
+        console.log(
+          "No explicit 'head' found, using heuristically determined start node:",
+          startAddress
+        );
+      } else if (allNodeAddresses.length > 0) {
+        // Fallback: try to find the first object that looks like a node
+        const firstPotentialNode = allNodeAddresses.find(
+          (addr) =>
+            addressObjectMap[addr] &&
+            typeof addressObjectMap[addr] === "object" &&
+            !Array.isArray(addressObjectMap[addr]) &&
+            (addressObjectMap[addr].hasOwnProperty("data") ||
+              addressObjectMap[addr].hasOwnProperty("value") ||
+              addressObjectMap[addr].hasOwnProperty("next"))
+        );
+        if (firstPotentialNode) {
+          startAddress = firstPotentialNode;
+          console.log(
+            "No 'head' or clear unpointed start, falling back to first potential node object in map:",
+            startAddress
+          );
+        } else {
+          console.log(
+            "Could not determine a start node for the linked list from addressObjectMap."
+          );
+        }
+      } else {
+        console.log("addressObjectMap is empty, cannot determine start node.");
+      }
+    }
+
+    let currentAddress = startAddress;
+    let nodesProcessedCount = 0;
+    const MAX_NODES_TO_RENDER = 50; // Safety break
+
+    while (
+      currentAddress &&
+      currentAddress !== "0x0" &&
+      currentAddress !== "null" &&
+      !visited.has(currentAddress) &&
+      nodesProcessedCount < MAX_NODES_TO_RENDER
+    ) {
+      visited.add(currentAddress);
+      const nodeData = addressObjectMap[currentAddress];
+
+      if (
+        !nodeData ||
+        typeof nodeData !== "object" ||
+        Array.isArray(nodeData)
+      ) {
+        console.warn(
+          `Address ${currentAddress} in list does not point to a valid node object in addressObjectMap. Stopping traversal here.`
+        );
+        break;
+      }
+
+      nodes.push({
+        id: currentAddress, // Unique ID for D3 keys
+        address: currentAddress,
+        dataVal:
+          nodeData.data !== undefined
+            ? nodeData.data
+            : nodeData.value !== undefined
+            ? nodeData.value
+            : "N/A",
+        nextAddress: nodeData.nextAddress, // Changed from nodeData.next
+        // prevAddress: nodeData.prev, // This was already correctly removed/commented if not used
+        x: currentX,
+        y: currentYNode,
+      });
+      nodePositions[currentAddress] = {
+        x: currentX,
+        y: currentYNode,
+        width: styles.node.width,
+        height: styles.node.height,
+      };
+
+      currentX += styles.node.width + styles.node.spacingX;
+      // For now, a simple horizontal list. Vertical/grid layout would modify currentYNode here.
+
+      currentAddress = nodeData.nextAddress; // Changed from nodeData.next
+      nodesProcessedCount++;
+    }
+
+    if (nodesProcessedCount === MAX_NODES_TO_RENDER) {
+      console.warn(
+        "Reached MAX_NODES_TO_RENDER limit during linked list traversal. List might be truncated in visualization."
+      );
+    }
+
+    // Update placeholder message logic based on node preparation
+    const nodesPlaceholderX = nodeStartX;
+    const nodesPlaceholderY = nodeStartY + styles.node.height / 2;
+
+    if (nodes.length > 0) {
+      showNotImplementedMessage(
+        contentGroup,
+        width,
+        height,
+        `Found ${nodes.length} nodes. Rendering coming next...`,
+        nodesPlaceholderX,
+        nodesPlaceholderY - styles.node.height / 2 - 10
+      ); // Move msg above where nodes will be
+    } else if (
+      !startAddress ||
+      startAddress === "0x0" ||
+      startAddress === "null"
+    ) {
+      showNotImplementedMessage(
+        contentGroup,
+        width,
+        height,
+        "Could not find a starting node (e.g., 'head').",
+        nodesPlaceholderX,
+        nodesPlaceholderY
+      );
+    } else {
+      showNotImplementedMessage(
+        contentGroup,
+        width,
+        height,
+        "List is empty or start node data is invalid.",
+        nodesPlaceholderX,
+        nodesPlaceholderY
+      );
+    }
+
+    console.log(
+      "Finished renderLinkedListVisualization (Step 1 + 2a: VarBoxes and Node Data Prep)"
+    );
+    console.log("Prepared nodes:", nodes);
+    console.log("Node positions:", nodePositions);
+
+    // --- Render Nodes and Connections (Step 2b) ---
+    if (nodes.length > 0) {
+      // Clear any "not implemented" messages specifically for nodes before drawing actual nodes
+      contentGroup
+        .selectAll(".not-implemented-message")
+        .filter(function () {
+          return (
+            d3.select(this).text().startsWith("Found") ||
+            d3.select(this).text().startsWith("Could not find") ||
+            d3.select(this).text().startsWith("List is empty")
+          );
+        })
+        .remove();
+
+      const nodesGroup = contentGroup
+        .append("g")
+        .attr("class", "linked-list-nodes");
+
+      // Render each node (Styled like Web Browser Page)
+      nodes.forEach((node) => {
+        const nodeGroup = nodesGroup
+          .append("g")
+          .attr("class", "ll-node")
+          .attr("transform", `translate(${node.x}, ${node.y})`);
+
+        // Node box (like web-browser page rect)
+        nodeGroup
+          .append("rect")
+          .attr("width", styles.node.width)
+          .attr("height", styles.node.height)
+          .attr("fill", styles.node.fill)
+          .attr("stroke", styles.node.stroke)
+          .attr("stroke-width", 1) // Web browser page uses 1 or 2 if current
+          .attr("rx", 5);
+
+        // Node address header (like web-browser page title section)
+        nodeGroup
+          .append("rect")
+          .attr("width", styles.node.width)
+          .attr("height", styles.node.headerHeight)
+          .attr("fill", styles.node.stroke) // Web-browser page title uses page.stroke with opacity
+          .attr("fill-opacity", 0.3)
+          .attr("rx", 5)
+          .attr("ry", 0);
+        nodeGroup
+          .append("text") // Address text
+          .attr("x", styles.node.width / 2)
+          .attr("y", styles.node.headerHeight / 2 + 4) // Centered in header
+          .attr("text-anchor", "middle")
+          .attr("font-size", "13px") // Larger like web-browser page titles
+          .attr("font-weight", "bold")
+          .attr("fill", styles.node.textFill)
+          .text(truncateAddress(node.address, 8));
+
+        // Divider line after header (like web-browser page)
+        nodeGroup
+          .append("line")
+          .attr("x1", 0)
+          .attr("y1", styles.node.headerHeight)
+          .attr("x2", styles.node.width)
+          .attr("y2", styles.node.headerHeight)
+          .attr("stroke", styles.node.stroke)
+          .attr("stroke-width", 1);
+
+        // Start Y for first field: Header height + specific vertical padding
+        let fieldCurrentY =
+          styles.node.headerHeight + styles.node.fieldVPadding;
+
+        // Field container rects (like web-browser page fields)
+        // Value field rect
+        nodeGroup
+          .append("rect")
+          .attr("x", styles.node.padding / 2) // Small horizontal padding for rect
+          .attr("y", fieldCurrentY)
+          .attr("width", styles.node.width - styles.node.padding) // Rect width takes into account padding on both sides
+          .attr("height", styles.node.fieldHeight)
+          .attr("fill", "none") // web-browser page fields use fill:none
+          .attr("stroke", "#e2e8f0") // light stroke for field separator
+          .attr("rx", 3);
+
+        // Data/Value field text
+        nodeGroup
+          .append("text")
+          .attr("x", styles.node.padding) // Text starts after main node padding
+          .attr(
+            "y",
+            fieldCurrentY +
+              styles.node.fieldHeight / 2 +
+              styles.node.padding / 2 -
+              2
+          ) // Adjusted for better centering within field rect
+          .attr("font-size", "13px") // Match web-browser page field text size
+          .attr("font-weight", "bold")
+          .attr("fill", styles.node.textFill)
+          .text("value:");
+        nodeGroup
+          .append("text")
+          .attr("x", styles.node.width - styles.node.padding) // Text ends before main node padding (anchor end)
+          .attr(
+            "y",
+            fieldCurrentY +
+              styles.node.fieldHeight / 2 +
+              styles.node.padding / 2 -
+              2
+          ) // Adjusted for better centering
+          .attr("text-anchor", "end")
+          .attr("font-size", "13px")
+          .attr("font-weight", isAddress(node.dataVal) ? "bold" : "normal")
+          .attr(
+            "fill",
+            isAddress(node.dataVal)
+              ? styles.node.addressTextFill
+              : styles.node.valueTextFill
+          )
+          .text(truncateAddress(String(node.dataVal)));
+        fieldCurrentY += styles.node.fieldHeight + styles.node.fieldVPadding;
+
+        // Next pointer field rect
+        nodeGroup
+          .append("rect")
+          .attr("x", styles.node.padding / 2)
+          .attr("y", fieldCurrentY)
+          .attr("width", styles.node.width - styles.node.padding)
+          .attr("height", styles.node.fieldHeight)
+          .attr("fill", "none")
+          .attr("stroke", "#e2e8f0")
+          .attr("rx", 3);
+
+        // Next pointer field text
+        nodeGroup
+          .append("text")
+          .attr("x", styles.node.padding)
+          .attr(
+            "y",
+            fieldCurrentY +
+              styles.node.fieldHeight / 2 +
+              styles.node.padding / 2 -
+              2
+          ) // Adjusted for better centering
+          .attr("font-size", "13px")
+          .attr("font-weight", "bold")
+          .attr("fill", styles.node.textFill)
+          .text("next:");
+        nodeGroup
+          .append("text")
+          .attr("x", styles.node.width - styles.node.padding)
+          .attr(
+            "y",
+            fieldCurrentY +
+              styles.node.fieldHeight / 2 +
+              styles.node.padding / 2 -
+              2
+          ) // Adjusted for better centering
+          .attr("text-anchor", "end")
+          .attr("font-size", "13px")
+          .attr("font-weight", "bold")
+          .attr("fill", styles.connection.nextColor) // Use specific nextColor for the address value
+          .text(truncateAddress(node.nextAddress));
+
+        // Removed Prev pointer field rendering
+      });
+
+      // Render connections
+      const connectionsGroup = contentGroup
+        .append("g")
+        .attr("class", "ll-connections");
+      nodes.forEach((node) => {
+        // Next connection
+        if (
+          node.nextAddress &&
+          node.nextAddress !== "0x0" &&
+          node.nextAddress !== "null" &&
+          nodePositions[node.nextAddress]
+        ) {
+          const sourcePos = nodePositions[node.address];
+          const targetPos = nodePositions[node.nextAddress];
+
+          const sourcePoint = {
+            x: sourcePos.x + sourcePos.width,
+            y:
+              sourcePos.y +
+              styles.node.headerHeight +
+              styles.node.fieldVPadding + // Padding after header
+              styles.node.fieldHeight + // Height of value field
+              styles.node.fieldVPadding + // Padding after value field
+              styles.node.fieldHeight / 2, // Middle of the next field itself
+          };
+          const targetPoint = {
+            x: targetPos.x, // Connect to left edge of target node
+            y: targetPos.y + targetPos.height / 2,
+          };
+
+          connectionsGroup
+            .append("path") // Changed from line to path
+            .attr("d", generateCurvedPath(sourcePoint, targetPoint)) // Use curved path
+            .attr("fill", "none") // Paths should not be filled for arrows
+            .attr("stroke", styles.connection.nextColor)
+            .attr("stroke-width", styles.connection.strokeWidth)
+            .attr("marker-end", "url(#ll-next-arrow)");
+        }
+        // Removed Prev connection rendering
+      });
+
+      // Connections from Instance Variables to nodes (e.g., head, tail pointers)
+      Object.entries(instanceVariables).forEach(([varName, varValue]) => {
+        if (isAddress(varValue) && nodePositions[varValue]) {
+          // Calculate sourceY for the instance variable field
+          let varBoxYOffset = varBoxTopMargin;
+          if (Object.keys(localVariables).length > 0) {
+            const localVarCount = Object.keys(localVariables).length;
+            varBoxYOffset +=
+              styles.varBox.headerHeight +
+              (localVarCount > 0
+                ? styles.varBox.padding * 2 +
+                  localVarCount * styles.varBox.fieldHeight
+                : styles.varBox.padding) +
+              20;
+          }
+          const varIndex = Object.keys(instanceVariables).indexOf(varName);
+
+          let sourcePoint;
+          let targetPoint;
+          const targetNodePos = nodePositions[varValue];
+          let pathType = "default"; // Default path type
+          let dAttribute = ""; // To store the path 'd' attribute string
+
+          if (varName === "end" && nodes.length > 1 && targetNodePos) {
+            const varBoxInstanceHeight =
+              styles.varBox.headerHeight +
+              (Object.keys(instanceVariables).length > 0
+                ? styles.varBox.padding * 2 +
+                  Object.keys(instanceVariables).length *
+                    styles.varBox.fieldHeight
+                : styles.varBox.padding);
+
+            sourcePoint = {
+              x: firstColX + styles.varBox.width / 2,
+              y: varBoxYOffset + varBoxInstanceHeight, // Bottom-middle of the var box
+            };
+            targetPoint = {
+              x: targetNodePos.x + targetNodePos.width / 2,
+              y: targetNodePos.y + targetNodePos.height, // Bottom-middle of target node
+            };
+
+            const verticalDip = Math.max(30, styles.node.height / 2); // How far down the path should go
+            const cornerRadius = 10; // Radius for curved corners
+
+            // Start path
+            dAttribute = `M ${sourcePoint.x} ${sourcePoint.y}`;
+            // Line down
+            dAttribute += ` V ${sourcePoint.y + verticalDip - cornerRadius}`;
+            // Curve for first corner (down then right)
+            dAttribute += ` Q ${sourcePoint.x} ${
+              sourcePoint.y + verticalDip
+            }, ${sourcePoint.x + cornerRadius} ${sourcePoint.y + verticalDip}`;
+            // Horizontal line to the right, towards target X
+            dAttribute += ` H ${targetPoint.x - cornerRadius}`;
+            // Curve for second corner (right then up)
+            dAttribute += ` Q ${targetPoint.x} ${
+              sourcePoint.y + verticalDip
+            }, ${targetPoint.x} ${sourcePoint.y + verticalDip - cornerRadius}`;
+            // Line up to target
+            dAttribute += ` V ${targetPoint.y}`;
+          } else {
+            // Default connection for other instance variables (like 'start') or if 'end' is the only node
+            sourcePoint = {
+              x: firstColX + styles.varBox.width,
+              y:
+                varBoxYOffset +
+                styles.varBox.headerHeight +
+                styles.varBox.padding +
+                varIndex *
+                  (styles.varBox.fieldHeight + styles.varBox.padding / 2) +
+                styles.varBox.fieldHeight / 2 -
+                2,
+            };
+            targetPoint = {
+              x: targetNodePos ? targetNodePos.x : currentX, // Fallback if targetNodePos is somehow undefined for start
+              y: targetNodePos
+                ? targetNodePos.y + targetNodePos.height / 2
+                : currentYNode,
+            };
+            pathType = "default"; // Will be used by generateCurvedPath
+            dAttribute = generateCurvedPath(sourcePoint, targetPoint, pathType);
+          }
+
+          if (dAttribute) {
+            // Ensure dAttribute is set
+            connectionsGroup
+              .append("path")
+              .attr("d", dAttribute)
+              .attr("fill", "none")
+              .attr("stroke", styles.connection.instanceVarColor)
+              .attr("stroke-width", styles.connection.strokeWidth)
+              .attr("marker-end", "url(#ll-instance-var-arrow)");
+          }
+        }
+      });
+    } else if (
+      !startAddress ||
+      startAddress === "0x0" ||
+      startAddress === "null"
+    ) {
+      showNotImplementedMessage(
+        contentGroup,
+        width,
+        height,
+        "Could not find a starting node (e.g., 'head').",
+        nodesPlaceholderX,
+        nodesPlaceholderY
+      );
+    }
   };
 
   const renderTreeVisualization = (
