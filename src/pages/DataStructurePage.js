@@ -2476,36 +2476,77 @@ function DataStructurePage() {
     const localVariables = arrayState.localVariables || {};
     const instanceVariables = arrayState.instanceVariables || {};
     const addressObjectMap = arrayState.addressObjectMap || {};
-    const arrayAddress = instanceVariables.array;
 
-    const size = instanceVariables.count ?? instanceVariables.size ?? 0;
-    let capacity = instanceVariables.capacity || 0;
+    // Determine the array to visualize
+    let effectiveArrayAddress = null;
+    let arrayObjectInMap = null; // The actual array object from the map
 
-    let arrayElements = [];
-    if (arrayAddress && addressObjectMap[arrayAddress]) {
-      const elements = addressObjectMap[arrayAddress];
-      if (Array.isArray(elements)) {
-        arrayElements = elements.slice(0, size);
-        if (capacity === 0 && elements.length > 0) capacity = elements.length;
+    const ivArrayAddress = instanceVariables.array; // Address from instance variable
+
+    if (
+      ivArrayAddress &&
+      addressObjectMap[ivArrayAddress] &&
+      Array.isArray(addressObjectMap[ivArrayAddress])
+    ) {
+      // Priority 1: Use the array pointed to by instanceVariables.array
+      effectiveArrayAddress = ivArrayAddress;
+      arrayObjectInMap = addressObjectMap[ivArrayAddress];
+    } else {
+      // Priority 2: instanceVariables.array is not set, or doesn't point to a valid array.
+      // Look for a unique candidate array in addressObjectMap.
+      const candidateArrayAddresses = Object.keys(addressObjectMap).filter(
+        (addr) => Array.isArray(addressObjectMap[addr])
+      );
+
+      if (candidateArrayAddresses.length === 1) {
+        effectiveArrayAddress = candidateArrayAddresses[0];
+        arrayObjectInMap = addressObjectMap[effectiveArrayAddress];
+        console.log(
+          "Displaying an array found in addressObjectMap not (yet) pointed to by instanceVariables.array:",
+          effectiveArrayAddress
+        );
+      } else if (candidateArrayAddresses.length > 1) {
+        console.warn(
+          "Multiple arrays in addressObjectMap, and instanceVariables.array is not specific. Cannot determine which array to display."
+        );
       }
-    } else if (arrayState.elements) {
-      arrayElements = arrayState.elements.slice(0, size);
-      if (capacity === 0 && arrayState.elements.length > 0)
-        capacity = arrayState.elements.length;
+      // If 0 candidates, effectiveArrayAddress and arrayObjectInMap remain null.
     }
 
-    const hasArrayObject = !!arrayAddress;
-    const displayCapacity = hasArrayObject ? Math.max(capacity, size, 0) : 0;
-    // If displayCapacity is still 0 but arrayAddress exists, it means an empty array object is present.
-    // We might want to show a small visual cue for the array object itself in this case, even if no cells.
-    // For now, if displayCapacity is 0, no cells will be drawn.
+    // Determine size, elements, and capacity for display
+    const sizeFromInstanceVars =
+      instanceVariables.count ?? instanceVariables.size ?? 0;
+    let arrayElements = []; // Still useful for connections source/target logic
+    // let calculatedCapacityForCells = 0; // No longer needed with simpler logic
 
-    console.log("Array Info:", {
-      arrayAddress,
-      size,
-      capacity,
-      displayCapacity,
-      elementsLength: arrayElements.length,
+    if (arrayObjectInMap) {
+      // arrayElements are primarily for knowing what values *might* have connections
+      // We slice up to arrayObjectInMap.length because any of these could be pointers
+      arrayElements = arrayObjectInMap.slice(0, arrayObjectInMap.length);
+
+      // let tempCapacity = instanceVariables.capacity || 0; // Old logic
+      // if (tempCapacity === 0) { // Old logic
+      //   tempCapacity = arrayObjectInMap.length; // Old logic
+      // }
+      // calculatedCapacityForCells = Math.max(tempCapacity, sizeFromInstanceVars); // Old logic
+      // calculatedCapacityForCells = Math.min(calculatedCapacityForCells, arrayObjectInMap.length); // Old logic
+    }
+
+    const hasArrayObjectToDisplay =
+      !!effectiveArrayAddress && !!arrayObjectInMap;
+    // const displayCapacity = hasArrayObjectToDisplay ? calculatedCapacityForCells : 0; // Old logic
+    const displayCapacity =
+      hasArrayObjectToDisplay && arrayObjectInMap ? arrayObjectInMap.length : 0;
+
+    console.log("Array Visualization Info:", {
+      instanceArrayVarPointsTo: ivArrayAddress,
+      effectiveArrayAddressRendered: effectiveArrayAddress,
+      sizeFromInstance: sizeFromInstanceVars,
+      capacityFromInstance: instanceVariables.capacity,
+      finalDisplayCapacityCells: displayCapacity,
+      elementsInVisualization: arrayElements.length,
+      hasArrayObjectToDisplay,
+      arrayObjectInMapExists: !!arrayObjectInMap,
     });
 
     const styles = {
@@ -2720,12 +2761,12 @@ function DataStructurePage() {
     const arrayRefBoxWidth = 110;
     const arrayRefBoxX = firstColX + styles.localVars.width + 50;
     const arrayStartX =
-      arrayRefBoxX + (hasArrayObject ? arrayRefBoxWidth + 20 : 0); // Start cells after ref box if it exists
+      arrayRefBoxX + (hasArrayObjectToDisplay ? arrayRefBoxWidth + 20 : 0); // Start cells after ref box if it exists
     // const arraySectionY = varBoxTopMargin; // Align top of array stuff with top of local vars
     const arraySectionY = instanceVarsStartY; // Align top of array stuff with top of instance vars
 
     // 3. Draw the array reference box (if array object exists)
-    if (hasArrayObject) {
+    if (hasArrayObjectToDisplay) {
       const arrayRefBox = contentGroup
         .append("g")
         .attr("class", "array-reference");
@@ -2766,7 +2807,7 @@ function DataStructurePage() {
         .attr("text-anchor", "middle")
         .attr("font-size", "14px")
         .attr("fill", "#0284c7")
-        .text(arrayAddress.substring(0, 8));
+        .text(effectiveArrayAddress.substring(0, 8)); // Use effectiveArrayAddress here
       if (displayCapacity > 0) {
         arrayRefBox
           .append("path")
@@ -2786,7 +2827,7 @@ function DataStructurePage() {
         y: arraySectionY,
         width: arrayRefBoxWidth,
         height: cellSize,
-        value: arrayAddress,
+        value: effectiveArrayAddress,
       };
     }
 
@@ -2802,7 +2843,12 @@ function DataStructurePage() {
           .attr("y", y)
           .attr("width", cellSize)
           .attr("height", cellSize)
-          .attr("fill", i < size ? styles.array.fill : styles.array.unusedFill)
+          .attr(
+            "fill",
+            i < sizeFromInstanceVars
+              ? styles.array.fill
+              : styles.array.unusedFill
+          )
           .attr("stroke", styles.array.stroke)
           .attr("stroke-width", 1)
           .attr("rx", 4);
@@ -2856,7 +2902,7 @@ function DataStructurePage() {
           };
         }
       }
-    } else if (hasArrayObject) {
+    } else if (hasArrayObjectToDisplay) {
       // arrayAddress exists, but displayCapacity is 0 (empty array object)
       contentGroup
         .append("text")
@@ -2880,7 +2926,7 @@ function DataStructurePage() {
 
     Object.entries(localVariables).forEach(([key, value]) => {
       if (isAddress(value)) {
-        if (value === arrayAddress)
+        if (value === effectiveArrayAddress)
           connections.push({
             source: `local_${key}`,
             target: "array_ref",
@@ -2896,7 +2942,7 @@ function DataStructurePage() {
     });
     Object.entries(instanceVariables).forEach(([key, value]) => {
       if (isAddress(value) || key === "array") {
-        if (value === arrayAddress || key === "array")
+        if (value === effectiveArrayAddress || key === "array")
           connections.push({
             source: `instance_${key}`,
             target: "array_ref",
