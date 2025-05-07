@@ -617,15 +617,62 @@ function DataStructurePage() {
     let cp1x, cp1y, cp2x, cp2y;
 
     if (pathType === "longArcDown") {
-      // Force a path that arcs downwards significantly
-      // Useful for end pointers that need to go under the list
-      const arcHeight = Math.max(50, distanceTotal * 0.2, Math.abs(dx) * 0.15); // Make arc proportional but with a minimum
-      cp1x = source.x + dx * 0.25; // Control point starts moving towards target x
-      cp1y = source.y + arcHeight; // But dips down
-      cp2x = target.x - dx * 0.25; // Control point ends moving from target x
-      cp2y = target.y + arcHeight; // And also dips down from target side
-      // If source.y and target.y are very different, this might need refinement
-      // For now, assuming source and target y are somewhat similar for this path type (e.g. var box to node row)
+      // Revised for ERD-style orthogonal connector with ROUNDED corners: Down, Horizontal, Up
+      const verticalDipFromSource = 30;
+      const cornerRadius = 8; // Increased radius for more visible rounding
+
+      let path = `M ${source.x} ${source.y}`;
+      const firstVerticalY = source.y + verticalDipFromSource;
+      const targetHorizontalSign = Math.sign(target.x - source.x);
+
+      // Segment 1: Go down to the start of the first curve
+      path += ` V ${firstVerticalY - cornerRadius}`;
+      // Corner 1: Rounded turn from vertical (down) to horizontal (right or left)
+      path += ` Q ${source.x} ${firstVerticalY}, ${
+        source.x + targetHorizontalSign * cornerRadius
+      } ${firstVerticalY}`;
+      // Segment 2: Go horizontal towards the start of the second curve
+      path += ` H ${target.x - targetHorizontalSign * cornerRadius}`;
+      // Corner 2: Rounded turn from horizontal to vertical (up)
+      path += ` Q ${target.x} ${firstVerticalY}, ${target.x} ${
+        firstVerticalY - cornerRadius
+      }`;
+      // Segment 3: Go vertical up to target's Y
+      path += ` V ${target.y}`;
+
+      console.log("[generateCurvedPath] longArcDown Data (Rounded):", {
+        sourceX: source.x,
+        sourceY: source.y,
+        targetX: target.x,
+        targetY: target.y,
+        generatedPath: path,
+      });
+      return path;
+    } else if (pathType === "arcUpHigh") {
+      // New: Force a path that arcs upwards significantly
+      const arcHeight = Math.max(80, distanceTotal * 0.3, Math.abs(dx) * 0.25); // Increased arc height
+      cp1x = source.x + dx * 0.3;
+      cp1y = source.y - arcHeight;
+      cp2x = target.x - dx * 0.3;
+      cp2y = target.y - arcHeight;
+    } else if (pathType === "orthogonalNext") {
+      // ERD-style for node-to-node next pointers: H, V, H
+      const horizontalOffset = 20; // Use a fixed horizontal offset
+      let path = `M ${source.x} ${source.y}`;
+      // Segment 1: Horizontal line out from source
+      path += ` H ${source.x + horizontalOffset}`;
+      // Segment 2: Vertical line to align with target Y
+      path += ` V ${target.y}`;
+      // Segment 3: Horizontal line into target
+      path += ` H ${target.x}`;
+      console.log("[generateCurvedPath] orthogonalNext Data:", {
+        sourceX: source.x,
+        sourceY: source.y,
+        targetX: target.x,
+        targetY: target.y,
+        generatedPath: path,
+      });
+      return path;
     } else {
       // Default pathing logic
       if (isMainlyHorizontal) {
@@ -649,9 +696,771 @@ function DataStructurePage() {
     return `M ${source.x} ${source.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
   };
 
+  // *** NEW Universal Orthogonal Path Generator ***
+  const generateOrthogonalPath = (
+    source,
+    target,
+    cornerRadius = 5,
+    hint = "auto",
+    initialOffset = 30, // New parameter for initial segment length
+    detourTargetY = null // New parameter for V-H-V detour
+  ) => {
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+
+    let path = `M ${source.x} ${source.y}`;
+    let orientation = hint;
+
+    // Basic orientation heuristic (can be refined)
+    if (hint === "auto") {
+      // If target is mostly horizontal from source, prefer H-V-H
+      // If target is mostly vertical, or if hint='VHV' prefer V-H-V
+      if (Math.abs(dx) > Math.abs(dy) * 1.2) {
+        orientation = "H-V-H";
+      } else {
+        orientation = "V-H-V";
+      }
+      // Special case override: if source/target suggests a bottom-to-bottom connection (like 'end' pointer)
+      // This is tricky without knowing box heights, rely on explicit hint for now.
+    }
+
+    if (orientation === "H-V-H") {
+      // Horizontal -> Vertical -> Horizontal
+      // const midX = source.x + dx / 2; // Old midpoint
+      const sourceSignX = Math.sign(dx) || 1; // Ensure sign is not 0 if dx is 0
+      const targetSignY = Math.sign(dy) || 1; // Ensure sign is not 0 if dy is 0
+
+      const turn1X = source.x + sourceSignX * initialOffset;
+      const turn1Y = source.y;
+      const turn2X = turn1X; // Vertical segment shares this X
+      const turn2Y = target.y;
+
+      // Ensure radius isn't larger than segment length
+      const effectiveRadiusH1 = Math.min(
+        cornerRadius,
+        Math.abs(turn1X - source.x)
+      );
+      const effectiveRadiusV = Math.min(
+        cornerRadius,
+        Math.abs(turn2Y - turn1Y)
+      );
+      const effectiveRadiusH2 = Math.min(
+        cornerRadius,
+        Math.abs(target.x - turn2X)
+      );
+
+      // Segment 1: Horizontal from source to turn1X (before corner)
+      path += ` H ${turn1X - sourceSignX * effectiveRadiusH1}`;
+      // Corner 1: Rounded turn from horizontal to vertical
+      path += ` Q ${turn1X} ${turn1Y}, ${turn1X} ${
+        turn1Y + targetSignY * effectiveRadiusV
+      }`;
+      // Segment 2: Vertical from turn1Y to turn2Y (before corner)
+      path += ` V ${turn2Y - targetSignY * effectiveRadiusV}`;
+      // Corner 2: Rounded turn from vertical to horizontal
+      path += ` Q ${turn2X} ${turn2Y}, ${
+        turn2X + sourceSignX * effectiveRadiusH2
+      } ${turn2Y}`;
+      // Segment 3: Horizontal into target X
+      path += ` H ${target.x}`;
+    } else if (orientation === "V-H-V") {
+      // Vertical -> Horizontal -> Vertical
+      // const midY = source.y + dy / 2; // Old midpoint
+      const sourceSignY = Math.sign(dy) || 1;
+      const targetSignX = Math.sign(dx) || 1;
+
+      let turn1Yactual;
+      // Check detour condition *first*
+      let useDetour = false;
+      if (
+        detourTargetY !== null &&
+        hint === "V-H-V" &&
+        detourTargetY > source.y
+      ) {
+        console.log(
+          `[generateOrthogonalPath] V-H-V: Applying detour. SourceY: ${source.y}, DetourTargetY: ${detourTargetY}`
+        );
+        turn1Yactual = detourTargetY; // Use the detour Y
+        useDetour = true;
+      } else {
+        // If no valid detour, calculate based on initial offset
+        turn1Yactual = source.y + sourceSignY * initialOffset;
+        if (detourTargetY !== null && hint === "V-H-V") {
+          // Log if detour was provided but not applied
+          console.log(
+            `[generateOrthogonalPath] V-H-V: DetourY (${detourTargetY}) provided but NOT applied (condition detourTargetY > source.y failed). SourceY: ${source.y}`
+          );
+        }
+      }
+
+      const turn1X = source.x;
+      // const turn1Y = source.y + sourceSignY * initialOffset; // Old way
+      const turn1Y = turn1Yactual; // Use the correctly determined Y for the horizontal segment
+      const turn2X = target.x;
+      const turn2Y = turn1Y; // Horizontal segment shares this Y
+
+      // Determine local signs for vertical segments, especially important for detours
+      const signV1 = useDetour ? 1 : sourceSignY; // If detouring down, first segment is always down (+1)
+      const signV2 = useDetour
+        ? Math.sign(target.y - turn1Y) || -1
+        : sourceSignY; // If detouring, second segment direction is from detourY to targetY
+
+      // Ensure radius isn't larger than segment length
+      const effectiveRadiusV1 = Math.min(
+        cornerRadius,
+        Math.abs(turn1Y - source.y)
+      );
+      const effectiveRadiusH = Math.min(
+        cornerRadius,
+        Math.abs(turn2X - turn1X)
+      );
+      const effectiveRadiusV2 = Math.min(
+        cornerRadius,
+        Math.abs(target.y - turn2Y)
+      );
+
+      // Segment 1: Vertical from source to turn1Y (before corner)
+      path += ` V ${turn1Y - signV1 * effectiveRadiusV1}`;
+      // Corner 1: Rounded turn from vertical to horizontal
+      path += ` Q ${turn1X} ${turn1Y}, ${
+        turn1X + targetSignX * effectiveRadiusH
+      } ${turn1Y}`;
+      // Segment 2: Horizontal from turn1X to turn2X (before corner)
+      path += ` H ${turn2X - targetSignX * effectiveRadiusH}`;
+      // Corner 2: Rounded turn from horizontal to vertical
+      path += ` Q ${turn2X} ${turn2Y}, ${turn2X} ${
+        turn2Y + signV2 * effectiveRadiusV2
+      }`;
+      // Segment 3: Vertical into target Y
+      path += ` V ${target.y}`;
+
+      if (useDetour && orientation === "V-H-V") {
+        console.log("[generateOrthogonalPath] V-H-V DETOUR path constructed:");
+        console.log(
+          `  Source: (${source.x}, ${source.y}), Target: (${target.x}, ${target.y}), DetourY: ${turn1Yactual}`
+        );
+        console.log(`  Path: ${path}`);
+      }
+    } else if (orientation === "H-V_to_target_top") {
+      // Horizontal -> Vertical (directly to target top-center)
+      const sourceSignX = Math.sign(dx) || 1;
+      const targetSignY = Math.sign(dy) || 1; // Should typically be 1 (down) or -1 (up)
+
+      // First turn X-coordinate is the target's X (top-center)
+      const turn1X = target.x;
+      const turn1Y = source.y; // Horizontal segment is at source's Y
+
+      const effectiveRadiusH1 = Math.min(
+        cornerRadius,
+        Math.abs(turn1X - source.x)
+      );
+      const effectiveRadiusV = Math.min(
+        cornerRadius,
+        Math.abs(target.y - turn1Y) // Vertical segment length to target.y
+      );
+
+      // Segment 1: Horizontal from source to turn1X (before corner)
+      path += ` H ${turn1X - sourceSignX * effectiveRadiusH1}`;
+      // Corner 1: Rounded turn from horizontal to vertical
+      path += ` Q ${turn1X} ${turn1Y}, ${turn1X} ${
+        turn1Y + targetSignY * effectiveRadiusV
+      }`;
+      // Segment 2: Vertical from turn1Y to target.y (ends path)
+      path += ` V ${target.y}`;
+
+      console.log(
+        "[generateOrthogonalPath] H-V_to_target_top path constructed:"
+      );
+      console.log(
+        `  Source: (${source.x}, ${source.y}), Target: (${target.x}, ${target.y})`
+      );
+      console.log(`  Path: ${path}`);
+    } else {
+      // Fallback to straight line if orientation is unknown
+      console.warn(
+        `[generateOrthogonalPath] Unknown orientation: ${orientation}. Drawing straight line.`
+      );
+      path += ` L ${target.x} ${target.y}`;
+    }
+
+    console.log(
+      `[generateOrthogonalPath] Hint: ${hint}, Orientation: ${orientation}, Path: ${path}`
+    );
+    return path;
+  };
+
+  // *** NEW Hardcoded Path Generator for 'end' pointer ***
+  const generateHardcodedEndPointerPath = (
+    sourceConnectionPoint, // {x, y} - the actual point on the left of the 'end' field
+    targetNodePosition, // {x, y, width, height} - of the last node
+    verticalDrop = 75, // How much to go down initially (increased from 50)
+    horizontalClearance = 20, // How much to go left initially from source before main rightward travel
+    cornerRadius = 8
+  ) => {
+    let path = `M ${sourceConnectionPoint.x} ${sourceConnectionPoint.y}`;
+    const p0 = sourceConnectionPoint;
+
+    // --- Sharp Corners ---
+
+    // 1. Go left a bit initially
+    const p1x = p0.x - horizontalClearance;
+    path += ` H ${p1x}`;
+
+    // 2. Go down (main vertical drop)
+    const p2y = p0.y + verticalDrop;
+    path += ` V ${p2y}`;
+
+    // 3. Go right to align under the target node's center
+    const targetCenterX = targetNodePosition.x + targetNodePosition.width / 2;
+    path += ` H ${targetCenterX}`;
+
+    // 4. Go up to meet the bottom-center of the target node
+    const targetAttachY = targetNodePosition.y + targetNodePosition.height;
+    path += ` V ${targetAttachY}`;
+
+    console.log("[generateHardcodedEndPointerPath - SHARP] Constructed:", {
+      path,
+      p0,
+      p1x,
+      p2y,
+      targetCenterX,
+      targetAttachY,
+      verticalDrop,
+      horizontalClearance,
+    });
+    return path;
+  };
+
+  // *** NEW Smart Detour Path Generator (for specific cases like 'end' pointer) ***
+  const generateSmartDetourPath = (
+    sourcePoint,
+    targetNodePos,
+    standoff = 30,
+    cornerRadius = 8
+  ) => {
+    let path = `M ${sourcePoint.x} ${sourcePoint.y}`;
+
+    // This version is specifically for a V-H-V path, starting by going DOWN.
+    // sourcePoint: actual starting coordinate {x, y}
+    // targetNodePos: {x, y, width, height} of the target node
+    // standoff: how far down the first vertical segment goes to establish the horizontal path level.
+
+    const horizontalPathY = sourcePoint.y + standoff; // Y-level of the main horizontal segment
+    const sourceSegmentEndX = sourcePoint.x;
+    const sourceSegmentEndY = horizontalPathY;
+
+    const targetAttachX = targetNodePos.x + targetNodePos.width / 2; // Attach to bottom-center of target node
+    const targetAttachY = targetNodePos.y + targetNodePos.height;
+
+    // Intermediate points for the horizontal segment
+    const horizontalSegmentStartX = sourcePoint.x;
+    const horizontalSegmentEndX = targetAttachX;
+
+    // Signs for corner radius calculations
+    const signY_sourceToHorizontal =
+      Math.sign(horizontalPathY - sourcePoint.y) || 1; // Should be +1 (down)
+    const signX_horizontal =
+      Math.sign(horizontalSegmentEndX - horizontalSegmentStartX) || 1;
+    const signY_horizontalToTarget =
+      Math.sign(targetAttachY - horizontalPathY) || 1; // From horizontal to target
+
+    // Effective radii, ensuring they are not larger than segment lengths
+    const rV1 = Math.min(
+      cornerRadius,
+      Math.abs(horizontalPathY - sourcePoint.y)
+    );
+    const rH = Math.min(
+      cornerRadius,
+      Math.abs(horizontalSegmentEndX - horizontalSegmentStartX)
+    );
+    const rV2 = Math.min(
+      cornerRadius,
+      Math.abs(targetAttachY - horizontalPathY)
+    );
+
+    // 1. Initial Vertical Segment (Down)
+    path += ` V ${horizontalPathY - signY_sourceToHorizontal * rV1}`;
+
+    // 2. First Corner (to Horizontal)
+    path += ` Q ${sourceSegmentEndX} ${horizontalPathY}, ${
+      horizontalSegmentStartX + signX_horizontal * rH
+    } ${horizontalPathY}`;
+
+    // 3. Horizontal Segment
+    path += ` H ${horizontalSegmentEndX - signX_horizontal * rH}`;
+
+    // 4. Second Corner (to Vertical to reach target)
+    path += ` Q ${horizontalSegmentEndX} ${horizontalPathY}, ${horizontalSegmentEndX} ${
+      horizontalPathY + signY_horizontalToTarget * rV2
+    }`;
+
+    // 5. Final Vertical Segment (to Target)
+    path += ` V ${targetAttachY}`;
+
+    console.log("[generateSmartDetourPath] Path constructed:", {
+      path,
+      sourcePoint,
+      targetNodeX: targetNodePos.x,
+      targetNodeY: targetNodePos.y,
+      targetNodeWidth: targetNodePos.width,
+      targetNodeHeight: targetNodePos.height,
+      standoff,
+      horizontalPathY,
+      targetAttachX,
+      targetAttachY,
+    });
+
+    return path;
+  };
+
+  // *** NEW REUSABLE HELPER FUNCTION (Step 1: Definition Only) ***
+  // Helper function to render a generic variable box (for local or instance variables)
+  const renderVariableBox = (
+    group, // D3 group to append to
+    title, // String: "Local Variables", "Instance Variables"
+    variables, // Object: { varName: value, ... }
+    x, // Number: top-left X coordinate
+    y, // Number: top-left Y coordinate
+    styleConfig, // Object: styling parameters (widths, heights, colors, padding)
+    type, // String: "local" or "instance" (for connection point naming)
+    isAddressFn // Function: checks if a value is an address (e.g., isAddress)
+  ) => {
+    // ... (implementation of renderVariableBox as previously defined) ...
+    // (Assuming the full body of renderVariableBox is here)
+    const boxGroup = group
+      .append("g")
+      .attr("class", `${type}-variables-box-group`);
+    const connectionPoints = [];
+    const defaultConfig = {
+      width: 180,
+      headerHeight: 25,
+      fieldHeight: 25,
+      fieldSpacing: 5,
+      padding: 10,
+      fill: "#f9f9f9",
+      stroke: "#cccccc",
+      titleFill: "#eeeeee",
+      titleStroke: "#cccccc",
+      titleTextFill: "#333333",
+      keyTextFill: "#333333",
+      valueTextFill: "#333333",
+      addressValueFill: "#0000cc",
+      fieldRectFill: "#ffffff",
+      fieldRectStroke: "#dddddd",
+      fontSize: "12px",
+      titleFontSize: "13px",
+    };
+    const s = { ...defaultConfig, ...styleConfig };
+    const varCount = Object.keys(variables).length;
+    const contentHeight =
+      varCount * s.fieldHeight +
+      (varCount > 0 ? (varCount - 1) * s.fieldSpacing : 0);
+    const boxHeight =
+      s.headerHeight +
+      (varCount > 0 ? s.padding * 2 + contentHeight : s.padding);
+    boxGroup
+      .append("rect")
+      .attr("x", x)
+      .attr("y", y)
+      .attr("width", s.width)
+      .attr("height", boxHeight)
+      .attr("fill", s.fill)
+      .attr("stroke", s.stroke)
+      .attr("stroke-width", 1)
+      .attr("rx", 5);
+    boxGroup
+      .append("rect")
+      .attr("x", x)
+      .attr("y", y)
+      .attr("width", s.width)
+      .attr("height", s.headerHeight)
+      .attr("fill", s.titleFill)
+      .attr(
+        "fill-opacity",
+        s.titleFillOpacity !== undefined ? s.titleFillOpacity : 1
+      )
+      .attr("stroke", s.titleStroke || s.stroke)
+      .attr("stroke-width", 1)
+      .attr("rx", 5)
+      .attr("ry", 0);
+    boxGroup
+      .append("text")
+      .attr("x", x + s.width / 2)
+      .attr("y", y + s.headerHeight / 2 + parseFloat(s.titleFontSize) / 3)
+      .attr("text-anchor", "middle")
+      .attr("font-weight", "bold")
+      .attr("font-size", s.titleFontSize)
+      .attr("fill", s.titleTextFill)
+      .text(title);
+    if (varCount > 0) {
+      boxGroup
+        .append("line")
+        .attr("x1", x)
+        .attr("y1", y + s.headerHeight)
+        .attr("x2", x + s.width)
+        .attr("y2", y + s.headerHeight)
+        .attr("stroke", s.titleStroke || s.stroke)
+        .attr("stroke-width", 0.5);
+    }
+    let fieldCurrentY = y + s.headerHeight + s.padding;
+    Object.entries(variables).forEach(([key, value]) => {
+      const fieldGroup = boxGroup.append("g").attr("class", `var-field-${key}`);
+      if (s.fieldRectFill || s.fieldRectStroke) {
+        fieldGroup
+          .append("rect")
+          .attr("x", x + s.padding / 2)
+          .attr("y", fieldCurrentY - s.padding / 2)
+          .attr("width", s.width - s.padding)
+          .attr("height", s.fieldHeight)
+          .attr(
+            "fill",
+            s.fieldRectFill === "none" ? "transparent" : s.fieldRectFill
+          )
+          .attr(
+            "stroke",
+            s.fieldRectStroke === "none" ? "transparent" : s.fieldRectStroke
+          )
+          .attr("stroke-width", 1)
+          .attr("rx", 3);
+      }
+      fieldGroup
+        .append("text")
+        .attr("x", x + s.padding)
+        .attr(
+          "y",
+          fieldCurrentY + s.fieldHeight / 2 - parseFloat(s.fontSize) / 3 + 2
+        )
+        .attr("font-size", s.fontSize)
+        .attr("font-weight", "bold")
+        .attr("fill", s.keyTextFill)
+        .text(`${key}:`);
+      const stringValue = String(value);
+      const isAddr = isAddressFn(stringValue);
+      fieldGroup
+        .append("text")
+        .attr("x", x + s.width - s.padding)
+        .attr(
+          "y",
+          fieldCurrentY + s.fieldHeight / 2 - parseFloat(s.fontSize) / 3 + 2
+        )
+        .attr("text-anchor", "end")
+        .attr("font-size", s.fontSize)
+        .attr("font-weight", isAddr ? "bold" : "normal")
+        .attr("fill", isAddr ? s.addressValueFill : s.valueTextFill)
+        .text(stringValue);
+      if (isAddr) {
+        const connectionData = {
+          sourceName: `${type}-${key}`,
+          sourceCoords: {
+            // This is the RIGHT side exit point
+            x: x + s.width,
+            y:
+              fieldCurrentY +
+              s.fieldHeight / 2 -
+              parseFloat(s.fontSize) / 3 +
+              2 -
+              s.padding / 2 +
+              s.fieldHeight / 2,
+          },
+          targetAddress: stringValue,
+          type: type,
+          varName: key,
+        };
+
+        if (type === "instance") {
+          connectionData.leftSourceCoords = {
+            x: x, // Left edge of the var box
+            y: connectionData.sourceCoords.y, // Same Y as the right side exit
+          };
+        }
+        connectionPoints.push(connectionData);
+      }
+      fieldCurrentY += s.fieldHeight + s.fieldSpacing;
+    });
+    return { height: boxHeight, connectionPoints: connectionPoints };
+  };
+
+  // *** NEW REUSABLE HELPER FUNCTION (Step 3: Definition Only) ***
+  // Helper function to define standard arrowhead markers in the SVG <defs>
+  // Placed immediately AFTER renderVariableBox and BEFORE renderWebBrowserVisualization
+  const defineArrowheads = (defs, globalStyles) => {
+    const createMarker = (id, color, size = 8, refX = 8) => {
+      if (defs.select(`#${id}`).empty()) {
+        defs
+          .append("marker")
+          .attr("id", id)
+          .attr("viewBox", "0 -5 10 10")
+          .attr("refX", refX)
+          .attr("refY", 0)
+          .attr("markerWidth", size)
+          .attr("markerHeight", size)
+          .attr("orient", "auto-start-reverse")
+          .append("path")
+          .attr("d", "M0,-5L10,0L0,5")
+          .attr("fill", color);
+      }
+    };
+
+    const connStyles = globalStyles?.connection || {};
+    const defaultBlue = "#0284c7";
+    const defaultDarkGray = "#334155";
+    const defaultSlate = "#64748b";
+    const defaultRed = "#ef4444";
+    const defaultGreen = "#166534";
+
+    createMarker("array-arrow", connStyles.arrayArrowColor || defaultBlue);
+    createMarker("var-ref-arrow", connStyles.varRefColor || defaultDarkGray);
+    createMarker("next-arrow", connStyles.nextColor || defaultBlue);
+    createMarker("prev-arrow", connStyles.prevColor || defaultRed);
+    createMarker("current-arrow", connStyles.currentColor || defaultGreen);
+    createMarker(
+      "ll-next-arrow",
+      connStyles.llNextColor || connStyles.nextColor || defaultBlue,
+      7,
+      7
+    );
+    createMarker(
+      "ll-instance-var-arrow",
+      connStyles.llInstanceVarColor ||
+        connStyles.varRefColor ||
+        defaultDarkGray,
+      7,
+      7
+    );
+  };
+
+  // *** NEW REUSABLE HELPER FUNCTION (Step 6: Definition Only) ***
+  // Helper function to render a generic node (like a LL node or Web Browser page)
+  const renderGenericNode = (
+    group, // D3 group to append the node elements to
+    nodeSpec, // Object: { x, y, address, title?, fields: {key:val,...}, isCurrent?, isIsolated?, style? }
+    styleConfig, // Object: styling parameters (widths, heights, colors, padding etc)
+    positionsMap, // Object: map where position data {x, y, width, height} will be stored, keyed by address
+    isAddressFn, // Function: checks if a value is an address
+    truncateAddrFn // Function: truncates address for display
+  ) => {
+    console.log(
+      `[renderGenericNode] START processing node: ${nodeSpec?.address}`
+    );
+    // Default styles and validation
+    const defaultConfig = {
+      width: 180,
+      headerHeight: 25,
+      fieldHeight: 25,
+      fieldSpacing: 5,
+      padding: 10,
+      fill: "#ffffff",
+      stroke: "#cccccc",
+      titleFill: "#eeeeee",
+      titleStroke: "#cccccc",
+      titleTextFill: "#333333",
+      keyTextFill: "#334155",
+      valueTextFill: "#334155",
+      addressTextFill: "#0ea5e9", // Use a distinct address color
+      fieldRectFill: "none",
+      fieldRectStroke: "#e2e8f0",
+      fontSize: "12px",
+      titleFontSize: "13px",
+      currentFill: "#f0f9ff",
+      currentStroke: "#0284c7",
+      currentStrokeWidth: 1.5, // Light blue theme for current
+      isolatedFill: "#fefce8",
+      isolatedStroke: "#ca8a04",
+      isolatedStrokeWidth: 1.5,
+      isolatedDasharray: "4,4", // Yellow theme for isolated
+    };
+    // Merge default, global styleConfig, and node-specific style overrides
+    const s = { ...defaultConfig, ...styleConfig, ...(nodeSpec.style || {}) };
+    const { x, y, address, title, fields, isCurrent, isIsolated } = nodeSpec;
+
+    // Calculate overall node height
+    const fieldCount = fields ? Object.keys(fields).length : 0;
+    const fieldsAreaHeight =
+      fieldCount * s.fieldHeight +
+      (fieldCount > 0 ? (fieldCount - 1) * s.fieldSpacing : 0);
+    // Ensure minimum height for header+padding even if no fields
+    const nodeHeight =
+      s.headerHeight +
+      (fieldCount > 0 ? s.padding * 2 + fieldsAreaHeight : s.padding);
+
+    // Create group for the node, positioned at x, y
+    const nodeGroup = group
+      .append("g")
+      .attr("class", `generic-node ${address}`)
+      .attr("transform", `translate(${x}, ${y})`);
+
+    // Draw main node rectangle with conditional styling
+    nodeGroup
+      .append("rect")
+      .attr("class", "node-body")
+      .attr("width", s.width)
+      .attr("height", nodeHeight)
+      .attr(
+        "fill",
+        isCurrent ? s.currentFill : isIsolated ? s.isolatedFill : s.fill
+      )
+      .attr(
+        "stroke",
+        isCurrent ? s.currentStroke : isIsolated ? s.isolatedStroke : s.stroke
+      )
+      .attr(
+        "stroke-width",
+        isCurrent
+          ? s.currentStrokeWidth
+          : isIsolated
+          ? s.isolatedStrokeWidth
+          : 1
+      )
+      .attr("stroke-dasharray", isIsolated ? s.isolatedDasharray : "none")
+      .attr("rx", 5); // Rounded corners for the main box
+
+    // Draw title bar rectangle with conditional styling
+    nodeGroup
+      .append("rect")
+      .attr("class", "node-header-bg")
+      .attr("width", s.width)
+      .attr("height", s.headerHeight)
+      .attr(
+        "fill",
+        isCurrent
+          ? s.currentStroke
+          : isIsolated
+          ? s.isolatedStroke
+          : s.titleFill
+      )
+      .attr(
+        "fill-opacity",
+        isCurrent || isIsolated
+          ? 0.3
+          : s.titleFillOpacity !== undefined
+          ? s.titleFillOpacity
+          : 1
+      )
+      .attr("stroke", "none") // No stroke for the header bg itself, main box provides border
+      .attr("rx", 5)
+      .attr("ry", 0); // Keep top corners rounded
+
+    // Draw title text (use provided title or truncated address)
+    nodeGroup
+      .append("text")
+      .attr("class", "node-title")
+      .attr("x", s.width / 2)
+      .attr("y", s.headerHeight / 2 + parseFloat(s.titleFontSize) / 3) // Approx vertical center
+      .attr("text-anchor", "middle")
+      .attr("font-weight", "bold")
+      .attr("font-size", s.titleFontSize)
+      .attr("fill", s.titleTextFill)
+      .text(title || truncateAddrFn(address)); // Use provided title or fallback to truncated address
+
+    // Draw divider line below header (only if fields exist)
+    if (fieldCount > 0) {
+      nodeGroup
+        .append("line")
+        .attr("class", "header-divider")
+        .attr("x1", 0)
+        .attr("y1", s.headerHeight)
+        .attr("x2", s.width)
+        .attr("y2", s.headerHeight)
+        .attr("stroke", s.titleStroke || s.stroke)
+        .attr("stroke-width", 0.5);
+    }
+
+    // Render fields if they exist
+    if (fields && fieldCount > 0) {
+      let fieldCurrentYOffset = s.headerHeight + s.padding; // Start fields below header + padding
+      console.log(
+        `[renderGenericNode] Node ${nodeSpec?.address}: Processing ${fieldCount} fields...`
+      );
+      Object.entries(fields).forEach(([key, value]) => {
+        const fieldGroup = nodeGroup
+          .append("g")
+          .attr("class", `node-field-group-${key}`);
+        const fieldY = fieldCurrentYOffset; // Y relative to nodeGroup origin (top-left)
+
+        // Optional field background/border rectangle
+        if (s.fieldRectFill !== "none" || s.fieldRectStroke !== "none") {
+          fieldGroup
+            .append("rect")
+            .attr("class", "field-bg")
+            .attr("x", s.padding / 2)
+            .attr(
+              "y",
+              fieldY - s.fieldHeight / 2 - s.padding / 2 + s.fieldHeight / 2
+            ) // Position background rect around the field content area
+            .attr("width", s.width - s.padding)
+            .attr("height", s.fieldHeight)
+            .attr(
+              "fill",
+              s.fieldRectFill === "none" ? "transparent" : s.fieldRectFill
+            )
+            .attr(
+              "stroke",
+              s.fieldRectStroke === "none" ? "transparent" : s.fieldRectStroke
+            )
+            .attr("stroke-width", 0.5)
+            .attr("rx", 3);
+        }
+
+        // Field key text
+        fieldGroup
+          .append("text")
+          .attr("class", "field-key")
+          .attr("x", s.padding)
+          .attr(
+            "y",
+            fieldY + s.fieldHeight / 2 - parseFloat(s.fontSize) / 3 + 2
+          ) // Approx vert center
+          .attr("font-size", s.fontSize)
+          .attr("font-weight", "bold")
+          .attr("fill", s.keyTextFill)
+          .text(`${key}:`);
+
+        // Field value text
+        const stringValue = String(value); // Ensure value is string for checks/display
+        const isAddr = isAddressFn(stringValue);
+        fieldGroup
+          .append("text")
+          .attr("class", "field-value")
+          .attr("x", s.width - s.padding)
+          .attr(
+            "y",
+            fieldY + s.fieldHeight / 2 - parseFloat(s.fontSize) / 3 + 2
+          ) // Approx vert center
+          .attr("text-anchor", "end")
+          .attr("font-size", s.fontSize)
+          .attr("font-weight", isAddr ? "bold" : "normal")
+          .attr("fill", isAddr ? s.addressTextFill : s.valueTextFill)
+          .text(truncateAddrFn(stringValue)); // Use truncateAddress for display
+
+        // Move to Y position for the next field
+        fieldCurrentYOffset += s.fieldHeight + s.fieldSpacing;
+      });
+      console.log(
+        `[renderGenericNode] Node ${nodeSpec?.address}: FINISHED processing fields.`
+      );
+    }
+
+    // Store position and dimensions in the shared map
+    if (positionsMap && address) {
+      positionsMap[address] = {
+        x: x,
+        y: y,
+        width: s.width,
+        height: nodeHeight,
+      };
+    } else if (!address) {
+      console.warn(
+        "renderGenericNode called without an address in nodeSpec. Position not stored."
+      );
+    }
+    console.log(
+      `[renderGenericNode] END processing node: ${nodeSpec?.address}`
+    );
+  };
+
   // Add this new function for web browser visualization
   const renderWebBrowserVisualization = (
-    container,
+    contentGroup, // Changed from container
     width,
     height,
     operation,
@@ -659,920 +1468,834 @@ function DataStructurePage() {
   ) => {
     console.log("Rendering Web Browser visualization");
 
-    // Extract data from operation or memory snapshot
-    let browserData = {};
-
-    // First try to get data from memory snapshot
-    if (memorySnapshot) {
-      // Use memory snapshot directly
-      browserData = memorySnapshot;
-      console.log("Web Browser data from memory snapshot:", browserData);
-    } else if (operation.state) {
-      // Fallback to operation state
-      browserData = operation.state;
-      console.log("Web Browser data from operation state:", browserData);
-    }
-
-    // Extract the browser components
+    // Extract data (remains the same)
+    let browserData = memorySnapshot || operation.state || {};
     const localVariables = browserData.localVariables || {};
     const instanceVariables = browserData.instanceVariables || {};
     const addressObjectMap = browserData.addressObjectMap || {};
     const currentPageAddress = instanceVariables.current;
 
-    console.log("Local variables:", localVariables);
-    console.log("Instance variables:", instanceVariables);
-    console.log("Address object map:", addressObjectMap);
-    console.log("Current page address:", currentPageAddress);
-
-    // Entity styles
+    // Adjusted styles for renderGenericNode compatibility
     const styles = {
-      browser: {
-        width: 500,
-        height: 80,
-        fill: "#f8fafc", // Very light gray
-        stroke: "#94a3b8", // Gray
-        textColor: "#334155", // Dark gray
-      },
       page: {
+        // Styles for renderGenericNode
         width: 200,
-        height: 120,
-        fill: "#ffffff", // White
-        stroke: "#94a3b8", // Gray
-        textColor: "#334155", // Dark gray
-        currentFill: "#f1f5f9", // Light gray for current page
-        currentStroke: "#64748b", // Darker gray for current page
+        headerHeight: 25,
+        fieldHeight: 25,
+        fieldSpacing: 5,
+        padding: 10,
+        fill: "#ffffff",
+        stroke: "#94a3b8",
+        titleFill: "#94a3b8",
+        titleStroke: "#94a3b8",
+        titleTextFill: "#334155",
+        keyTextFill: "#334155",
+        valueTextFill: "#334155",
+        addressTextFill: "#0284c7", // Address color for next/prev
+        fieldRectFill: "none",
+        fieldRectStroke: "#e2e8f0",
+        fontSize: "12px",
+        titleFontSize: "13px",
+        currentFill: "#f1f5f9",
+        currentStroke: "#64748b",
+        currentStrokeWidth: 1.5,
+        isolatedFill: "#fcf5e5",
+        isolatedStroke: "#eab308",
+        isolatedStrokeWidth: 1.5,
+        isolatedDasharray: "4,4",
       },
-      localVars: {
+      varBox: {
+        // Styles for renderVariableBox
         width: 200,
-        height: 30, // Will be adjusted based on content
-        fill: "#f8fafc", // Very light gray
-        stroke: "#94a3b8", // Gray
-        textColor: "#334155", // Dark gray
-      },
-      instanceVars: {
-        width: 200,
-        height: 30, // Will be adjusted based on content
-        fill: "#f1f5f9", // Light slate
-        stroke: "#64748b", // Slate
-        textColor: "#334155", // Dark slate
+        headerHeight: 25,
+        fieldHeight: 25,
+        fieldSpacing: 5,
+        padding: 10,
+        fill: "#ffffff",
+        stroke: "#94a3b8",
+        titleFill: "#94a3b8",
+        titleFillOpacity: 0.3,
+        titleStroke: "#94a3b8",
+        textFill: "#334155",
+        valueTextFill: "#334155",
+        addressValueFill: "#0ea5e9",
+        fieldRectFill: "white",
+        fieldRectStroke: "#e2e8f0",
       },
       connection: {
-        stroke: "#64748b", // Slate
-        width: 2,
-        nextColor: "#64748b", // Gray for next pointers
-        prevColor: "#64748b", // Gray for previous pointers
-        currentColor: "#334155", // Dark gray for current pointer
+        // Styles for connections and arrowheads
+        stroke: "#64748b",
+        width: 1.5,
+        nextColor: "#64748b", // Gray used for marker fill
+        prevColor: "#64748b", // Gray used for marker fill
+        currentColor: "#334155", // Dark gray used for marker fill
       },
     };
 
-    // Add arrowhead definitions for connections
-    const defs = container.append("defs");
+    // Use helper to define arrowheads
+    let defs = contentGroup.select("defs");
+    if (defs.empty()) {
+      defs = contentGroup.append("defs");
+    }
+    defineArrowheads(defs, styles);
 
-    // Next pointer (blue)
-    defs
-      .append("marker")
-      .attr("id", "next-arrow")
-      .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 8)
-      .attr("refY", 0)
-      .attr("markerWidth", 8)
-      .attr("markerHeight", 8)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M0,-5L10,0L0,5")
-      .attr("fill", styles.connection.nextColor);
+    const pagePositions = {}; // Stores positions of ALL elements (nodes and var boxes)
+    const allConnections = []; // Stores ALL connection data points
 
-    // Previous pointer (red)
-    defs
-      .append("marker")
-      .attr("id", "prev-arrow")
-      .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 8)
-      .attr("refY", 0)
-      .attr("markerWidth", 8)
-      .attr("markerHeight", 8)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M0,-5L10,0L0,5")
-      .attr("fill", styles.connection.prevColor);
+    const firstColX = 50;
+    const varBoxTopMargin = 30;
+    const varBoxSpacing = 20;
 
-    // Current pointer (green)
-    defs
-      .append("marker")
-      .attr("id", "current-arrow")
-      .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 8)
-      .attr("refY", 0)
-      .attr("markerWidth", 8)
-      .attr("markerHeight", 8)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M0,-5L10,0L0,5")
-      .attr("fill", styles.connection.currentColor);
-
-    // 1. Render Local Variables Box
-    const localVarsBox = container.append("g").attr("class", "local-variables");
-
-    // Adjust height based on number of variables
-    const localVarCount = Object.keys(localVariables).length;
-    const localVarsHeight = Math.max(65, 25 + 5 + localVarCount * 30); // Header (25px) + small gap (5px) + variables
-    styles.localVars.height = localVarsHeight;
-
-    // Box container
-    localVarsBox
-      .append("rect")
-      .attr("x", 50)
-      .attr("y", 80)
-      .attr("width", styles.localVars.width)
-      .attr("height", styles.localVars.height)
-      .attr("fill", "#ffffff")
-      .attr("stroke", "#94a3b8")
-      .attr("stroke-width", 1)
-      .attr("rx", 5);
-
-    // Title
-    localVarsBox
-      .append("rect")
-      .attr("x", 50)
-      .attr("y", 80)
-      .attr("width", styles.localVars.width)
-      .attr("height", 25)
-      .attr("fill", "#94a3b8")
-      .attr("fill-opacity", 0.3)
-      .attr("stroke", "none")
-      .attr("rx", 5)
-      .attr("ry", 0);
-
-    localVarsBox
-      .append("text")
-      .attr("x", 50 + styles.localVars.width / 2)
-      .attr("y", 80 + 17)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "13px")
-      .attr("font-weight", "bold")
-      .attr("fill", "#334155")
-      .text("Local Variables");
-
-    // Divider line
-    localVarsBox
-      .append("line")
-      .attr("x1", 50)
-      .attr("y1", 80 + 25)
-      .attr("x2", 50 + styles.localVars.width)
-      .attr("y2", 80 + 25)
-      .attr("stroke", "#94a3b8")
-      .attr("stroke-width", 1);
-
-    // Variables
-    let yOffset = 30; // Start below the header
-    Object.entries(localVariables).forEach(([key, value]) => {
-      // Add field container for local variables
-      localVarsBox
-        .append("rect")
-        .attr("x", 50 + 10) // Same padding as page nodes (10px)
-        .attr("y", 80 + yOffset)
-        .attr("width", styles.localVars.width - 20)
-        .attr("height", 25) // Same as page nodes
-        .attr("fill", "white")
-        .attr("stroke", "#e2e8f0")
-        .attr("stroke-width", 1)
-        .attr("rx", 3);
-
-      // Variable name (like "value:" in node boxes)
-      localVarsBox
-        .append("text")
-        .attr("x", 50 + 20) // Same as page nodes
-        .attr("y", 80 + yOffset + 17) // Center in the row like page nodes
-        .attr("font-size", "12px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#334155")
-        .text(key + ":");
-
-      // Variable value (like the values in node boxes)
-      localVarsBox
-        .append("text")
-        .attr("x", 50 + styles.localVars.width - 20) // Same as page nodes
-        .attr("y", 80 + yOffset + 17) // Center in the row like page nodes
-        .attr("text-anchor", "end")
-        .attr("font-size", "12px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#334155")
-        .text(
-          String(value).length > 10
-            ? String(value).substring(0, 9) + "..."
-            : value
-        );
-
-      yOffset += 30; // Same spacing as page nodes (node boxes use 30px spacing)
-    });
-
-    // 2. Render Instance Variables Box
-    const instanceVarsBox = container
-      .append("g")
-      .attr("class", "instance-variables");
-
-    // Adjust height based on number of variables
-    const instanceVarCount = Object.keys(instanceVariables).length;
-    const instanceVarsHeight = Math.max(65, 25 + 5 + instanceVarCount * 30); // Header (25px) + small gap (5px) + variables
-    styles.instanceVars.height = instanceVarsHeight;
-
-    // Box container
-    instanceVarsBox
-      .append("rect")
-      .attr("x", width - 50 - styles.instanceVars.width)
-      .attr("y", 80)
-      .attr("width", styles.instanceVars.width)
-      .attr("height", styles.instanceVars.height)
-      .attr("fill", "#ffffff")
-      .attr("stroke", "#94a3b8")
-      .attr("stroke-width", 1)
-      .attr("rx", 5);
-
-    // Title
-    instanceVarsBox
-      .append("rect")
-      .attr("x", width - 50 - styles.instanceVars.width)
-      .attr("y", 80)
-      .attr("width", styles.instanceVars.width)
-      .attr("height", 25)
-      .attr("fill", "#94a3b8")
-      .attr("fill-opacity", 0.3)
-      .attr("stroke", "none")
-      .attr("rx", 5)
-      .attr("ry", 0);
-
-    instanceVarsBox
-      .append("text")
-      .attr("x", width - 50 - styles.instanceVars.width / 2)
-      .attr("y", 80 + 17)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "13px")
-      .attr("font-weight", "bold")
-      .attr("fill", "#334155")
-      .text("Instance Variables");
-
-    // Divider line
-    instanceVarsBox
-      .append("line")
-      .attr("x1", width - 50 - styles.instanceVars.width)
-      .attr("y1", 80 + 25)
-      .attr("x2", width - 50)
-      .attr("y2", 80 + 25)
-      .attr("stroke", "#94a3b8")
-      .attr("stroke-width", 1);
-
-    // Variables
-    yOffset = 30; // Start below the header
-    Object.entries(instanceVariables).forEach(([key, value]) => {
-      // Add field container for instance variables
-      instanceVarsBox
-        .append("rect")
-        .attr("x", width - 50 - styles.instanceVars.width + 10) // Same padding as page nodes (10px)
-        .attr("y", 80 + yOffset)
-        .attr("width", styles.instanceVars.width - 20)
-        .attr("height", 25) // Same as page nodes
-        .attr("fill", "white")
-        .attr("stroke", "#e2e8f0")
-        .attr("stroke-width", 1)
-        .attr("rx", 3);
-
-      // Variable name (like "value:" in node boxes)
-      instanceVarsBox
-        .append("text")
-        .attr("x", width - 50 - styles.instanceVars.width + 20) // Same as page nodes
-        .attr("y", 80 + yOffset + 17) // Center in the row like page nodes
-        .attr("font-size", "12px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#334155")
-        .text(key + ":");
-
-      // Variable value (like the values in node boxes)
-      instanceVarsBox
-        .append("text")
-        .attr("x", width - 70) // Same as page nodes
-        .attr("y", 80 + yOffset + 17) // Center in the row like page nodes
-        .attr("text-anchor", "end")
-        .attr("font-size", "12px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#334155")
-        .text(
-          String(value).length > 10
-            ? String(value).substring(0, 9) + "..."
-            : value
-        );
-
-      yOffset += 30; // Same spacing as page nodes (node boxes use 30px spacing)
-    });
-
-    // 3. Build page nodes layout information
-    const pageNodes = [];
-    const pagePositions = {};
-    const connections = [];
-
-    // Get all page nodes from address object map
-    const addresses = Object.keys(addressObjectMap);
-
-    // Helper to check if an address is valid
-    const isValidAddress = (addr) =>
-      addr && addr !== "null" && addr !== "0x0" && addr in addressObjectMap;
-
-    // Find starting point (page with no previous)
-    let startAddress = null;
-    const processedAddresses = new Set();
-    const nodesToProcess = [];
-
-    // First try to find a node with no previous that has a next (real start of a chain)
-    for (const addr of addresses) {
-      const page = addressObjectMap[addr];
-      if (
-        !isValidAddress(page.previousAddress) &&
-        isValidAddress(page.nextAddress)
-      ) {
-        startAddress = addr;
-        break;
-      }
+    // Render Local Variables using helper (if not already done)
+    let localVarsBottomY = varBoxTopMargin;
+    // Assuming renderVariableBox is integrated here from previous steps
+    // ... (Call to renderVariableBox for localVariables, updates allConnections and pagePositions) ...
+    if (Object.keys(localVariables).length > 0) {
+      const localVarsResult = renderVariableBox(
+        contentGroup,
+        "Local Variables",
+        localVariables,
+        firstColX,
+        varBoxTopMargin,
+        styles.varBox,
+        "local",
+        isAddress
+      );
+      allConnections.push(...localVarsResult.connectionPoints);
+      pagePositions["local_vars_box"] = {
+        x: firstColX,
+        y: varBoxTopMargin,
+        width: styles.varBox.width,
+        height: localVarsResult.height,
+      };
+      localVarsBottomY = varBoxTopMargin + localVarsResult.height;
+    } else {
+      localVarsBottomY = varBoxTopMargin - varBoxSpacing;
     }
 
-    // If no proper chain start found, then any node with no previous
-    if (!startAddress) {
-      for (const addr of addresses) {
+    // Render Instance Variables using helper (if not already done)
+    const instanceVarsX = width - styles.varBox.width - 50;
+    const instanceVarsStartY = varBoxTopMargin;
+    let instanceVarsBottomY = instanceVarsStartY;
+    // Assuming renderVariableBox is integrated here from previous steps
+    // ... (Call to renderVariableBox for instanceVariables, updates allConnections and pagePositions) ...
+    if (Object.keys(instanceVariables).length > 0) {
+      const instanceVarsResult = renderVariableBox(
+        contentGroup,
+        "Instance Variables",
+        instanceVariables,
+        instanceVarsX,
+        instanceVarsStartY,
+        styles.varBox,
+        "instance",
+        isAddress
+      );
+      allConnections.push(...instanceVarsResult.connectionPoints);
+      pagePositions["instance_vars_box"] = {
+        x: instanceVarsX,
+        y: instanceVarsStartY,
+        width: styles.varBox.width,
+        height: instanceVarsResult.height,
+      };
+      instanceVarsBottomY = instanceVarsStartY + instanceVarsResult.height;
+    } else {
+      instanceVarsBottomY = instanceVarsStartY - varBoxSpacing;
+    }
+
+    // --- Prepare Node Specifications ---
+    const nodeSpecs = [];
+    const processedAddresses = new Set();
+    const pageLikeAddresses = Object.keys(addressObjectMap).filter(
+      (addr) =>
+        addressObjectMap[addr] &&
+        typeof addressObjectMap[addr] === "object" &&
+        !Array.isArray(addressObjectMap[addr]) &&
+        (addressObjectMap[addr].hasOwnProperty("value") ||
+          addressObjectMap[addr].hasOwnProperty("url") ||
+          addressObjectMap[addr].hasOwnProperty("title"))
+    );
+    const isValidPageAddress = (addr) =>
+      addr && addr !== "null" && addr !== "0x0" && addressObjectMap[addr];
+
+    // Find start address logic (same as before)
+    let startAddress =
+      instanceVariables.first || instanceVariables.historyStart;
+    // ... (rest of the start address finding logic) ...
+    if (!isValidPageAddress(startAddress)) {
+      for (const addr of pageLikeAddresses) {
         const page = addressObjectMap[addr];
-        if (!isValidAddress(page.previousAddress)) {
+        if (
+          page &&
+          !isValidPageAddress(page.previousAddress) &&
+          isValidPageAddress(page.nextAddress)
+        ) {
           startAddress = addr;
           break;
         }
       }
     }
-
-    // If no start found, just use the first address
-    if (!startAddress && addresses.length > 0) {
-      startAddress = addresses[0];
+    if (!isValidPageAddress(startAddress)) {
+      for (const addr of pageLikeAddresses) {
+        const page = addressObjectMap[addr];
+        if (page && !isValidPageAddress(page.previousAddress)) {
+          startAddress = addr;
+          break;
+        }
+      }
     }
+    if (!isValidPageAddress(startAddress) && pageLikeAddresses.length > 0)
+      startAddress = pageLikeAddresses[0];
 
-    // Build the linked list of pages in order
-    let currentAddr = startAddress;
-    let xPos = width / 2 - styles.page.width / 2;
-    let nextX = 100;
+    // Build main chain specs
+    let currentLayoutAddr = startAddress;
+    let nextX = firstColX + styles.varBox.width + 80;
+    const pageChainY = Math.max(localVarsBottomY, instanceVarsBottomY) / 2 + 40; // Try to center vertically between var boxes
 
-    // First process the main chain
     while (
-      isValidAddress(currentAddr) &&
-      !processedAddresses.has(currentAddr)
+      isValidPageAddress(currentLayoutAddr) &&
+      !processedAddresses.has(currentLayoutAddr) &&
+      processedAddresses.size < 50
     ) {
-      const page = addressObjectMap[currentAddr];
-      const yCenter = height / 2;
-
-      // Add to our nodes list
-      pageNodes.push({
-        address: currentAddr,
-        value: page.value,
-        previousAddress: page.previousAddress,
-        nextAddress: page.nextAddress,
-        isCurrent: currentAddr === currentPageAddress,
+      const pageData = addressObjectMap[currentLayoutAddr];
+      nodeSpecs.push({
         x: nextX,
-        y: yCenter - styles.page.height / 2,
+        y: pageChainY,
+        address: currentLayoutAddr,
+        title:
+          pageData.title ||
+          pageData.url ||
+          truncateAddress(currentLayoutAddr, 6), // Use truncateAddress here
+        fields: {
+          // Key names match what renderGenericNode expects
+          value: pageData.value || pageData.url || "N/A",
+          prev: pageData.previousAddress || "null", // Pass raw address or null
+          next: pageData.nextAddress || "null",
+        },
+        isCurrent: currentLayoutAddr === currentPageAddress,
+        isIsolated: false,
+        style: styles.page, // Pass the base page style config
       });
-
-      // Save position for reference
-      pagePositions[currentAddr] = {
-        x: nextX,
-        y: yCenter - styles.page.height / 2,
-      };
-
-      // Mark as processed
-      processedAddresses.add(currentAddr);
-
-      // Move to next page
-      currentAddr = page.nextAddress;
+      processedAddresses.add(currentLayoutAddr);
+      currentLayoutAddr = pageData.nextAddress;
       nextX += styles.page.width + 50;
     }
 
-    // Now process any isolated nodes that weren't part of the main chain
-    let isolatedNodeX = nextX;
-    const isolatedNodeY = height / 2 + 150; // Place isolated nodes below the main chain
-    let hasIsolatedNodes = false;
+    // Build isolated node specs
+    let isolatedNodeX = firstColX;
+    let isolatedNodeY = Math.max(localVarsBottomY, instanceVarsBottomY) + 80;
 
-    addresses.forEach((addr) => {
+    pageLikeAddresses.forEach((addr) => {
       if (!processedAddresses.has(addr)) {
-        hasIsolatedNodes = true;
-        const page = addressObjectMap[addr];
-
-        // Add isolated node to pageNodes
-        pageNodes.push({
+        const pageData = addressObjectMap[addr];
+        nodeSpecs.push({
+          x: isolatedNodeX,
+          y: isolatedNodeY,
           address: addr,
-          value: page.value,
-          previousAddress: page.previousAddress,
-          nextAddress: page.nextAddress,
+          title: pageData.title || pageData.url || truncateAddress(addr, 6),
+          fields: {
+            value: pageData.value || pageData.url || "N/A",
+            prev: pageData.previousAddress || "null",
+            next: pageData.nextAddress || "null",
+          },
           isCurrent: addr === currentPageAddress,
-          x: isolatedNodeX,
-          y: isolatedNodeY,
-          isIsolated: true, // Mark as isolated for visual distinction
+          isIsolated: true,
+          style: styles.page,
         });
-
-        // Save position
-        pagePositions[addr] = {
-          x: isolatedNodeX,
-          y: isolatedNodeY,
-          width: styles.page.width,
-          height: 130,
-        };
-
-        // Mark as processed
         processedAddresses.add(addr);
-
-        // Move to next position
         isolatedNodeX += styles.page.width + 50;
+        if (isolatedNodeX + styles.page.width > width - 50) {
+          isolatedNodeX = firstColX;
+          isolatedNodeY += (styles.page.height || 130) + 40; // Use calculated or default height
+        }
       }
     });
 
-    // Add helper text when isolated nodes are present
-    // if (hasIsolatedNodes) {
-    //   container
-    //     .append("text")
-    //     .attr("x", width / 2)
-    //     .attr("y", height / 2 + 130)
-    //     .attr("text-anchor", "middle")
-    //     .attr("font-size", "13px")
-    //     .attr("fill", "#9c5805")
-    //     .attr("font-weight", "bold")
-    //     .text("Isolated Nodes (not yet connected to main chain):");
-    // }
+    // --- Render Nodes using Helper ---
+    // REMOVE the old page rendering loop (pageNodes.forEach with d3 appends)
+    /*
+    pageNodes.forEach((node) => { 
+        const pageGroup = container.append("g")... 
+        // ... all the rect/text/line appends ...
+    });
+    */
+    // Call renderGenericNode for each prepared spec
+    nodeSpecs.forEach((spec) => {
+      renderGenericNode(
+        contentGroup,
+        spec,
+        spec.style,
+        pagePositions,
+        isAddress,
+        truncateAddress
+      );
+    });
 
-    // Center the pages horizontally if there's more than one
-    if (pageNodes.length > 1) {
-      const totalWidth =
-        pageNodes.length * styles.page.width + (pageNodes.length - 1) * 50;
-      const startX = (width - totalWidth) / 2;
-
-      pageNodes.forEach((node, index) => {
-        node.x = startX + index * (styles.page.width + 50);
-        pagePositions[node.address] = {
-          x: node.x,
-          y: node.y,
-        };
-      });
-    }
-
-    // 4. Setup connections between nodes
-    pageNodes.forEach((node) => {
-      // Next connections
-      if (isValidAddress(node.nextAddress)) {
-        connections.push({
-          source: node.address,
-          target: node.nextAddress,
+    // --- Setup Connections (using allConnections and pagePositions) ---
+    // Add connections originating from page nodes (next/prev pointers)
+    nodeSpecs.forEach((spec) => {
+      const pageData = addressObjectMap[spec.address] || {}; // Get original data again for raw addresses
+      if (
+        isValidPageAddress(pageData.nextAddress) &&
+        pagePositions[pageData.nextAddress]
+      ) {
+        allConnections.push({
+          sourceName: spec.address,
+          targetAddress: pageData.nextAddress,
           type: "next",
         });
       }
-
-      // Previous connections
-      if (isValidAddress(node.previousAddress)) {
-        connections.push({
-          source: node.address,
-          target: node.previousAddress,
+      if (
+        isValidPageAddress(pageData.previousAddress) &&
+        pagePositions[pageData.previousAddress]
+      ) {
+        allConnections.push({
+          sourceName: spec.address,
+          targetAddress: pageData.previousAddress,
           type: "prev",
         });
       }
     });
+    // Note: Connections from var boxes (like 'current') are already in allConnections from renderVariableBox calls
 
-    // Current node connection from instance variable
-    if (isValidAddress(currentPageAddress)) {
-      connections.push({
-        source: "current",
-        target: currentPageAddress,
-        type: "current",
-        sourcePoint: {
-          x: width - 50 - styles.instanceVars.width / 2,
-          y: 80 + styles.instanceVars.height, // Remove the gap of 5px
-        },
-      });
-    }
+    // --- Render Connections (uses pagePositions populated by renderGenericNode and renderVariableBox) ---
+    const connectionsGroup = contentGroup
+      .append("g")
+      .attr("class", "connections-group");
+    allConnections.forEach((conn) => {
+      let sourcePoint, targetPoint;
+      let markerId = null;
+      let color = styles.connection.stroke;
+      let pathType = "default";
 
-    // 5. Render all page nodes
-    pageNodes.forEach((node) => {
-      const pageGroup = container
-        .append("g")
-        .attr("class", "page-node")
-        .attr("transform", `translate(${node.x}, ${node.y})`);
+      // Get source position data
+      const sourceBoxPos = pagePositions[conn.sourceName]; // Might be a var box or a node
+      const sourceNodePos = pagePositions[conn.sourceName]; // Could be a node
 
-      // Increase height for better field separation
-      const nodeHeight = 130; // More compact height
+      if (conn.sourceCoords) {
+        // Provided by renderVariableBox
+        sourcePoint = conn.sourceCoords;
+      } else if (sourceNodePos) {
+        // Calculate source point for page node field (next/prev)
+        // Approx Y pos of fields within the generic node structure
+        const headerAndPadding = styles.page.headerHeight + styles.page.padding;
+        const fieldMidYOffset =
+          conn.type === "next"
+            ? headerAndPadding +
+              styles.page.fieldHeight +
+              styles.page.fieldSpacing +
+              styles.page.fieldHeight / 2 // Approx middle of 'next' field
+            : headerAndPadding + styles.page.fieldHeight / 2; // Approx middle of 'prev' field (assuming value, prev, next order)
 
-      // Page rectangle
-      pageGroup
-        .append("rect")
-        .attr("width", styles.page.width)
-        .attr("height", nodeHeight)
-        .attr(
-          "fill",
-          node.isCurrent
-            ? styles.page.currentFill
-            : node.isIsolated
-            ? "#fcf5e5"
-            : styles.page.fill // Light yellow for isolated nodes
-        )
-        .attr(
-          "stroke",
-          node.isCurrent
-            ? styles.page.currentStroke
-            : node.isIsolated
-            ? "#eab308"
-            : styles.page.stroke // Amber for isolated nodes
-        )
-        .attr("stroke-width", node.isCurrent ? 2 : node.isIsolated ? 2 : 1)
-        .attr("stroke-dasharray", node.isIsolated ? "5,5" : "none") // Dashed border for isolated
-        .attr("rx", 5);
-
-      // Title section background
-      pageGroup
-        .append("rect")
-        .attr("width", styles.page.width)
-        .attr("height", 25)
-        .attr(
-          "fill",
-          node.isCurrent
-            ? styles.page.currentStroke
-            : node.isIsolated
-            ? "#eab308"
-            : styles.page.stroke
-        )
-        .attr("fill-opacity", node.isIsolated ? 0.2 : 0.3)
-        .attr("rx", 5)
-        .attr("ry", 0);
-
-      // Page title (short address)
-      pageGroup
-        .append("text")
-        .attr("x", styles.page.width / 2)
-        .attr("y", 17)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "13px")
-        .attr("font-weight", "bold")
-        .attr("fill", styles.page.textColor)
-        .text(
-          node.address.substring(0, 8) + (node.isCurrent ? " (current)" : "")
+        sourcePoint = {
+          x: sourceNodePos.x + (conn.type === "next" ? sourceNodePos.width : 0), // Exit right for next, left for prev
+          y: sourceNodePos.y + fieldMidYOffset,
+        };
+      } else {
+        console.warn(
+          "WebBrowserViz: Cannot find source position for connection",
+          conn
         );
+        return;
+      }
 
-      // Divider line after title
-      pageGroup
-        .append("line")
-        .attr("x1", 0)
-        .attr("y1", 25)
-        .attr("x2", styles.page.width)
-        .attr("y2", 25)
-        .attr("stroke", styles.page.stroke)
-        .attr("stroke-width", 1);
+      // Get target position data (must be a node)
+      const targetPosData = pagePositions[conn.targetAddress];
+      if (!targetPosData) {
+        console.warn(
+          "WebBrowserViz: Cannot find target node position for",
+          conn.targetAddress,
+          conn
+        );
+        return;
+      }
 
-      // Create fields section with vertical layout
-      const fieldsGroup = pageGroup.append("g").attr("class", "fields");
+      // Determine target point and connection style based on type
+      if (conn.type === "next") {
+        targetPoint = {
+          x: targetPosData.x,
+          y: targetPosData.y + styles.page.headerHeight / 2,
+        }; // Target left-middle of header
+        markerId = "next-arrow";
+        color = styles.connection.nextColor;
+      } else if (conn.type === "prev") {
+        targetPoint = {
+          x: targetPosData.x + targetPosData.width,
+          y: targetPosData.y + styles.page.headerHeight / 2,
+        }; // Target right-middle of header
+        markerId = "prev-arrow";
+        color = styles.connection.prevColor;
+      } else if (conn.type === "instance" && conn.varName === "current") {
+        targetPoint = {
+          x: targetPosData.x + targetPosData.width / 2,
+          y: targetPosData.y,
+        }; // Target top-center of page
+        markerId = "current-arrow";
+        color = styles.connection.currentColor;
+        pathType = "arcUp"; // Make current pointer arc nicely
+      } else {
+        // Default for other var->address pointers (if any)
+        targetPoint = {
+          x: targetPosData.x,
+          y: targetPosData.y + targetPosData.height / 2,
+        }; // Target left-middle
+        markerId = "var-ref-arrow";
+        color = styles.connection.varRefColor || styles.connection.stroke; // Use varRefColor if defined
+      }
 
-      // Add value field
-      fieldsGroup
-        .append("rect")
-        .attr("x", 10)
-        .attr("y", 32)
-        .attr("width", styles.page.width - 20)
-        .attr("height", 25)
-        .attr("fill", "none")
-        .attr("stroke", "#e2e8f0")
-        .attr("stroke-width", 1)
-        .attr("rx", 3);
-
-      // Value label
-      fieldsGroup
-        .append("text")
-        .attr("x", 20)
-        .attr("y", 49)
-        .attr("font-size", "13px")
-        .attr("font-weight", "bold")
-        .attr("fill", styles.page.textColor)
-        .text("value:");
-
-      // Page value
-      fieldsGroup
-        .append("text")
-        .attr("x", styles.page.width - 20)
-        .attr("y", 49)
-        .attr("text-anchor", "end")
-        .attr("font-size", "13px")
-        .attr("font-weight", "bold")
-        .attr("fill", styles.page.textColor)
-        .text(node.value || "null");
-
-      // Add previous field
-      fieldsGroup
-        .append("rect")
-        .attr("x", 10)
-        .attr("y", 62)
-        .attr("width", styles.page.width - 20)
-        .attr("height", 25)
-        .attr("fill", "none")
-        .attr("stroke", "#e2e8f0")
-        .attr("stroke-width", 1)
-        .attr("rx", 3);
-
-      // Previous address
-      fieldsGroup
-        .append("text")
-        .attr("x", 20)
-        .attr("y", 79)
-        .attr("font-size", "13px")
-        .attr("font-weight", "bold")
-        .attr("fill", styles.page.textColor)
-        .text("prev:");
-
-      fieldsGroup
-        .append("text")
-        .attr("x", styles.page.width - 20)
-        .attr("y", 79)
-        .attr("text-anchor", "end")
-        .attr("font-size", "13px")
-        .attr("fill", styles.connection.prevColor)
-        .attr("font-weight", "bold")
-        .text(node.previousAddress?.substring(0, 8) || "null");
-
-      // Add next field
-      fieldsGroup
-        .append("rect")
-        .attr("x", 10)
-        .attr("y", 92)
-        .attr("width", styles.page.width - 20)
-        .attr("height", 25)
-        .attr("fill", "none")
-        .attr("stroke", "#e2e8f0")
-        .attr("stroke-width", 1)
-        .attr("rx", 3);
-
-      // Next address
-      fieldsGroup
-        .append("text")
-        .attr("x", 20)
-        .attr("y", 109)
-        .attr("font-size", "13px")
-        .attr("font-weight", "bold")
-        .attr("fill", styles.page.textColor)
-        .text("next:");
-
-      fieldsGroup
-        .append("text")
-        .attr("x", styles.page.width - 20)
-        .attr("y", 109)
-        .attr("text-anchor", "end")
-        .attr("font-size", "13px")
-        .attr("fill", styles.connection.nextColor)
-        .attr("font-weight", "bold")
-        .text(node.nextAddress?.substring(0, 8) || "null");
-
-      // Update node height in our positions record for connection calculations
-      pagePositions[node.address] = {
-        x: node.x,
-        y: node.y,
-        width: styles.page.width,
-        height: nodeHeight,
-      };
+      if (sourcePoint && targetPoint) {
+        const path = generateCurvedPath(sourcePoint, targetPoint, pathType);
+        connectionsGroup
+          .append("path")
+          .attr("d", path)
+          .attr("fill", "none")
+          .attr("stroke", color)
+          .attr("stroke-width", styles.connection.width)
+          .attr("marker-end", markerId ? `url(#${markerId})` : null)
+          .attr("stroke-opacity", 0.9)
+          .attr("stroke-linecap", "round");
+      }
     });
 
-    // 6. Render Address Object Map Box
-    // Only if there's space at the bottom and not too many pages
-    if (false) {
-      // Completely disabled per user request
-      const addressMapBox = container
+    console.log(
+      "Finished Web Browser Visualization render using renderGenericNode."
+    );
+  };
+
+  // Function to render Array/Vector visualization
+  const renderArrayVisualization = (
+    contentGroup,
+    width,
+    height,
+    operation,
+    memorySnapshot = null
+  ) => {
+    console.log("Rendering array visualization with operation:", operation);
+    console.log("With memory snapshot:", memorySnapshot);
+
+    const arrayState = operation.state || {};
+    const localVariables = arrayState.localVariables || {};
+    const instanceVariables = arrayState.instanceVariables || {};
+    const addressObjectMap = arrayState.addressObjectMap || {};
+
+    // Define styles, including a sub-object for the variable box helper
+    const styles = {
+      array: {
+        elementWidth: 60,
+        elementHeight: 60,
+        fill: "#ffffff",
+        unusedFill: "#f8fafc",
+        stroke: "#94a3b8",
+        textColor: "#334155",
+      },
+      // Style config object for the renderVariableBox helper
+      varBox: {
+        width: 200,
+        headerHeight: 25,
+        fieldHeight: 25,
+        fieldSpacing: 5,
+        padding: 10,
+        fill: "#ffffff",
+        stroke: "#94a3b8", // Main box colors
+        titleFill: "#e2e8f0",
+        titleStroke: "#94a3b8", // Header colors
+        titleTextFill: "#334155",
+        keyTextFill: "#334155",
+        valueTextFill: "#334155", // Text colors
+        addressValueFill: "#0ea5e9", // Specific color for address values
+        fieldRectFill: "white",
+        fieldRectStroke: "#e2e8f0", // Field background/border
+        fontSize: "12px",
+        titleFontSize: "13px",
+      },
+      connection: {
+        stroke: "#64748b",
+        width: 1.5,
+        varRefColor: "#334155", // Color for var -> array ref box connections
+        arrayArrowColor: "#0284c7", // Color for array ref box -> cell, or cell -> array ref box
+      },
+    };
+
+    // Define Arrowheads
+    // (Assuming defineArrowheads helper will be created and integrated in a later step)
+    // For now, keep inline definitions needed by this specific visualization
+    let defs = contentGroup.select("defs");
+    if (defs.empty()) {
+      defs = contentGroup.append("defs");
+    }
+    // REMOVE the old inline definitions for #array-arrow and #var-ref-arrow
+    /*
+    if (defs.select("#array-arrow").empty()) {
+      defs.append("marker").attr("id", "array-arrow").attr("viewBox", "0 -5 10 10")
+          .attr("refX", 8).attr("refY", 0).attr("markerWidth", 8).attr("markerHeight", 8)
+          .attr("orient", "auto-start-reverse").append("path").attr("d", "M0,-5L10,0L0,5")
+          .attr("fill", styles.connection.arrayArrowColor);
+    }
+    if (defs.select("#var-ref-arrow").empty()) {
+      defs.append("marker").attr("id", "var-ref-arrow").attr("viewBox", "0 -5 10 10")
+          .attr("refX", 8).attr("refY", 0).attr("markerWidth", 8).attr("markerHeight", 8)
+          .attr("orient", "auto-start-reverse").append("path").attr("d", "M0,-5L10,0L0,5")
+          .attr("fill", styles.connection.varRefColor);
+    }
+    */
+    // Call the helper function to define all standard arrowheads
+    defineArrowheads(defs, styles);
+
+    // Determine the array to visualize (existing logic)
+    let effectiveArrayAddress = null;
+    let arrayObjectInMap = null;
+    const ivArrayAddress = instanceVariables.array;
+    if (
+      ivArrayAddress &&
+      addressObjectMap[ivArrayAddress] &&
+      Array.isArray(addressObjectMap[ivArrayAddress])
+    ) {
+      effectiveArrayAddress = ivArrayAddress;
+      arrayObjectInMap = addressObjectMap[ivArrayAddress];
+    } else {
+      const candidateArrays = Object.entries(addressObjectMap).filter(
+        ([addr, obj]) => Array.isArray(obj)
+      );
+      if (candidateArrays.length === 1) {
+        effectiveArrayAddress = candidateArrays[0][0];
+        arrayObjectInMap = candidateArrays[0][1];
+      } else {
+        console.warn("ArrayViz: Cannot uniquely determine array to display.");
+      }
+    }
+    const sizeFromInstanceVars =
+      instanceVariables.count ?? instanceVariables.size ?? 0;
+    let arrayElements = arrayObjectInMap ? arrayObjectInMap.slice() : [];
+    const hasArrayObjectToDisplay =
+      !!effectiveArrayAddress && !!arrayObjectInMap;
+    const displayCapacity =
+      hasArrayObjectToDisplay && arrayObjectInMap ? arrayObjectInMap.length : 0;
+
+    const pagePositions = {}; // Store positions of ALL rendered elements (var boxes, ref box, cells)
+    const allConnections = []; // Store ALL connection data points {sourceName, sourceCoords, targetAddress, type, varName}
+
+    const cellSize = styles.array.elementWidth;
+    const firstColX = 50;
+    const varBoxTopMargin = 20;
+    const varBoxSpacing = 20;
+
+    // --- Use helper for Local Variables ---
+    let localVarsBottomY = varBoxTopMargin;
+    if (Object.keys(localVariables).length > 0) {
+      const localVarsResult = renderVariableBox(
+        contentGroup,
+        "Local Variables",
+        localVariables,
+        firstColX,
+        varBoxTopMargin,
+        styles.varBox,
+        "local",
+        isAddress
+      );
+      allConnections.push(...localVarsResult.connectionPoints);
+      pagePositions["local_vars_box"] = {
+        x: firstColX,
+        y: varBoxTopMargin,
+        width: styles.varBox.width,
+        height: localVarsResult.height,
+      };
+      localVarsBottomY = varBoxTopMargin + localVarsResult.height;
+    } else {
+      localVarsBottomY = varBoxTopMargin - varBoxSpacing;
+    }
+
+    // --- Use helper for Instance Variables ---
+    const instanceVarsStartY = localVarsBottomY + varBoxSpacing;
+    if (Object.keys(instanceVariables).length > 0) {
+      const instanceVarsResult = renderVariableBox(
+        contentGroup,
+        "Instance Variables",
+        instanceVariables,
+        firstColX,
+        instanceVarsStartY,
+        styles.varBox,
+        "instance",
+        isAddress
+      );
+      allConnections.push(...instanceVarsResult.connectionPoints);
+      pagePositions["instance_vars_box"] = {
+        x: firstColX,
+        y: instanceVarsStartY,
+        width: styles.varBox.width,
+        height: instanceVarsResult.height,
+      };
+      // instanceVarsBottomY = instanceVarsStartY + instanceVarsResult.height; // Not strictly needed for current layout
+    }
+
+    // --- Render Array Ref Box and Array Cells (largely existing logic) ---
+    const arrayRefBoxWidth = 110;
+    const arrayRefBoxX = firstColX + styles.varBox.width + 50;
+    const arrayStartX =
+      arrayRefBoxX + (hasArrayObjectToDisplay ? arrayRefBoxWidth + 20 : 0);
+    const arraySectionY = varBoxTopMargin;
+
+    if (hasArrayObjectToDisplay) {
+      const arrayRefBoxGroup = contentGroup
         .append("g")
-        .attr("class", "address-object-map");
-
-      const mapBoxY = height - 120;
-      const mapBoxHeight = 160;
-      const mapBoxWidth = width - 100;
-
-      // Box container
-      addressMapBox
+        .attr("class", "array-reference-group");
+      arrayRefBoxGroup
         .append("rect")
-        .attr("x", 50)
-        .attr("y", mapBoxY)
-        .attr("width", mapBoxWidth)
-        .attr("height", mapBoxHeight)
-        .attr("fill", "#f8fafc")
-        .attr("stroke", "#cbd5e1")
+        .attr("x", arrayRefBoxX)
+        .attr("y", arraySectionY)
+        .attr("width", arrayRefBoxWidth)
+        .attr("height", cellSize)
+        .attr("fill", "#f0f9ff")
+        .attr("stroke", "#94a3b8")
         .attr("stroke-width", 1)
-        .attr("rx", 5);
-
-      // Title
-      addressMapBox
+        .attr("rx", 4);
+      arrayRefBoxGroup
         .append("rect")
-        .attr("x", 50)
-        .attr("y", mapBoxY)
-        .attr("width", mapBoxWidth)
-        .attr("height", 30)
+        .attr("x", arrayRefBoxX)
+        .attr("y", arraySectionY)
+        .attr("width", arrayRefBoxWidth)
+        .attr("height", 25)
         .attr("fill", "#94a3b8")
         .attr("fill-opacity", 0.3)
         .attr("stroke", "none")
-        .attr("rx", 5)
+        .attr("rx", 4)
         .attr("ry", 0);
-
-      addressMapBox
+      arrayRefBoxGroup
         .append("text")
-        .attr("x", 50 + mapBoxWidth / 2)
-        .attr("y", mapBoxY + 20)
+        .attr("x", arrayRefBoxX + arrayRefBoxWidth / 2)
+        .attr("y", arraySectionY + 17)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#334155")
+        .text("array");
+      arrayRefBoxGroup
+        .append("text")
+        .attr("x", arrayRefBoxX + arrayRefBoxWidth / 2)
+        .attr("y", arraySectionY + 45)
         .attr("text-anchor", "middle")
         .attr("font-size", "14px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#475569")
-        .text("Address Object Map");
+        .attr("fill", styles.connection.arrayArrowColor)
+        .text(truncateAddress(effectiveArrayAddress));
 
-      // Address entries
-      const entryWidth = 180;
-      const entriesPerRow = Math.floor(mapBoxWidth / entryWidth);
+      pagePositions["array_ref_box"] = {
+        x: arrayRefBoxX,
+        y: arraySectionY,
+        width: arrayRefBoxWidth,
+        height: cellSize,
+        address: effectiveArrayAddress,
+      };
 
-      addresses.forEach((address, index) => {
-        const row = Math.floor(index / entriesPerRow);
-        const col = index % entriesPerRow;
-
-        const entryX = 50 + col * entryWidth + 10;
-        const entryY = mapBoxY + 40 + row * 40;
-
-        // Address
-        addressMapBox
-          .append("text")
-          .attr("x", entryX)
-          .attr("y", entryY)
-          .attr("font-size", "12px")
-          .attr("font-weight", "bold")
-          .attr("fill", "#475569")
-          .text(address.substring(0, 8) + ":");
-
-        // Value
-        const value = addressObjectMap[address]?.value;
-        addressMapBox
-          .append("text")
-          .attr("x", entryX + 80)
-          .attr("y", entryY)
-          .attr("font-size", "12px")
-          .attr("fill", "#475569")
-          .text(value || "null");
-      });
+      if (displayCapacity > 0) {
+        arrayRefBoxGroup
+          .append("path")
+          .attr(
+            "d",
+            `M ${arrayRefBoxX + arrayRefBoxWidth} ${
+              arraySectionY + cellSize / 2
+            } L ${arrayStartX - 3} ${arraySectionY + cellSize / 2}`
+          )
+          .attr("stroke", styles.connection.arrayArrowColor)
+          .attr("stroke-width", styles.connection.width)
+          .attr("fill", "none")
+          .attr("marker-end", "url(#array-arrow)");
+      }
     }
 
-    // 7. Render connections between nodes
-    const connectionsGroup = container.append("g").attr("class", "connections");
+    if (displayCapacity > 0) {
+      const arrayCellsGroup = contentGroup
+        .append("g")
+        .attr("class", "array-cells-group");
+      for (let i = 0; i < displayCapacity; i++) {
+        const x = arrayStartX + i * cellSize;
+        const y = arraySectionY;
+        const cellGroup = arrayCellsGroup
+          .append("g")
+          .attr("class", `array-cell-${i}-group`);
 
-    // Helper function to determine the best exit/entry points for arrows
-    const getConnectionPoints = (sourceNode, targetNode, connectionType) => {
-      const source = pagePositions[sourceNode];
-      const target = pagePositions[targetNode];
+        cellGroup
+          .append("rect")
+          .attr("x", x)
+          .attr("y", y)
+          .attr("width", cellSize)
+          .attr("height", cellSize)
+          .attr(
+            "fill",
+            i < sizeFromInstanceVars
+              ? styles.array.fill
+              : styles.array.unusedFill
+          )
+          .attr("stroke", styles.array.stroke)
+          .attr("stroke-width", 1)
+          .attr("rx", 4);
+        cellGroup
+          .append("rect")
+          .attr("x", x)
+          .attr("y", y)
+          .attr("width", cellSize)
+          .attr("height", 25)
+          .attr("fill", "#94a3b8")
+          .attr("fill-opacity", 0.3)
+          .attr("stroke", "none")
+          .attr("rx", 4)
+          .attr("ry", 0);
+        cellGroup
+          .append("text")
+          .attr("x", x + cellSize / 2)
+          .attr("y", y + 17)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "11px")
+          .attr("font-weight", "bold")
+          .attr("fill", "#475569")
+          .text(i);
+        cellGroup
+          .append("line")
+          .attr("x1", x)
+          .attr("y1", y + 25)
+          .attr("x2", x + cellSize)
+          .attr("y2", y + 25)
+          .attr("stroke", styles.array.stroke)
+          .attr("stroke-width", 0.5);
 
-      if (!source || !target) {
-        return { sourcePoint: null, targetPoint: null };
-      }
-
-      // Determine if nodes are in same row or column
-      const isHorizontal = Math.abs(source.y - target.y) < 50;
-      const isVertical = Math.abs(source.x - target.x) < 50;
-      const isLeftToRight = source.x < target.x;
-      const isTopToBottom = source.y < target.y;
-
-      let sourcePoint, targetPoint;
-
-      // Calculate edge points based on connection type and relative positions
-      if (connectionType === "next") {
-        // For next pointers - prefer right-to-left connections
-        if (isLeftToRight) {
-          // Source at right edge of "next" field
-          sourcePoint = {
-            x: source.x + styles.page.width,
-            y: source.y + 100, // Near the next field
-          };
-          // Target at left edge
-          targetPoint = {
-            x: target.x,
-            y: target.y + 25, // Top section of target
-          };
-        } else {
-          // If target is to the left, exit from bottom
-          sourcePoint = {
-            x: source.x + styles.page.width - 50,
-            y: source.y + styles.page.height,
-          };
-          // Enter from bottom right
-          targetPoint = {
-            x: target.x + styles.page.width - 50,
-            y: target.y + styles.page.height,
-          };
-        }
-      } else if (connectionType === "prev") {
-        // For prev pointers - similar to next pointers but reversed direction
-        if (!isLeftToRight) {
-          // Source at left edge of "prev" field
-          sourcePoint = {
-            x: source.x,
-            y: source.y + 70, // Near the prev field
-          };
-          // Target at right edge, at the header/address section
-          targetPoint = {
-            x: target.x + styles.page.width,
-            y: target.y + 12, // Target the header/address area
-          };
-        } else {
-          // If target is to the right, use different exit/entry points
-          sourcePoint = {
-            x: source.x,
-            y: source.y + 70, // Near the prev field
-          };
-          // Enter at address/header section from left
-          targetPoint = {
-            x: target.x,
-            y: target.y + 12, // Target the header/address area
-          };
-        }
-      } else {
-        // Default - connect centers
-        sourcePoint = {
-          x: source.x + styles.page.width / 2,
-          y: source.y + styles.page.height / 2,
+        pagePositions[`array_cell_${i}`] = {
+          x: x,
+          y: y,
+          width: cellSize,
+          height: cellSize,
         };
-        targetPoint = {
-          x: target.x + styles.page.width / 2,
-          y: target.y + styles.page.height / 2,
-        };
-      }
 
-      return { sourcePoint, targetPoint };
-    };
-
-    connections.forEach((conn) => {
-      let sourcePoint, targetPoint;
-
-      // Special case for 'current' source
-      if (conn.source === "current") {
-        sourcePoint = conn.sourcePoint;
-
-        // Get target position
-        const targetPos = pagePositions[conn.target];
-        if (!targetPos) return;
-
-        // Current pointer should connect to the top of the box
-        targetPoint = {
-          x: targetPos.x + styles.page.width / 2,
-          y: targetPos.y + 0.5, // Adjust to eliminate any gap - connect directly to the box
-        };
-      } else {
-        // Use the helper function to get optimal connection points
-        const points = getConnectionPoints(conn.source, conn.target, conn.type);
-        if (!points.sourcePoint || !points.targetPoint) return;
-
-        sourcePoint = points.sourcePoint;
-        targetPoint = points.targetPoint;
-      }
-
-      // Generate curved path
-      const path = generateCurvedPath(sourcePoint, targetPoint);
-
-      // Determine color and marker based on connection type
-      let color, marker;
-      switch (conn.type) {
-        case "next":
-          color = styles.connection.nextColor;
-          marker = "url(#next-arrow)";
-          break;
-        case "prev":
-          color = styles.connection.prevColor;
-          marker = "url(#prev-arrow)";
-          break;
-        case "current":
-          color = styles.connection.currentColor;
-          marker = "url(#current-arrow)";
-          break;
-        default:
-          color = styles.connection.stroke;
-          marker = null;
-      }
-
-      // Draw path
-      connectionsGroup
-        .append("path")
-        .attr("d", path)
-        .attr("fill", "none")
-        .attr("stroke", color)
-        .attr("stroke-width", styles.connection.width)
-        .attr("marker-end", marker)
-        .attr("stroke-opacity", 0.8)
-        .attr("stroke-linecap", "round")
-        .attr("stroke-linejoin", "round");
-
-      // Add label if needed
-      if (conn.label) {
-        const pathNode = connectionsGroup.select("path").node();
-        if (pathNode) {
-          const pathLength = pathNode.getTotalLength();
-          const midPoint = pathNode.getPointAtLength(pathLength / 2);
-
-          connectionsGroup
+        if (i < arrayElements.length) {
+          const value = arrayElements[i];
+          const stringValue = String(value);
+          const isRef = isAddress(stringValue);
+          cellGroup
             .append("text")
-            .attr("x", midPoint.x)
-            .attr("y", midPoint.y - 5)
+            .attr("x", x + cellSize / 2)
+            .attr("y", y + cellSize / 2 + 10)
             .attr("text-anchor", "middle")
-            .attr("font-size", "12px")
-            .attr("fill", color)
-            .text(conn.label);
+            .attr("font-size", "14px")
+            .attr(
+              "fill",
+              isRef ? styles.connection.arrayArrowColor : styles.array.textColor
+            )
+            .text(
+              value !== undefined && value !== null
+                ? truncateAddress(stringValue)
+                : "null"
+            );
+
+          pagePositions[`array_cell_${i}`].value = stringValue; // Store raw value for connection logic
+
+          if (isRef) {
+            allConnections.push({
+              sourceName: `array_cell_${i}`,
+              // sourceCoords will be calculated in the connection loop
+              targetAddress: stringValue,
+              type: "arrayContentPointer",
+            });
+          }
         }
+      }
+    } else if (hasArrayObjectToDisplay) {
+      contentGroup
+        .append("text")
+        .attr("x", arrayStartX)
+        .attr("y", arraySectionY + cellSize / 2)
+        .attr("text-anchor", "start")
+        .attr("font-style", "italic")
+        .attr("fill", "#6b7280")
+        .text("(empty array structure)");
+    }
+
+    // --- Render Connections ---
+    const connectionsGroup = contentGroup
+      .append("g")
+      .attr("class", "connections-group");
+    allConnections.forEach((conn) => {
+      let sourcePoint, targetPoint;
+      let pathType = "default";
+      let markerId = null;
+      let color = styles.connection.stroke; // Default connection color
+
+      if (conn.sourceCoords) {
+        // From renderVariableBox
+        sourcePoint = conn.sourceCoords;
+      } else if (conn.sourceName && pagePositions[conn.sourceName]) {
+        // From array cell
+        const sourcePos = pagePositions[conn.sourceName];
+        sourcePoint = {
+          x: sourcePos.x + sourcePos.width / 2,
+          y: sourcePos.y + sourcePos.height,
+        }; // Exit bottom-center of cell
+      } else {
+        console.warn("ArrayViz Connection: Cannot find source point for", conn);
+        return;
+      }
+
+      // Determine target: must be array_ref_box or another array_cell
+      let targetPosData = null;
+      if (
+        pagePositions["array_ref_box"] &&
+        conn.targetAddress === pagePositions["array_ref_box"].address
+      ) {
+        targetPosData = pagePositions["array_ref_box"];
+        targetPoint = {
+          x: targetPosData.x,
+          y: targetPosData.y + targetPosData.height / 2,
+        }; // Target left-middle of ref box
+      } else {
+        // Is target another cell? (less common for simple array pointers, but possible)
+        const targetCellKey = Object.keys(pagePositions).find(
+          (key) =>
+            key.startsWith("array_cell_") &&
+            pagePositions[key].value === conn.targetAddress
+        );
+        if (targetCellKey) {
+          targetPosData = pagePositions[targetCellKey];
+          targetPoint = {
+            x: targetPosData.x + targetPosData.width / 2,
+            y: targetPosData.y,
+          }; // Target top-center of cell
+        } else {
+          console.warn(
+            "ArrayViz Connection: Cannot find target position for",
+            conn.targetAddress,
+            conn
+          );
+          return;
+        }
+      }
+
+      // Style based on connection type
+      if (conn.type === "instance" || conn.type === "local") {
+        // Pointers from var boxes
+        markerId = "var-ref-arrow";
+        color = styles.connection.varRefColor;
+        // Specific path for instance var 'array' if it points to the array_ref_box
+        if (
+          conn.varName === "array" &&
+          targetPosData === pagePositions["array_ref_box"]
+        ) {
+          // Default path is fine, from right of var box to left of array_ref_box
+        } else {
+          // Could add other path types here if needed for other var box pointers
+        }
+      } else if (conn.type === "arrayContentPointer") {
+        // Pointer from an array cell
+        markerId = "array-arrow";
+        color = styles.connection.arrayArrowColor;
+        pathType = "arcUp"; // Example: make cell pointers arc slightly
+      }
+
+      if (sourcePoint && targetPoint) {
+        const path = generateCurvedPath(sourcePoint, targetPoint, pathType);
+        connectionsGroup
+          .append("path")
+          .attr("d", path)
+          .attr("fill", "none")
+          .attr("stroke", color)
+          .attr("stroke-width", styles.connection.width)
+          .attr("marker-end", markerId ? `url(#${markerId})` : null)
+          .attr("stroke-opacity", 0.85)
+          .attr("stroke-linecap", "round");
       }
     });
   };
@@ -2410,342 +3133,194 @@ function DataStructurePage() {
     memorySnapshot // Added memorySnapshot
   ) => {
     console.log(
-      "Starting renderLinkedListVisualization (Step 1: VarBoxes) with op:",
-      operation
+      "TOP OF renderLinkedListVisualization. Op:",
+      operation,
+      "Snap:",
+      memorySnapshot
     );
 
-    const state = operation.state || {};
+    const state = memorySnapshot || operation.state || {}; // Prioritize snapshot
     const localVariables = state.localVariables || {};
     const instanceVariables = state.instanceVariables || {};
-    const addressObjectMap = state.addressObjectMap || {}; // Now needed for node data
+    const addressObjectMap = state.addressObjectMap || {};
 
-    // Define styles (scoped to this function for now)
+    // Define styles, adjusting node styles for renderGenericNode
     const styles = {
       varBox: {
-        // Styles adapted from webBrowserVisualization's localVars/instanceVars
+        // Style for renderVariableBox
         width: 200,
         headerHeight: 25,
         fieldHeight: 25,
+        fieldSpacing: 5,
         padding: 10,
-        fill: "#ffffff", // Main box fill is white like web-browser's var boxes
-        stroke: "#94a3b8", // Gray stroke like web-browser's localVars
-        titleFill: "#94a3b8", // Header fill like web-browser's var boxes
+        fill: "#ffffff",
+        stroke: "#94a3b8",
+        titleFill: "#94a3b8",
         titleFillOpacity: 0.3,
-        textFill: "#334155", // Dark gray text
-        valueFill: "#0ea5e9", // Keep blue for addresses in var boxes
+        titleStroke: "#94a3b8",
+        textFill: "#334155",
+        valueTextFill: "#334155",
+        addressValueFill: "#0ea5e9",
         fieldRectFill: "white",
         fieldRectStroke: "#e2e8f0",
+        fontSize: "12px",
+        titleFontSize: "13px",
       },
       node: {
-        // Styles adapted from webBrowserVisualization's page style
-        width: 200,
-        // Calculated height: header (25) + 2 fields (value, next) * 25 = 50. Padding: 10 (top) + 5 (between field & header) + 5 (between fields) + 10 (bottom) = 25+50+25 = 100
-        height: 105, // Adjusted: Header(25) + Pad1(10) + Field1(25) + Pad2(5) + Field2(25) + Pad3(10) = 100. Let's use 105 to match structure.
+        // Styles for renderGenericNode
+        width: 180, // Slightly narrower nodes for LL?
         headerHeight: 25,
         fieldHeight: 25,
-        padding: 10, // General padding (e.g. for text from edge, and bottom of node)
-        fieldVPadding: 5, // Vertical padding between header & first field, and between fields themselves
-        fill: "#ffffff", // White fill like a web page
-        stroke: "#94a3b8", // Gray stroke
-        textFill: "#334155", // Dark gray text for labels
-        valueTextFill: "#334155", // Dark gray for actual value data
-        addressTextFill: "#0284c7", // Blue for address text (like next pointers)
-        spacingX: 50, // Increased spacing between nodes
-        spacingY: 40, // Vertical space (if implementing grid/vertical)
+        fieldSpacing: 5,
+        padding: 10,
+        fill: "#ffffff",
+        stroke: "#94a3b8",
+        titleFill: "#94a3b8",
+        titleStroke: "#94a3b8",
+        titleTextFill: "#334155",
+        keyTextFill: "#334155",
+        valueTextFill: "#334155",
+        addressTextFill: "#0284c7", // Blue for addresses
+        fieldRectFill: "none",
+        fieldRectStroke: "#e2e8f0", // Use borders for fields
+        fontSize: "12px",
+        titleFontSize: "13px",
+        // No specific current/isolated styles defined here, renderGenericNode defaults will be used if needed
       },
       connection: {
-        strokeWidth: 1.5, // Keep slightly thinner than web-browser's default 2
-        arrowSize: 7, // Slightly smaller arrow
-        instanceVarColor: "#334155", // Dark gray for pointers from instance vars (like 'head')
-        nextColor: "#2563eb", // Keep distinct blue for next pointers in list
-        // prevColor removed as per request
+        strokeWidth: 1.5,
+        instanceVarColor: "#334155", // Used by defineArrowheads for #ll-instance-var-arrow
+        nextColor: "#2563eb", // Used by defineArrowheads for #ll-next-arrow
+        // Define marker IDs used in this viz
+        llInstanceVarMarkerId: "ll-instance-var-arrow",
+        llNextMarkerId: "ll-next-arrow",
+      },
+      layout: {
+        // Layout specific parameters
+        nodeSpacingX: 60, // Increased from 40
+        varBoxSpacingY: 20,
+        nodesStartYOffset: 30, // DEPRECATED by layered layout
+        nodesStartXOffset: 60, // Space between var boxes and first node
+        layerSpacingY: 120, // NEW: Vertical space between layers
       },
     };
 
-    // Add arrowhead definitions
+    // Define Arrowheads using helper
     let defs = contentGroup.select("defs");
     if (defs.empty()) {
       defs = contentGroup.append("defs");
     }
-    // Arrow for 'next' pointers - blue
-    if (defs.select("#ll-next-arrow").empty()) {
-      defs
-        .append("marker")
-        .attr("id", "ll-next-arrow")
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", styles.connection.arrowSize - 1) // Adjust refX if arrow head seems detached
-        .attr("refY", 0)
-        .attr("markerWidth", styles.connection.arrowSize)
-        .attr("markerHeight", styles.connection.arrowSize)
-        .attr("orient", "auto-start-reverse")
-        .append("path")
-        .attr("d", "M0,-5L10,0L0,5")
-        .attr("fill", styles.connection.nextColor);
-    }
-    // Arrow for instance variable pointers (e.g. head) - dark gray
-    if (defs.select("#ll-instance-var-arrow").empty()) {
-      defs
-        .append("marker")
-        .attr("id", "ll-instance-var-arrow")
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", styles.connection.arrowSize - 1)
-        .attr("refY", 0)
-        .attr("markerWidth", styles.connection.arrowSize)
-        .attr("markerHeight", styles.connection.arrowSize)
-        .attr("orient", "auto-start-reverse")
-        .append("path")
-        .attr("d", "M0,-5L10,0L0,5")
-        .attr("fill", styles.connection.instanceVarColor);
-    }
+    defineArrowheads(defs, styles); // Defines #ll-next-arrow, #ll-instance-var-arrow etc.
+    // REMOVE old inline LL arrowhead defs if they still exist here
+
+    const nodePositions = {}; // Stores positions calculated by helpers { x, y, width, height }
+    const allConnections = []; // Stores connection data { sourceName?, sourceCoords?, targetAddress, type, varName? }
 
     const firstColX = 30;
     const varBoxTopMargin = 30;
-    let yOffset = varBoxTopMargin;
+    // Remove currentY, topLayerBottomY initialization here
 
-    // --- 1. Render Local Variables Box (Styled like Web Browser) ---
-    const localVarsGroup = contentGroup
-      .append("g")
-      .attr("class", "local-variables-group");
+    // --- Layer Calculation Prep ---
+    let instanceVarsBoxHeight = 0;
+    let localVarsBoxHeight = 0;
+    const instanceVarsBoxWidth = styles.varBox.width || 180;
+    const localVarsBoxWidth = styles.varBox.width || 180;
+    const layerSpacingY = styles.layout.layerSpacingY || 120;
+    let nodeStartX = firstColX; // Default start for middle layer
 
-    if (Object.keys(localVariables).length > 0) {
-      const localVarCount = Object.keys(localVariables).length;
-      const localVarsInternalHeight =
-        localVarCount * styles.varBox.fieldHeight +
-        (localVarCount > 0 ? styles.varBox.padding * (localVarCount - 1) : 0);
-      const localVarsHeight =
-        styles.varBox.headerHeight +
-        (localVarCount > 0
-          ? styles.varBox.padding * 2 +
-            localVarCount * styles.varBox.fieldHeight
-          : styles.varBox.padding);
-
-      localVarsGroup
-        .append("rect") // Main box
-        .attr("x", firstColX)
-        .attr("y", yOffset)
-        .attr("width", styles.varBox.width)
-        .attr("height", localVarsHeight)
-        .attr("fill", styles.varBox.fill)
-        .attr("stroke", styles.varBox.stroke)
-        .attr("stroke-width", 1)
-        .attr("rx", 5);
-      localVarsGroup
-        .append("rect") // Titlebar
-        .attr("x", firstColX)
-        .attr("y", yOffset)
-        .attr("width", styles.varBox.width)
-        .attr("height", styles.varBox.headerHeight)
-        .attr("fill", styles.varBox.titleFill)
-        .attr("fill-opacity", styles.varBox.titleFillOpacity)
-        .attr("stroke", styles.varBox.stroke) // Match main stroke for consistency
-        .attr("stroke-width", 1) // Ensure title bar stroke is visible if fill is very light
-        .attr("rx", 5)
-        .attr("ry", 0);
-      localVarsGroup
-        .append("text") // Title text
-        .attr("x", firstColX + styles.varBox.width / 2)
-        .attr("y", yOffset + styles.varBox.headerHeight / 2 + 5)
-        .attr("text-anchor", "middle")
-        .attr("font-weight", "bold")
-        .attr("font-size", "13px")
-        .attr("fill", styles.varBox.textFill)
-        .text("Local Variables");
-
-      let fieldContentY =
-        yOffset + styles.varBox.headerHeight + styles.varBox.padding;
-      Object.entries(localVariables).forEach(([key, value]) => {
-        // Field container rect (like web browser)
-        localVarsGroup
-          .append("rect")
-          .attr("x", firstColX + styles.varBox.padding / 2)
-          .attr("y", fieldContentY - styles.varBox.padding / 2 + 2)
-          .attr("width", styles.varBox.width - styles.varBox.padding)
-          .attr("height", styles.varBox.fieldHeight)
-          .attr("fill", styles.varBox.fieldRectFill)
-          .attr("stroke", styles.varBox.fieldRectStroke)
-          .attr("rx", 3);
-
-        localVarsGroup // Key text
-          .append("text")
-          .attr("x", firstColX + styles.varBox.padding)
-          .attr("y", fieldContentY + styles.varBox.fieldHeight / 2 - 2)
-          .attr("font-size", "12px")
-          .attr("fill", styles.varBox.textFill)
-          .text(`${key}:`);
-        localVarsGroup // Value text
-          .append("text")
-          .attr("x", firstColX + styles.varBox.width - styles.varBox.padding)
-          .attr("y", fieldContentY + styles.varBox.fieldHeight / 2 - 2)
-          .attr("text-anchor", "end")
-          .attr("font-size", "12px")
-          .attr("font-weight", isAddress(value) ? "bold" : "normal")
-          .attr(
-            "fill",
-            isAddress(value) ? styles.varBox.valueFill : styles.varBox.textFill
-          )
-          .text(truncateAddress(String(value)));
-        fieldContentY += styles.varBox.fieldHeight + styles.varBox.padding / 2; // Add small gap between fields
-      });
-      yOffset += localVarsHeight + 20;
-    }
-
-    // --- 2. Render Instance Variables Box (Styled like Web Browser) ---
-    const instanceVarsGroup = contentGroup
-      .append("g")
-      .attr("class", "instance-variables-group");
-
+    // --- Render TOP LAYER: Instance Variables (Centered) ---
+    let topLayerBottomY = varBoxTopMargin; // Start calculation
     if (Object.keys(instanceVariables).length > 0) {
-      const instanceVarCount = Object.keys(instanceVariables).length;
-      const instanceVarsHeight =
-        styles.varBox.headerHeight +
-        (instanceVarCount > 0
-          ? styles.varBox.padding * 2 +
-            instanceVarCount * styles.varBox.fieldHeight
-          : styles.varBox.padding);
-
-      instanceVarsGroup
-        .append("rect") // Main box
-        .attr("x", firstColX)
-        .attr("y", yOffset)
-        .attr("width", styles.varBox.width)
-        .attr("height", instanceVarsHeight)
-        // instanceVars in web-browser has a slightly different fill. Let's use a common fill for varBoxes now for simplicity or use a specific one.
-        // For now, using the same fill as localVars for internal consistency here.
-        .attr("fill", styles.varBox.fill)
-        .attr("stroke", styles.varBox.stroke) // But can use instanceVar specific stroke if desired, e.g. styles.instanceVars.stroke from web browser
-        .attr("stroke-width", 1)
-        .attr("rx", 5);
-      instanceVarsGroup
-        .append("rect") // Titlebar
-        .attr("x", firstColX)
-        .attr("y", yOffset)
-        .attr("width", styles.varBox.width)
-        .attr("height", styles.varBox.headerHeight)
-        .attr("fill", styles.varBox.titleFill)
-        .attr("fill-opacity", styles.varBox.titleFillOpacity)
-        .attr("stroke", styles.varBox.stroke)
-        .attr("stroke-width", 1)
-        .attr("rx", 5)
-        .attr("ry", 0);
-      instanceVarsGroup
-        .append("text") // Title text
-        .attr("x", firstColX + styles.varBox.width / 2)
-        .attr("y", yOffset + styles.varBox.headerHeight / 2 + 5)
-        .attr("text-anchor", "middle")
-        .attr("font-weight", "bold")
-        .attr("font-size", "13px")
-        .attr("fill", styles.varBox.textFill)
-        .text("Instance Variables");
-
-      let fieldContentY =
-        yOffset + styles.varBox.headerHeight + styles.varBox.padding;
-      Object.entries(instanceVariables).forEach(([key, value]) => {
-        // Field container rect
-        instanceVarsGroup
-          .append("rect")
-          .attr("x", firstColX + styles.varBox.padding / 2)
-          .attr("y", fieldContentY - styles.varBox.padding / 2 + 2)
-          .attr("width", styles.varBox.width - styles.varBox.padding)
-          .attr("height", styles.varBox.fieldHeight)
-          .attr("fill", styles.varBox.fieldRectFill)
-          .attr("stroke", styles.varBox.fieldRectStroke)
-          .attr("rx", 3);
-
-        instanceVarsGroup // Key text
-          .append("text")
-          .attr("x", firstColX + styles.varBox.padding)
-          .attr("y", fieldContentY + styles.varBox.fieldHeight / 2 - 2)
-          .attr("font-size", "12px")
-          .attr("fill", styles.varBox.textFill)
-          .text(`${key}:`);
-        instanceVarsGroup // Value text
-          .append("text")
-          .attr("x", firstColX + styles.varBox.width - styles.varBox.padding)
-          .attr("y", fieldContentY + styles.varBox.fieldHeight / 2 - 2)
-          .attr("text-anchor", "end")
-          .attr("font-size", "12px")
-          .attr("font-weight", isAddress(value) ? "bold" : "normal")
-          .attr(
-            "fill",
-            isAddress(value) ? styles.varBox.valueFill : styles.varBox.textFill
-          )
-          .text(truncateAddress(String(value)));
-        fieldContentY += styles.varBox.fieldHeight + styles.varBox.padding / 2;
-      });
+      const instanceVarsX = width / 2 - instanceVarsBoxWidth / 2; // Center the box
+      const instanceVarsY = varBoxTopMargin;
+      const instanceVarsResult = renderVariableBox(
+        contentGroup,
+        "Instance Variables",
+        instanceVariables,
+        instanceVarsX,
+        instanceVarsY,
+        styles.varBox,
+        "instance",
+        isAddress
+      );
+      allConnections.push(...instanceVarsResult.connectionPoints);
+      instanceVarsBoxHeight = instanceVarsResult.height;
+      nodePositions["instance_vars_box"] = {
+        x: instanceVarsX,
+        y: instanceVarsY,
+        width: instanceVarsBoxWidth,
+        height: instanceVarsBoxHeight,
+      };
+      topLayerBottomY = instanceVarsY + instanceVarsBoxHeight;
+      nodeStartX = firstColX; // Can keep nodes starting left even if vars centered
+    } else {
+      // If no instance vars, top layer doesn't take space
+      topLayerBottomY = 0;
     }
 
-    // --- Prepare Linked List Node Data (Step 2a) ---
-    const nodes = [];
-    const nodePositions = {};
+    // --- Calculate MIDDLE LAYER Y Position ---
+    const middleLayerY =
+      topLayerBottomY > 0 ? topLayerBottomY + layerSpacingY : varBoxTopMargin; // Add spacing only if top layer existed
+
+    // --- Prepare Linked List Node Specs (Main Chain) ---
+    const nodeSpecs = [];
+    const mainListSpecs = []; // Separate array for main list nodes first
+    const orphanSpecs = []; // Separate array for orphan nodes
     const visited = new Set();
+    const MAX_NODES_TO_RENDER = 50;
 
-    let nodeStartX =
-      firstColX + styles.varBox.width + (styles.node.spacingX || 50) + 40;
-    let nodeStartY = varBoxTopMargin; // Align top of nodes with top of var boxes for a cleaner look
-
+    nodeStartX = // Changed 'let nodeStartX =' to 'nodeStartX ='
+      firstColX + styles.varBox.width + styles.layout.nodesStartXOffset;
+    let nodeStartY = varBoxTopMargin + styles.layout.nodesStartYOffset;
     let currentX = nodeStartX;
     let currentYNode = nodeStartY;
 
-    // Determine starting point (e.g., 'head', or first node found if no head)
+    // Determine starting node address
     let startAddress =
       instanceVariables.start ||
       instanceVariables.head ||
       instanceVariables.front;
-    if (!startAddress || startAddress === "0x0" || startAddress === "null") {
-      const allNodeAddresses = Object.keys(addressObjectMap);
-      const pointedToAddresses = new Set();
-      allNodeAddresses.forEach((addr) => {
-        const obj = addressObjectMap[addr];
-        if (obj && typeof obj === "object" && !Array.isArray(obj)) {
-          if (obj.next && obj.next !== "0x0" && obj.next !== "null")
-            pointedToAddresses.add(obj.next);
-          if (obj.prev && obj.prev !== "0x0" && obj.prev !== "null")
-            pointedToAddresses.add(obj.prev); // For doubly linked
-        }
-      });
-      const potentialStarts = allNodeAddresses.filter(
+    if (
+      !startAddress ||
+      startAddress === "0x0" ||
+      startAddress === "null" ||
+      !addressObjectMap[startAddress]
+    ) {
+      // Find first node in map not pointed to by another node's 'next' (simple heuristic)
+      const allNodeAddrs = Object.keys(addressObjectMap).filter(
         (addr) =>
           addressObjectMap[addr] &&
           typeof addressObjectMap[addr] === "object" &&
-          !Array.isArray(addressObjectMap[addr]) &&
-          !pointedToAddresses.has(addr)
+          !Array.isArray(addressObjectMap[addr])
+      );
+      const pointedToAddrs = new Set();
+      allNodeAddrs.forEach((addr) => {
+        const nodeData = addressObjectMap[addr];
+        if (
+          nodeData &&
+          nodeData.nextAddress &&
+          nodeData.nextAddress !== "0x0" &&
+          nodeData.nextAddress !== "null"
+        ) {
+          pointedToAddrs.add(nodeData.nextAddress);
+        }
+      });
+      const potentialStarts = allNodeAddrs.filter(
+        (addr) => !pointedToAddrs.has(addr)
       );
       if (potentialStarts.length > 0) {
-        startAddress = potentialStarts[0];
-        console.log(
-          "No explicit 'head' found, using heuristically determined start node:",
-          startAddress
-        );
-      } else if (allNodeAddresses.length > 0) {
-        // Fallback: try to find the first object that looks like a node
-        const firstPotentialNode = allNodeAddresses.find(
-          (addr) =>
-            addressObjectMap[addr] &&
-            typeof addressObjectMap[addr] === "object" &&
-            !Array.isArray(addressObjectMap[addr]) &&
-            (addressObjectMap[addr].hasOwnProperty("data") ||
-              addressObjectMap[addr].hasOwnProperty("value") ||
-              addressObjectMap[addr].hasOwnProperty("next"))
-        );
-        if (firstPotentialNode) {
-          startAddress = firstPotentialNode;
-          console.log(
-            "No 'head' or clear unpointed start, falling back to first potential node object in map:",
-            startAddress
-          );
-        } else {
-          console.log(
-            "Could not determine a start node for the linked list from addressObjectMap."
-          );
-        }
-      } else {
-        console.log("addressObjectMap is empty, cannot determine start node.");
+        startAddress = potentialStarts[0]; // Use the first one found
+      } else if (allNodeAddrs.length > 0) {
+        startAddress = allNodeAddrs[0]; // Fallback if all nodes are pointed to (e.g., circular list)
       }
     }
 
     let currentAddress = startAddress;
     let nodesProcessedCount = 0;
-    const MAX_NODES_TO_RENDER = 50; // Safety break
+
+    // --- Layout MAIN LIST nodes in Middle Layer ---
+    let middleLayerMaxNodeHeight = styles.node.height || 100; // Estimate or use config
+    currentX = nodeStartX; // Use calculated nodeStartX
 
     while (
       currentAddress &&
@@ -2763,400 +3338,562 @@ function DataStructurePage() {
         Array.isArray(nodeData)
       ) {
         console.warn(
-          `Address ${currentAddress} in list does not point to a valid node object in addressObjectMap. Stopping traversal here.`
+          `LinkedListViz: Invalid node data for address ${currentAddress}.`
         );
         break;
       }
 
-      nodes.push({
-        id: currentAddress, // Unique ID for D3 keys
+      // Prepare the spec for renderGenericNode - add to mainListSpecs
+      const nodeFields = {};
+      if (nodeData.data !== undefined) {
+        nodeFields.value = nodeData.data;
+      } else if (nodeData.value !== undefined) {
+        nodeFields.value = nodeData.value;
+      } else {
+        nodeFields.value = "N/A"; // Fallback if no value/data field
+      }
+
+      if (nodeData.nextAddress !== undefined) {
+        nodeFields.next = nodeData.nextAddress;
+      } else if (nodeData.next !== undefined) {
+        nodeFields.next = nodeData.next;
+      } else {
+        nodeFields.next = "null"; // Default if no next pointer
+      }
+
+      // Optionally add prev if it exists (for potential doubly-linked data)
+      if (nodeData.previousAddress !== undefined) {
+        nodeFields.prev = nodeData.previousAddress;
+      } else if (nodeData.prev !== undefined) {
+        nodeFields.prev = nodeData.prev;
+      }
+
+      mainListSpecs.push({
+        x: currentX,
+        y: middleLayerY, // Position node in the middle layer
         address: currentAddress,
-        dataVal:
-          nodeData.data !== undefined
-            ? nodeData.data
-            : nodeData.value !== undefined
-            ? nodeData.value
-            : "N/A",
-        nextAddress: nodeData.nextAddress, // Changed from nodeData.next
-        // prevAddress: nodeData.prev, // This was already correctly removed/commented if not used
-        x: currentX,
-        y: currentYNode,
+        title:
+          nodeData.title || nodeData.url || truncateAddress(currentAddress, 6),
+        fields: nodeFields, // Use the dynamically created fields object
+        isIsolated: false,
+        style: styles.node, // Use the defined node style
       });
-      nodePositions[currentAddress] = {
-        x: currentX,
-        y: currentYNode,
-        width: styles.node.width,
-        height: styles.node.height,
-      };
 
-      currentX += styles.node.width + styles.node.spacingX;
-      // For now, a simple horizontal list. Vertical/grid layout would modify currentYNode here.
+      // Update max height seen in this layer for bottom layer calculation
+      // (Need to estimate or get actual height from renderGenericNode later - tricky chicken/egg)
+      // For now, let's assume styles.node.height is representative
+      // A better way might be to calculate after rendering, but let's try this first.
+      middleLayerMaxNodeHeight = Math.max(
+        middleLayerMaxNodeHeight,
+        styles.node.height || 100
+      );
 
-      currentAddress = nodeData.nextAddress; // Changed from nodeData.next
+      // Prepare connection data for this node's 'next' pointer
+      if (
+        nodeData.nextAddress &&
+        nodeData.nextAddress !== "0x0" &&
+        nodeData.nextAddress !== "null"
+      ) {
+        allConnections.push({
+          sourceName: currentAddress, // Connection originates from this node
+          targetAddress: nodeData.nextAddress,
+          type: "ll_next", // Specific type for styling/marker
+        });
+      }
+      // Add connection for 'prev' if doubly linked
+
+      currentX += styles.node.width + styles.layout.nodeSpacingX;
+      currentAddress = nodeData.nextAddress;
       nodesProcessedCount++;
     }
 
     if (nodesProcessedCount === MAX_NODES_TO_RENDER) {
-      console.warn(
-        "Reached MAX_NODES_TO_RENDER limit during linked list traversal. List might be truncated in visualization."
-      );
-    }
-
-    // Update placeholder message logic based on node preparation
-    const nodesPlaceholderX = nodeStartX;
-    const nodesPlaceholderY = nodeStartY + styles.node.height / 2;
-
-    if (nodes.length > 0) {
-      showNotImplementedMessage(
-        contentGroup,
-        width,
-        height,
-        `Found ${nodes.length} nodes. Rendering coming next...`,
-        nodesPlaceholderX,
-        nodesPlaceholderY - styles.node.height / 2 - 10
-      ); // Move msg above where nodes will be
-    } else if (
-      !startAddress ||
-      startAddress === "0x0" ||
-      startAddress === "null"
-    ) {
-      showNotImplementedMessage(
-        contentGroup,
-        width,
-        height,
-        "Could not find a starting node (e.g., 'head').",
-        nodesPlaceholderX,
-        nodesPlaceholderY
-      );
-    } else {
-      showNotImplementedMessage(
-        contentGroup,
-        width,
-        height,
-        "List is empty or start node data is invalid.",
-        nodesPlaceholderX,
-        nodesPlaceholderY
-      );
+      console.warn("LinkedListViz: Reached max node render limit.");
     }
 
     console.log(
-      "Finished renderLinkedListVisualization (Step 1 + 2a: VarBoxes and Node Data Prep)"
+      "[LinkedListViz] Before rendering MAIN LIST nodes. mainListSpecs:",
+      mainListSpecs,
+      "nodePositions so far:",
+      nodePositions
     );
-    console.log("Prepared nodes:", nodes);
-    console.log("Node positions:", nodePositions);
 
-    // --- Render Nodes and Connections (Step 2b) ---
-    if (nodes.length > 0) {
-      // Clear any "not implemented" messages specifically for nodes before drawing actual nodes
-      contentGroup
-        .selectAll(".not-implemented-message")
-        .filter(function () {
-          return (
-            d3.select(this).text().startsWith("Found") ||
-            d3.select(this).text().startsWith("Could not find") ||
-            d3.select(this).text().startsWith("List is empty")
-          );
-        })
-        .remove();
+    // --- Render MAIN LIST Nodes first using Helper ---
+    mainListSpecs.forEach((spec) => {
+      try {
+        renderGenericNode(
+          contentGroup,
+          spec,
+          spec.style,
+          nodePositions,
+          isAddress,
+          truncateAddress
+        );
+      } catch (e) {
+        console.error(
+          "[LinkedListViz] Error rendering MAIN LIST node:",
+          spec.address,
+          e
+        );
+      }
+    });
 
-      const nodesGroup = contentGroup
-        .append("g")
-        .attr("class", "linked-list-nodes");
+    console.log("[LinkedListViz] FINISHED rendering MAIN LIST nodes.");
 
-      // Render each node (Styled like Web Browser Page)
-      nodes.forEach((node) => {
-        const nodeGroup = nodesGroup
-          .append("g")
-          .attr("class", "ll-node")
-          .attr("transform", `translate(${node.x}, ${node.y})`);
+    // --- Calculate BOTTOM LAYER Y Position ---
+    const middleLayerBottomY = middleLayerY + middleLayerMaxNodeHeight;
+    const bottomLayerStartY = middleLayerBottomY + layerSpacingY;
 
-        // Node box (like web-browser page rect)
-        nodeGroup
-          .append("rect")
-          .attr("width", styles.node.width)
-          .attr("height", styles.node.height)
-          .attr("fill", styles.node.fill)
-          .attr("stroke", styles.node.stroke)
-          .attr("stroke-width", 1) // Web browser page uses 1 or 2 if current
-          .attr("rx", 5);
-
-        // Node address header (like web-browser page title section)
-        nodeGroup
-          .append("rect")
-          .attr("width", styles.node.width)
-          .attr("height", styles.node.headerHeight)
-          .attr("fill", styles.node.stroke) // Web-browser page title uses page.stroke with opacity
-          .attr("fill-opacity", 0.3)
-          .attr("rx", 5)
-          .attr("ry", 0);
-        nodeGroup
-          .append("text") // Address text
-          .attr("x", styles.node.width / 2)
-          .attr("y", styles.node.headerHeight / 2 + 4) // Centered in header
-          .attr("text-anchor", "middle")
-          .attr("font-size", "13px") // Larger like web-browser page titles
-          .attr("font-weight", "bold")
-          .attr("fill", styles.node.textFill)
-          .text(truncateAddress(node.address, 8));
-
-        // Divider line after header (like web-browser page)
-        nodeGroup
-          .append("line")
-          .attr("x1", 0)
-          .attr("y1", styles.node.headerHeight)
-          .attr("x2", styles.node.width)
-          .attr("y2", styles.node.headerHeight)
-          .attr("stroke", styles.node.stroke)
-          .attr("stroke-width", 1);
-
-        // Start Y for first field: Header height + specific vertical padding
-        let fieldCurrentY =
-          styles.node.headerHeight + styles.node.fieldVPadding;
-
-        // Field container rects (like web-browser page fields)
-        // Value field rect
-        nodeGroup
-          .append("rect")
-          .attr("x", styles.node.padding / 2) // Small horizontal padding for rect
-          .attr("y", fieldCurrentY)
-          .attr("width", styles.node.width - styles.node.padding) // Rect width takes into account padding on both sides
-          .attr("height", styles.node.fieldHeight)
-          .attr("fill", "none") // web-browser page fields use fill:none
-          .attr("stroke", "#e2e8f0") // light stroke for field separator
-          .attr("rx", 3);
-
-        // Data/Value field text
-        nodeGroup
-          .append("text")
-          .attr("x", styles.node.padding) // Text starts after main node padding
-          .attr(
-            "y",
-            fieldCurrentY +
-              styles.node.fieldHeight / 2 +
-              styles.node.padding / 2 -
-              2
-          ) // Adjusted for better centering within field rect
-          .attr("font-size", "13px") // Match web-browser page field text size
-          .attr("font-weight", "bold")
-          .attr("fill", styles.node.textFill)
-          .text("value:");
-        nodeGroup
-          .append("text")
-          .attr("x", styles.node.width - styles.node.padding) // Text ends before main node padding (anchor end)
-          .attr(
-            "y",
-            fieldCurrentY +
-              styles.node.fieldHeight / 2 +
-              styles.node.padding / 2 -
-              2
-          ) // Adjusted for better centering
-          .attr("text-anchor", "end")
-          .attr("font-size", "13px")
-          .attr("font-weight", isAddress(node.dataVal) ? "bold" : "normal")
-          .attr(
-            "fill",
-            isAddress(node.dataVal)
-              ? styles.node.addressTextFill
-              : styles.node.valueTextFill
-          )
-          .text(truncateAddress(String(node.dataVal)));
-        fieldCurrentY += styles.node.fieldHeight + styles.node.fieldVPadding;
-
-        // Next pointer field rect
-        nodeGroup
-          .append("rect")
-          .attr("x", styles.node.padding / 2)
-          .attr("y", fieldCurrentY)
-          .attr("width", styles.node.width - styles.node.padding)
-          .attr("height", styles.node.fieldHeight)
-          .attr("fill", "none")
-          .attr("stroke", "#e2e8f0")
-          .attr("rx", 3);
-
-        // Next pointer field text
-        nodeGroup
-          .append("text")
-          .attr("x", styles.node.padding)
-          .attr(
-            "y",
-            fieldCurrentY +
-              styles.node.fieldHeight / 2 +
-              styles.node.padding / 2 -
-              2
-          ) // Adjusted for better centering
-          .attr("font-size", "13px")
-          .attr("font-weight", "bold")
-          .attr("fill", styles.node.textFill)
-          .text("next:");
-        nodeGroup
-          .append("text")
-          .attr("x", styles.node.width - styles.node.padding)
-          .attr(
-            "y",
-            fieldCurrentY +
-              styles.node.fieldHeight / 2 +
-              styles.node.padding / 2 -
-              2
-          ) // Adjusted for better centering
-          .attr("text-anchor", "end")
-          .attr("font-size", "13px")
-          .attr("font-weight", "bold")
-          .attr("fill", styles.connection.nextColor) // Use specific nextColor for the address value
-          .text(truncateAddress(node.nextAddress));
-
-        // Removed Prev pointer field rendering
-      });
-
-      // Render connections
-      const connectionsGroup = contentGroup
-        .append("g")
-        .attr("class", "ll-connections");
-      nodes.forEach((node) => {
-        // Next connection
-        if (
-          node.nextAddress &&
-          node.nextAddress !== "0x0" &&
-          node.nextAddress !== "null" &&
-          nodePositions[node.nextAddress]
-        ) {
-          const sourcePos = nodePositions[node.address];
-          const targetPos = nodePositions[node.nextAddress];
-
-          const sourcePoint = {
-            x: sourcePos.x + sourcePos.width,
-            y:
-              sourcePos.y +
-              styles.node.headerHeight +
-              styles.node.fieldVPadding + // Padding after header
-              styles.node.fieldHeight + // Height of value field
-              styles.node.fieldVPadding + // Padding after value field
-              styles.node.fieldHeight / 2, // Middle of the next field itself
-          };
-          const targetPoint = {
-            x: targetPos.x, // Connect to left edge of target node
-            y: targetPos.y + targetPos.height / 2,
-          };
-
-          connectionsGroup
-            .append("path") // Changed from line to path
-            .attr("d", generateCurvedPath(sourcePoint, targetPoint)) // Use curved path
-            .attr("fill", "none") // Paths should not be filled for arrows
-            .attr("stroke", styles.connection.nextColor)
-            .attr("stroke-width", styles.connection.strokeWidth)
-            .attr("marker-end", "url(#ll-next-arrow)");
-        }
-        // Removed Prev connection rendering
-      });
-
-      // Connections from Instance Variables to nodes (e.g., head, tail pointers)
-      Object.entries(instanceVariables).forEach(([varName, varValue]) => {
-        if (isAddress(varValue) && nodePositions[varValue]) {
-          // Calculate sourceY for the instance variable field
-          let varBoxYOffset = varBoxTopMargin;
-          if (Object.keys(localVariables).length > 0) {
-            const localVarCount = Object.keys(localVariables).length;
-            varBoxYOffset +=
-              styles.varBox.headerHeight +
-              (localVarCount > 0
-                ? styles.varBox.padding * 2 +
-                  localVarCount * styles.varBox.fieldHeight
-                : styles.varBox.padding) +
-              20;
-          }
-          const varIndex = Object.keys(instanceVariables).indexOf(varName);
-
-          let sourcePoint;
-          let targetPoint;
-          const targetNodePos = nodePositions[varValue];
-          let pathType = "default"; // Default path type
-          let dAttribute = ""; // To store the path 'd' attribute string
-
-          if (varName === "end" && nodes.length > 1 && targetNodePos) {
-            const varBoxInstanceHeight =
-              styles.varBox.headerHeight +
-              (Object.keys(instanceVariables).length > 0
-                ? styles.varBox.padding * 2 +
-                  Object.keys(instanceVariables).length *
-                    styles.varBox.fieldHeight
-                : styles.varBox.padding);
-
-            sourcePoint = {
-              x: firstColX + styles.varBox.width / 2,
-              y: varBoxYOffset + varBoxInstanceHeight, // Bottom-middle of the var box
-            };
-            targetPoint = {
-              x: targetNodePos.x + targetNodePos.width / 2,
-              y: targetNodePos.y + targetNodePos.height, // Bottom-middle of target node
-            };
-
-            const verticalDip = Math.max(30, styles.node.height / 2); // How far down the path should go
-            const cornerRadius = 10; // Radius for curved corners
-
-            // Start path
-            dAttribute = `M ${sourcePoint.x} ${sourcePoint.y}`;
-            // Line down
-            dAttribute += ` V ${sourcePoint.y + verticalDip - cornerRadius}`;
-            // Curve for first corner (down then right)
-            dAttribute += ` Q ${sourcePoint.x} ${
-              sourcePoint.y + verticalDip
-            }, ${sourcePoint.x + cornerRadius} ${sourcePoint.y + verticalDip}`;
-            // Horizontal line to the right, towards target X
-            dAttribute += ` H ${targetPoint.x - cornerRadius}`;
-            // Curve for second corner (right then up)
-            dAttribute += ` Q ${targetPoint.x} ${
-              sourcePoint.y + verticalDip
-            }, ${targetPoint.x} ${sourcePoint.y + verticalDip - cornerRadius}`;
-            // Line up to target
-            dAttribute += ` V ${targetPoint.y}`;
-          } else {
-            // Default connection for other instance variables (like 'start') or if 'end' is the only node
-            sourcePoint = {
-              x: firstColX + styles.varBox.width,
-              y:
-                varBoxYOffset +
-                styles.varBox.headerHeight +
-                styles.varBox.padding +
-                varIndex *
-                  (styles.varBox.fieldHeight + styles.varBox.padding / 2) +
-                styles.varBox.fieldHeight / 2 -
-                2,
-            };
-            targetPoint = {
-              x: targetNodePos ? targetNodePos.x : currentX, // Fallback if targetNodePos is somehow undefined for start
-              y: targetNodePos
-                ? targetNodePos.y + targetNodePos.height / 2
-                : currentYNode,
-            };
-            pathType = "default"; // Will be used by generateCurvedPath
-            dAttribute = generateCurvedPath(sourcePoint, targetPoint, pathType);
-          }
-
-          if (dAttribute) {
-            // Ensure dAttribute is set
-            connectionsGroup
-              .append("path")
-              .attr("d", dAttribute)
-              .attr("fill", "none")
-              .attr("stroke", styles.connection.instanceVarColor)
-              .attr("stroke-width", styles.connection.strokeWidth)
-              .attr("marker-end", "url(#ll-instance-var-arrow)");
-          }
-        }
-      });
-    } else if (
-      !startAddress ||
-      startAddress === "0x0" ||
-      startAddress === "null"
-    ) {
-      showNotImplementedMessage(
+    // --- Render BOTTOM LAYER Part 1: Local Variables ---
+    let currentBottomLayerY = bottomLayerStartY;
+    let bottomLayerOrphanStartX = firstColX; // Orphans start left if no local vars
+    if (Object.keys(localVariables).length > 0) {
+      const localVarsX = width / 2 - localVarsBoxWidth / 2; // Center the local variables box
+      const localVarsY = bottomLayerStartY;
+      const localVarsResult = renderVariableBox(
         contentGroup,
-        width,
-        height,
-        "Could not find a starting node (e.g., 'head').",
-        nodesPlaceholderX,
-        nodesPlaceholderY
+        "Local Variables",
+        localVariables,
+        localVarsX,
+        localVarsY,
+        styles.varBox,
+        "local",
+        isAddress
       );
+      allConnections.push(...localVarsResult.connectionPoints);
+      localVarsBoxHeight = localVarsResult.height;
+      nodePositions["local_vars_box"] = {
+        x: localVarsX,
+        y: localVarsY,
+        width: localVarsBoxWidth,
+        height: localVarsBoxHeight,
+      };
+      currentBottomLayerY = localVarsY + localVarsBoxHeight; // Update bottom Y based on this box
+      bottomLayerOrphanStartX =
+        localVarsX + localVarsBoxWidth + (styles.layout.nodeSpacingX || 60); // Start orphans after local vars
     }
+
+    // --- Render BOTTOM LAYER Part 2: Orphan Nodes ---
+    let orphanNodeX = bottomLayerOrphanStartX;
+    let orphanNodeY = bottomLayerStartY; // Start orphans at same Y as local vars
+    let bottomLayerMaxNodeHeight = Math.max(
+      styles.node.height || 100,
+      localVarsBoxHeight
+    ); // Consider local var height for wrapping
+
+    const allPotentialNodeAddresses = Object.keys(addressObjectMap).filter(
+      (addr) =>
+        addressObjectMap[addr] &&
+        typeof addressObjectMap[addr] === "object" &&
+        !Array.isArray(addressObjectMap[addr]) &&
+        (addressObjectMap[addr].hasOwnProperty("data") ||
+          addressObjectMap[addr].hasOwnProperty("value") ||
+          addressObjectMap[addr].hasOwnProperty("nextAddress"))
+    );
+
+    allPotentialNodeAddresses.forEach((addr) => {
+      if (!visited.has(addr)) {
+        // If not part of the main chain (already visited)
+        const nodeData = addressObjectMap[addr];
+        if (!nodeData) return; // Should not happen due to filter, but good check
+
+        const orphanNodeFields = {};
+        if (nodeData.data !== undefined) {
+          orphanNodeFields.value = nodeData.data;
+        } else if (nodeData.value !== undefined) {
+          orphanNodeFields.value = nodeData.value;
+        } else {
+          orphanNodeFields.value = "N/A";
+        }
+
+        if (nodeData.nextAddress !== undefined) {
+          orphanNodeFields.next = nodeData.nextAddress;
+        } else if (nodeData.next !== undefined) {
+          orphanNodeFields.next = nodeData.next;
+        } else {
+          orphanNodeFields.next = "null";
+        }
+
+        if (nodeData.previousAddress !== undefined) {
+          orphanNodeFields.prev = nodeData.previousAddress;
+        } else if (nodeData.prev !== undefined) {
+          orphanNodeFields.prev = nodeData.prev;
+        }
+
+        orphanSpecs.push({
+          x: orphanNodeX,
+          y: orphanNodeY, // Position orphan in the bottom layer
+          address: addr,
+          title: nodeData.title || nodeData.url || truncateAddress(addr, 6),
+          fields: orphanNodeFields, // Use the dynamically created fields object
+          isIsolated: true, // Mark as isolated for styling by renderGenericNode
+          style: styles.node,
+        });
+        visited.add(addr); // Add to visited to avoid re-processing if map has duplicates somehow
+
+        // Add its 'next' connection to allConnections if it points to a known node
+        if (
+          nodeData.nextAddress &&
+          nodeData.nextAddress !== "0x0" &&
+          nodeData.nextAddress !== "null"
+        ) {
+          allConnections.push({
+            sourceName: addr,
+            targetAddress: nodeData.nextAddress,
+            type: "ll_next_orphan", // Potentially style orphan next pointers differently
+          });
+        }
+
+        orphanNodeX += (styles.node.width || 180) + styles.layout.nodeSpacingX;
+        if (orphanNodeX + (styles.node.width || 180) > width - firstColX) {
+          // Wrap to next line
+          orphanNodeX = firstColX;
+          orphanNodeY += bottomLayerMaxNodeHeight + styles.layout.nodeSpacingX; // Use estimated height + spacing for row wrap
+        }
+        // Update max height for this layer if needed (less critical than middle layer)
+        bottomLayerMaxNodeHeight = Math.max(
+          bottomLayerMaxNodeHeight,
+          styles.node.height || 100
+        );
+      }
+    });
+    // --- END: Logic for Unreferenced/Orphan Nodes ---
+
+    console.log(
+      "[LinkedListViz] Before rendering ORPHAN nodes. orphanSpecs:",
+      orphanSpecs
+    );
+
+    // --- Render ORPHAN Nodes using Helper ---
+    orphanSpecs.forEach((spec) => {
+      try {
+        renderGenericNode(
+          contentGroup,
+          spec,
+          spec.style,
+          nodePositions,
+          isAddress,
+          truncateAddress
+        );
+      } catch (e) {
+        console.error(
+          "[LinkedListViz] Error rendering ORPHAN node:",
+          spec.address,
+          e
+        );
+      }
+    });
+
+    console.log("[LinkedListViz] FINISHED rendering ORPHAN nodes.");
+
+    // --- Render Connections ---
+    const connectionsGroup = contentGroup
+      .append("g")
+      .attr("class", "connections-group");
+    allConnections.forEach((conn) => {
+      let sourcePoint, targetPoint;
+      let path = ""; // Initialize path to empty string
+      let markerId = null;
+      let color = styles.connection.stroke; // Default stroke
+      let pathType = "default";
+      let pathOrientationHint = "auto"; // <<< Declare OUTSIDE with a default
+      const cornerRadius = styles.connection.cornerRadius || 8; // Define cornerRadius upfront
+      let strokeWidth = styles.connection.strokeWidth || 1.5; // Define strokeWidth upfront with default
+
+      // Get source position (must be a var box or a node)
+      const sourcePosData = nodePositions[conn.sourceName];
+      if (conn.sourceCoords) {
+        // From renderVariableBox
+        sourcePoint = conn.sourceCoords;
+      } else if (sourcePosData && conn.type === "ll_next") {
+        // From node's 'next' field
+        // Calculate approx middle-right of the 'next' field box based on generic node structure
+        const fieldYOffset =
+          styles.node.headerHeight +
+          styles.node.padding +
+          styles.node.fieldHeight +
+          styles.node.fieldSpacing +
+          styles.node.fieldHeight / 2;
+        sourcePoint = {
+          x: sourcePosData.x + sourcePosData.width,
+          y: sourcePosData.y + fieldYOffset,
+        };
+      } else if (sourcePosData) {
+        // Default exit for other node pointers (e.g. prev)
+        // Simple center-left exit for now if not 'next'
+        sourcePoint = {
+          x: sourcePosData.x,
+          y: sourcePosData.y + sourcePosData.height / 2,
+        };
+      } else {
+        console.warn(
+          "LL Viz Connection: Cannot find source position for:",
+          conn
+        );
+        return;
+      }
+
+      // Get target position (must be a node for ll_next, ll_prev; could be node or var box?)
+      const targetPosData = nodePositions[conn.targetAddress];
+      if (!targetPosData) {
+        console.warn(
+          "LL Viz Connection: Cannot find target position for:",
+          conn.targetAddress,
+          conn
+        );
+        return;
+      }
+
+      // Determine target point and style based on connection type
+      if (conn.type === "instance" || conn.type === "local") {
+        // From var box
+        markerId =
+          styles.connection.llInstanceVarMarkerId || "ll-instance-var-arrow";
+        color = styles.connection.instanceVarColor; // Default color for instance vars
+        // let strokeWidth = styles.connection.strokeWidth || 1.5; // REMOVE: Defined upfront
+        pathOrientationHint = "H-V-H"; // Re-assign default for this type
+
+        // Define standard source/target points first
+        sourcePoint = conn.sourceCoords; // From renderVariableBox (right edge of field)
+        targetPoint = {
+          // Target left-middle of node
+          x: targetPosData.x,
+          y: targetPosData.y + targetPosData.height / 2,
+        };
+
+        // Special case for 'end' pointer requires V-H-V
+        if (
+          conn.varName === "end" &&
+          mainListSpecs.length > 0 &&
+          targetPosData.address ===
+            mainListSpecs[mainListSpecs.length - 1].address
+        ) {
+          pathOrientationHint = "V-H-V"; // Re-assign for 'end'
+
+          // --- Original sourcePoint & targetPosData for 'end' pointer ---
+          if (nodePositions["instance_vars_box"]) {
+            // For 'end', the conceptual source is bottom-center of the instance_vars_box for V-H-V path
+            // However, generateHardcodedEndPointerPath uses conn.leftSourceCoords which is tied to field's Y.
+            // We will use conn.leftSourceCoords for generateHardcodedEndPointerPath as intended.
+          } else {
+            console.warn(
+              "[LinkedListViz] 'end' pointer: Instance vars box position not found! Using default sourcePoint from conn.sourceCoords.",
+              conn.sourceCoords
+            );
+          }
+
+          // *** Use the new generateHardcodedEndPointerPath for 'end' pointer ***
+          if (conn.leftSourceCoords) {
+            const verticalDropForEnd = 75; // Can be adjusted
+            const horizontalClearanceForEnd = 20; // Clearance from var box left edge
+            console.log(
+              "[LinkedListViz] 'end' pointer using generateHardcodedEndPointerPath. LeftSource:",
+              conn.leftSourceCoords,
+              "Target Node:",
+              targetPosData
+            );
+            path = generateHardcodedEndPointerPath(
+              conn.leftSourceCoords, // This uses the field's Y level, exiting left
+              targetPosData,
+              verticalDropForEnd,
+              horizontalClearanceForEnd,
+              cornerRadius
+            );
+            color = "red";
+            strokeWidth = 3;
+            connectionsGroup
+              .append("circle")
+              .attr("cx", conn.leftSourceCoords.x)
+              .attr("cy", conn.leftSourceCoords.y)
+              .attr("r", 4)
+              .attr("fill", "red");
+          } else {
+            console.error(
+              "[LinkedListViz] 'end' pointer missing leftSourceCoords!",
+              conn
+            );
+            path = "";
+          }
+        } else {
+          // New structure for instance and local vars (non-'end')
+          if (conn.type === "instance") {
+            pathOrientationHint = "H-V_to_target_top";
+            sourcePoint = conn.sourceCoords; // Default, refined below
+            const instanceBoxPos = nodePositions["instance_vars_box"];
+            if (instanceBoxPos && conn.leftSourceCoords) {
+              const targetNodeCenterX =
+                targetPosData.x + targetPosData.width / 2;
+              const instanceBoxCenter =
+                instanceBoxPos.x + instanceBoxPos.width / 2;
+              if (targetNodeCenterX < instanceBoxCenter) {
+                sourcePoint = conn.leftSourceCoords;
+              } else {
+                // sourcePoint remains conn.sourceCoords (right exit)
+              }
+            }
+
+            targetPoint = {
+              x: targetPosData.x + targetPosData.width / 2,
+              y: targetPosData.y, // Corrected: Target very top edge for H-V_to_target_top path
+            };
+
+            const tempInitialOffsetInst = 10; // Small default, H-V_to_target_top uses target.x
+
+            console.log(
+              `[LinkedListViz] INSTANCE Var '${conn.varName}' CALLING generateOrthogonalPath (H-V_to_target_top):`,
+              JSON.stringify(
+                {
+                  sourcePoint: { x: sourcePoint.x, y: sourcePoint.y },
+                  targetPoint: { x: targetPoint.x, y: targetPoint.y },
+                  cornerRadius,
+                  pathOrientationHint,
+                  initialOffset: tempInitialOffsetInst,
+                  detourTargetY: null,
+                },
+                null,
+                2
+              )
+            );
+            path = generateOrthogonalPath(
+              sourcePoint,
+              targetPoint,
+              cornerRadius,
+              pathOrientationHint,
+              tempInitialOffsetInst,
+              null
+            );
+          } else if (conn.type === "local") {
+            pathOrientationHint = "H-V-H";
+            sourcePoint = conn.sourceCoords; // Locals always exit right
+
+            targetPoint = {
+              x: targetPosData.x, // Target left-edge of node
+              y: targetPosData.y + targetPosData.height / 2, // Target middle-Y of node
+            };
+
+            const localInitialOffset = 30;
+
+            console.log(
+              `[LinkedListViz] LOCAL Var '${conn.varName}' CALLING generateOrthogonalPath (H-V-H default):`,
+              JSON.stringify(
+                {
+                  sourcePoint: { x: sourcePoint.x, y: sourcePoint.y },
+                  targetPoint: { x: targetPoint.x, y: targetPoint.y },
+                  cornerRadius,
+                  pathOrientationHint,
+                  initialOffset: localInitialOffset,
+                  detourTargetY: null,
+                },
+                null,
+                2
+              )
+            );
+            path = generateOrthogonalPath(
+              sourcePoint,
+              targetPoint,
+              cornerRadius,
+              pathOrientationHint,
+              localInitialOffset,
+              null
+            );
+          } else {
+            // Fallback for any other types caught here
+            path = "";
+            console.warn(
+              `[LinkedListViz] Unhandled connection type in var block: ${conn.type}`
+            );
+          }
+        }
+      } else if (conn.type === "ll_next" || conn.type === "ll_next_orphan") {
+        // Node-to-node or Orphan-to-node next pointers
+        markerId = styles.connection.llNextMarkerId || "ll-next-arrow";
+        color = styles.connection.nextColor;
+        // let strokeWidth = styles.connection.strokeWidth || 1.5; // REMOVE: Defined upfront
+        pathOrientationHint = "H-V-H"; // Re-assign default for this type
+
+        // Source: middle-right of the 'next' field area
+        const fieldYOffset =
+          styles.node.headerHeight +
+          styles.node.padding +
+          styles.node.fieldHeight +
+          styles.node.fieldSpacing +
+          styles.node.fieldHeight / 2;
+        sourcePoint = {
+          x: sourcePosData.x + sourcePosData.width,
+          y: sourcePosData.y + fieldYOffset,
+        };
+        // Target: middle-left of the target node
+        targetPoint = {
+          x: targetPosData.x,
+          y: targetPosData.y + targetPosData.height / 2,
+        };
+
+        // If orphan is far away, V-H-V might be better? (Experiment if needed)
+        // const dxOrphan = Math.abs(targetPoint.x - sourcePoint.x);
+        // if (conn.type === "ll_next_orphan" && dxOrphan > (styles.node.width || 180) * 2) {
+        //     pathOrientationHint = 'V-H-V'; // Or maybe H-V-H is still better?
+        // }
+
+        // For ll_next, use the original generateOrthogonalPath
+        path = generateOrthogonalPath(
+          sourcePoint,
+          targetPoint,
+          cornerRadius,
+          pathOrientationHint,
+          undefined,
+          null // No detour target for standard next pointers
+        );
+      }
+      // Add case for ll_prev if doubly linked (likely H-V-H from left-middle to right-middle)
+
+      if (sourcePoint && targetPoint) {
+        // *** Call the NEW orthogonal path function ***
+        // const cornerRadius = styles.connection.cornerRadius || 8; // Use style or default - MOVED UP
+
+        // console.log("[LinkedListViz] 'end' pointer CALLING generateOrthogonalPath with:", JSON.stringify(
+        //   {
+        //     sourcePoint: {x: sourcePoint.x, y: sourcePoint.y}, // stringify sourcePoint
+        //     targetPoint: {x: targetPoint.x, y: targetPoint.y}, // stringify targetPoint
+        //     cornerRadius,
+        //     pathOrientationHint, // Should be "V-H-V"
+        //     initialOffset: undefined, // Explicitly showing it's not set here
+        //     detourTargetY: forcedDetourY,
+        //   },
+        //   null,
+        //   2
+        // ));
+
+        // const path = generateOrthogonalPath( // THIS IS NOW CONDITIONAL
+        //   sourcePoint,
+        //   targetPoint,
+        //   cornerRadius,
+        //   pathOrientationHint,
+        //   undefined, // Let initialOffset use its default in generateOrthogonalPath, unless we need to override
+        //   pathOrientationHint === "V-H-V" && conn.varName === "end"
+        //     ? forcedDetourY // Pass the forced detour Y
+        //     : null // Pass null for other connections
+        // );
+
+        connectionsGroup
+          .append("path")
+          .attr("d", path)
+          .attr("fill", "none")
+          .attr("stroke", color)
+          .attr("stroke-width", strokeWidth) // Use the determined strokeWidth
+          .attr("marker-end", markerId ? `url(#${markerId})` : null)
+          .attr("stroke-opacity", 0.9)
+          .attr("stroke-linecap", "round");
+
+        if (conn.varName === "end" && pathOrientationHint === "V-H-V" && path) {
+          // Also check if path is non-empty
+          console.log("[LinkedListViz] 'end' pointer RETURNED path:", path);
+        }
+      }
+    });
+
+    console.log(
+      "Finished LinkedList Visualization render using renderGenericNode."
+    );
   };
 
   const renderTreeVisualization = (
@@ -3206,594 +3943,6 @@ function DataStructurePage() {
       height,
       operation?.state?.structureType || dataStructure?.type || "Unknown"
     );
-  };
-
-  // Function to render Array/Vector visualization
-  const renderArrayVisualization = (
-    contentGroup,
-    width,
-    height,
-    operation,
-    memorySnapshot = null
-  ) => {
-    console.log("Rendering array visualization with operation:", operation);
-    console.log("With memory snapshot:", memorySnapshot);
-
-    let svgDefs = d3.select(svgRef.current).select("defs");
-    if (svgDefs.empty()) {
-      svgDefs = d3.select(svgRef.current).append("defs");
-    }
-    if (svgDefs.select("#array-arrow").empty()) {
-      svgDefs
-        .append("marker")
-        .attr("id", "array-arrow")
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 8)
-        .attr("refY", 0)
-        .attr("markerWidth", 8)
-        .attr("markerHeight", 8)
-        .attr("orient", "auto")
-        .append("path")
-        .attr("d", "M0,-5L10,0L0,5")
-        .attr("fill", "#0284c7");
-    }
-    if (svgDefs.select("#var-ref-arrow").empty()) {
-      svgDefs
-        .append("marker")
-        .attr("id", "var-ref-arrow")
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 8)
-        .attr("refY", 0)
-        .attr("markerWidth", 8)
-        .attr("markerHeight", 8)
-        .attr("orient", "auto")
-        .append("path")
-        .attr("d", "M0,-5L10,0L0,5")
-        .attr("fill", "#334155");
-    }
-
-    const arrayState = operation.state || {};
-    const localVariables = arrayState.localVariables || {};
-    const instanceVariables = arrayState.instanceVariables || {};
-    const addressObjectMap = arrayState.addressObjectMap || {};
-
-    // Determine the array to visualize
-    let effectiveArrayAddress = null;
-    let arrayObjectInMap = null; // The actual array object from the map
-
-    const ivArrayAddress = instanceVariables.array; // Address from instance variable
-
-    if (
-      ivArrayAddress &&
-      addressObjectMap[ivArrayAddress] &&
-      Array.isArray(addressObjectMap[ivArrayAddress])
-    ) {
-      // Priority 1: Use the array pointed to by instanceVariables.array
-      effectiveArrayAddress = ivArrayAddress;
-      arrayObjectInMap = addressObjectMap[ivArrayAddress];
-    } else {
-      // Priority 2: instanceVariables.array is not set, or doesn't point to a valid array.
-      // Look for a unique candidate array in addressObjectMap.
-      const candidateArrayAddresses = Object.keys(addressObjectMap).filter(
-        (addr) => Array.isArray(addressObjectMap[addr])
-      );
-
-      if (candidateArrayAddresses.length === 1) {
-        effectiveArrayAddress = candidateArrayAddresses[0];
-        arrayObjectInMap = addressObjectMap[effectiveArrayAddress];
-        console.log(
-          "Displaying an array found in addressObjectMap not (yet) pointed to by instanceVariables.array:",
-          effectiveArrayAddress
-        );
-      } else if (candidateArrayAddresses.length > 1) {
-        console.warn(
-          "Multiple arrays in addressObjectMap, and instanceVariables.array is not specific. Cannot determine which array to display."
-        );
-      }
-      // If 0 candidates, effectiveArrayAddress and arrayObjectInMap remain null.
-    }
-
-    // Determine size, elements, and capacity for display
-    const sizeFromInstanceVars =
-      instanceVariables.count ?? instanceVariables.size ?? 0;
-    let arrayElements = []; // Still useful for connections source/target logic
-    // let calculatedCapacityForCells = 0; // No longer needed with simpler logic
-
-    if (arrayObjectInMap) {
-      // arrayElements are primarily for knowing what values *might* have connections
-      // We slice up to arrayObjectInMap.length because any of these could be pointers
-      arrayElements = arrayObjectInMap.slice(0, arrayObjectInMap.length);
-
-      // let tempCapacity = instanceVariables.capacity || 0; // Old logic
-      // if (tempCapacity === 0) { // Old logic
-      //   tempCapacity = arrayObjectInMap.length; // Old logic
-      // }
-      // calculatedCapacityForCells = Math.max(tempCapacity, sizeFromInstanceVars); // Old logic
-      // calculatedCapacityForCells = Math.min(calculatedCapacityForCells, arrayObjectInMap.length); // Old logic
-    }
-
-    const hasArrayObjectToDisplay =
-      !!effectiveArrayAddress && !!arrayObjectInMap;
-    // const displayCapacity = hasArrayObjectToDisplay ? calculatedCapacityForCells : 0; // Old logic
-    const displayCapacity =
-      hasArrayObjectToDisplay && arrayObjectInMap ? arrayObjectInMap.length : 0;
-
-    console.log("Array Visualization Info:", {
-      instanceArrayVarPointsTo: ivArrayAddress,
-      effectiveArrayAddressRendered: effectiveArrayAddress,
-      sizeFromInstance: sizeFromInstanceVars,
-      capacityFromInstance: instanceVariables.capacity,
-      finalDisplayCapacityCells: displayCapacity,
-      elementsInVisualization: arrayElements.length,
-      hasArrayObjectToDisplay,
-      arrayObjectInMapExists: !!arrayObjectInMap,
-    });
-
-    const styles = {
-      array: {
-        elementWidth: 60,
-        elementHeight: 60,
-        fill: "#ffffff",
-        unusedFill: "#f8fafc",
-        stroke: "#94a3b8",
-        textColor: "#334155",
-      },
-      localVars: {
-        width: 200,
-        fill: "#f8fafc",
-        stroke: "#94a3b8",
-        textColor: "#334155",
-      },
-      instanceVars: {
-        width: 200,
-        fill: "#f1f5f9",
-        stroke: "#64748b",
-        textColor: "#334155",
-      },
-      connection: { stroke: "#64748b", width: 2, varRefColor: "#334155" },
-    };
-    const pagePositions = {};
-    const cellSize = styles.array.elementWidth;
-
-    const firstColX = 50;
-    const varBoxTopMargin = 20;
-    const varBoxSpacing = 20;
-
-    // 1. Render Local Variables Box
-    const localVarsBox = contentGroup
-      .append("g")
-      .attr("class", "local-variables");
-    const localVarCount = Object.keys(localVariables).length;
-    const localVarsHeight = Math.max(65, 25 + 5 + localVarCount * 30);
-    localVarsBox
-      .append("rect")
-      .attr("x", firstColX)
-      .attr("y", varBoxTopMargin)
-      .attr("width", styles.localVars.width)
-      .attr("height", localVarsHeight)
-      .attr("fill", styles.localVars.fill)
-      .attr("stroke", styles.localVars.stroke)
-      .attr("stroke-width", 1)
-      .attr("rx", 5);
-    localVarsBox
-      .append("rect")
-      .attr("x", firstColX)
-      .attr("y", varBoxTopMargin)
-      .attr("width", styles.localVars.width)
-      .attr("height", 25)
-      .attr("fill", styles.localVars.stroke)
-      .attr("fill-opacity", 0.3)
-      .attr("stroke", "none")
-      .attr("rx", 5)
-      .attr("ry", 0);
-    localVarsBox
-      .append("text")
-      .attr("x", firstColX + styles.localVars.width / 2)
-      .attr("y", varBoxTopMargin + 17)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "13px")
-      .attr("font-weight", "bold")
-      .attr("fill", styles.localVars.textColor)
-      .text("Local Variables");
-    localVarsBox
-      .append("line")
-      .attr("x1", firstColX)
-      .attr("y1", varBoxTopMargin + 25)
-      .attr("x2", firstColX + styles.localVars.width)
-      .attr("y2", varBoxTopMargin + 25)
-      .attr("stroke", styles.localVars.stroke)
-      .attr("stroke-width", 1);
-    let yOffset = 30;
-    Object.entries(localVariables).forEach(([key, value], index) => {
-      localVarsBox
-        .append("rect")
-        .attr("x", firstColX + 10)
-        .attr("y", varBoxTopMargin + yOffset)
-        .attr("width", styles.localVars.width - 20)
-        .attr("height", 25)
-        .attr("fill", "white")
-        .attr("stroke", "#e2e8f0")
-        .attr("stroke-width", 1)
-        .attr("rx", 3);
-      localVarsBox
-        .append("text")
-        .attr("x", firstColX + 20)
-        .attr("y", varBoxTopMargin + yOffset + 17)
-        .attr("font-size", "12px")
-        .attr("font-weight", "bold")
-        .attr("fill", styles.localVars.textColor)
-        .text(key + ":");
-      const isRef = isAddress(value);
-      localVarsBox
-        .append("text")
-        .attr("x", firstColX + styles.localVars.width - 20)
-        .attr("y", varBoxTopMargin + yOffset + 17)
-        .attr("text-anchor", "end")
-        .attr("font-size", "12px")
-        .attr("font-weight", "bold")
-        .attr("fill", isRef ? "#0284c7" : styles.localVars.textColor)
-        .text(
-          String(value).length > 10
-            ? String(value).substring(0, 9) + "..."
-            : value
-        );
-      pagePositions[`local_${key}`] = {
-        x: firstColX,
-        y: varBoxTopMargin + yOffset,
-        width: styles.localVars.width,
-        height: 25,
-        value: value,
-      };
-      yOffset += 30;
-    });
-
-    // 2. Render Instance Variables Box (Below Local Variables)
-    const instanceVarsStartY =
-      varBoxTopMargin + localVarsHeight + varBoxSpacing;
-    const instanceVarsBox = contentGroup
-      .append("g")
-      .attr("class", "instance-variables");
-    const instanceVarCount = Object.keys(instanceVariables).length;
-    const instanceVarsHeight = Math.max(65, 25 + 5 + instanceVarCount * 30);
-    instanceVarsBox
-      .append("rect")
-      .attr("x", firstColX)
-      .attr("y", instanceVarsStartY)
-      .attr("width", styles.instanceVars.width)
-      .attr("height", instanceVarsHeight)
-      .attr("fill", styles.instanceVars.fill)
-      .attr("stroke", styles.instanceVars.stroke)
-      .attr("stroke-width", 1)
-      .attr("rx", 5);
-    instanceVarsBox
-      .append("rect")
-      .attr("x", firstColX)
-      .attr("y", instanceVarsStartY)
-      .attr("width", styles.instanceVars.width)
-      .attr("height", 25)
-      .attr("fill", styles.instanceVars.stroke)
-      .attr("fill-opacity", 0.3)
-      .attr("stroke", "none")
-      .attr("rx", 5)
-      .attr("ry", 0);
-    instanceVarsBox
-      .append("text")
-      .attr("x", firstColX + styles.instanceVars.width / 2)
-      .attr("y", instanceVarsStartY + 17)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "13px")
-      .attr("font-weight", "bold")
-      .attr("fill", styles.instanceVars.textColor)
-      .text("Instance Variables");
-    instanceVarsBox
-      .append("line")
-      .attr("x1", firstColX)
-      .attr("y1", instanceVarsStartY + 25)
-      .attr("x2", firstColX + styles.instanceVars.width)
-      .attr("y2", instanceVarsStartY + 25)
-      .attr("stroke", styles.instanceVars.stroke)
-      .attr("stroke-width", 1);
-    yOffset = 30;
-    Object.entries(instanceVariables).forEach(([key, value], index) => {
-      instanceVarsBox
-        .append("rect")
-        .attr("x", firstColX + 10)
-        .attr("y", instanceVarsStartY + yOffset)
-        .attr("width", styles.instanceVars.width - 20)
-        .attr("height", 25)
-        .attr("fill", "white")
-        .attr("stroke", "#e2e8f0")
-        .attr("stroke-width", 1)
-        .attr("rx", 3);
-      instanceVarsBox
-        .append("text")
-        .attr("x", firstColX + 20)
-        .attr("y", instanceVarsStartY + yOffset + 17)
-        .attr("font-size", "12px")
-        .attr("font-weight", "bold")
-        .attr("fill", styles.instanceVars.textColor)
-        .text(key + ":");
-      const isRef = isAddress(value) || key === "array";
-      instanceVarsBox
-        .append("text")
-        .attr("x", firstColX + styles.instanceVars.width - 20)
-        .attr("y", instanceVarsStartY + yOffset + 17)
-        .attr("text-anchor", "end")
-        .attr("font-size", "12px")
-        .attr("font-weight", "bold")
-        .attr("fill", isRef ? "#0284c7" : styles.instanceVars.textColor)
-        .text(
-          String(value).length > 10
-            ? String(value).substring(0, 9) + "..."
-            : String(value)
-        );
-      pagePositions[`instance_${key}`] = {
-        x: firstColX,
-        y: instanceVarsStartY + yOffset,
-        width: styles.instanceVars.width,
-        height: 25,
-        value: value,
-      };
-      yOffset += 30;
-    });
-
-    // Position Array and Array Ref Box to the right of the variable boxes
-    const arrayRefBoxWidth = 110;
-    const arrayRefBoxX = firstColX + styles.localVars.width + 50;
-    const arrayStartX =
-      arrayRefBoxX + (hasArrayObjectToDisplay ? arrayRefBoxWidth + 20 : 0); // Start cells after ref box if it exists
-    // const arraySectionY = varBoxTopMargin; // Align top of array stuff with top of local vars
-    const arraySectionY = instanceVarsStartY; // Align top of array stuff with top of instance vars
-
-    // 3. Draw the array reference box (if array object exists)
-    if (hasArrayObjectToDisplay) {
-      const arrayRefBox = contentGroup
-        .append("g")
-        .attr("class", "array-reference");
-      arrayRefBox
-        .append("rect")
-        .attr("x", arrayRefBoxX)
-        .attr("y", arraySectionY)
-        .attr("width", arrayRefBoxWidth)
-        .attr("height", cellSize)
-        .attr("fill", "#f0f9ff")
-        .attr("stroke", "#94a3b8")
-        .attr("stroke-width", 1)
-        .attr("rx", 4);
-      arrayRefBox
-        .append("rect")
-        .attr("x", arrayRefBoxX)
-        .attr("y", arraySectionY)
-        .attr("width", arrayRefBoxWidth)
-        .attr("height", 25)
-        .attr("fill", "#94a3b8")
-        .attr("fill-opacity", 0.3)
-        .attr("stroke", "none")
-        .attr("rx", 4)
-        .attr("ry", 0);
-      arrayRefBox
-        .append("text")
-        .attr("x", arrayRefBoxX + arrayRefBoxWidth / 2)
-        .attr("y", arraySectionY + 17)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "12px")
-        .attr("font-weight", "bold")
-        .attr("fill", "#334155")
-        .text("array");
-      arrayRefBox
-        .append("text")
-        .attr("x", arrayRefBoxX + arrayRefBoxWidth / 2)
-        .attr("y", arraySectionY + 45)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "14px")
-        .attr("fill", "#0284c7")
-        .text(effectiveArrayAddress.substring(0, 8)); // Use effectiveArrayAddress here
-      if (displayCapacity > 0) {
-        arrayRefBox
-          .append("path")
-          .attr(
-            "d",
-            `M ${arrayRefBoxX + arrayRefBoxWidth} ${
-              arraySectionY + cellSize / 2
-            } L ${arrayStartX - 3} ${arraySectionY + cellSize / 2}`
-          )
-          .attr("stroke", "#0284c7")
-          .attr("stroke-width", 1.5)
-          .attr("fill", "none")
-          .attr("marker-end", "url(#array-arrow)");
-      }
-      pagePositions["array_ref"] = {
-        x: arrayRefBoxX,
-        y: arraySectionY,
-        width: arrayRefBoxWidth,
-        height: cellSize,
-        value: effectiveArrayAddress,
-      };
-    }
-
-    // 4. Draw array cells only if displayCapacity > 0
-    if (displayCapacity > 0) {
-      const arrayCells = contentGroup.append("g").attr("class", "array-cells");
-      for (let i = 0; i < displayCapacity; i++) {
-        const x = arrayStartX + i * cellSize;
-        const y = arraySectionY;
-        arrayCells
-          .append("rect")
-          .attr("x", x)
-          .attr("y", y)
-          .attr("width", cellSize)
-          .attr("height", cellSize)
-          .attr(
-            "fill",
-            i < sizeFromInstanceVars
-              ? styles.array.fill
-              : styles.array.unusedFill
-          )
-          .attr("stroke", styles.array.stroke)
-          .attr("stroke-width", 1)
-          .attr("rx", 4);
-        arrayCells
-          .append("rect")
-          .attr("x", x)
-          .attr("y", y)
-          .attr("width", cellSize)
-          .attr("height", 25)
-          .attr("fill", "#94a3b8")
-          .attr("fill-opacity", 0.3)
-          .attr("stroke", "none")
-          .attr("rx", 4)
-          .attr("ry", 0);
-        arrayCells
-          .append("text")
-          .attr("x", x + cellSize / 2)
-          .attr("y", y + 17)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "11px")
-          .attr("font-weight", "bold")
-          .attr("fill", "#475569")
-          .text(i);
-        arrayCells
-          .append("line")
-          .attr("x1", x)
-          .attr("y1", y + 25)
-          .attr("x2", x + cellSize)
-          .attr("y2", y + 25)
-          .attr("stroke", styles.array.stroke)
-          .attr("stroke-width", 1);
-        if (i < arrayElements.length) {
-          const value = arrayElements[i];
-          const isRef = isAddress(value);
-          arrayCells
-            .append("text")
-            .attr("x", x + cellSize / 2)
-            .attr("y", y + cellSize / 2 + 10)
-            .attr("text-anchor", "middle")
-            .attr("font-size", "14px")
-            .attr("fill", isRef ? "#0284c7" : "#0f172a")
-            .text(
-              value !== undefined && value !== null ? String(value) : "null"
-            );
-          pagePositions[`array_cell_${i}`] = {
-            x: x,
-            y: y,
-            width: cellSize,
-            height: cellSize,
-            value: value,
-          };
-        }
-      }
-    } else if (hasArrayObjectToDisplay) {
-      // arrayAddress exists, but displayCapacity is 0 (empty array object)
-      contentGroup
-        .append("text")
-        .attr("x", arrayStartX)
-        .attr("y", arraySectionY + cellSize / 2)
-        .attr("text-anchor", "start")
-        .attr("font-style", "italic")
-        .attr("fill", "#6b7280")
-        .text("(empty array structure)");
-    }
-
-    // 5. Size indicator removed
-
-    // 6. Draw connections
-    const connectionsGroup = contentGroup
-      .append("g")
-      .attr("class", "connections");
-    const connections = [];
-    const isValidAddress = (addr) =>
-      addr && addr !== "null" && addr !== "0x0" && addr in addressObjectMap;
-
-    Object.entries(localVariables).forEach(([key, value]) => {
-      if (isAddress(value)) {
-        if (value === effectiveArrayAddress)
-          connections.push({
-            source: `local_${key}`,
-            target: "array_ref",
-            type: "reference",
-          });
-        else if (isValidAddress(value) && pagePositions[value])
-          connections.push({
-            source: `local_${key}`,
-            target: value,
-            type: "reference",
-          });
-      }
-    });
-    Object.entries(instanceVariables).forEach(([key, value]) => {
-      if (isAddress(value) || key === "array") {
-        if (value === effectiveArrayAddress || key === "array")
-          connections.push({
-            source: `instance_${key}`,
-            target: "array_ref",
-            type: "reference",
-          });
-        else if (isValidAddress(value) && pagePositions[value])
-          connections.push({
-            source: `instance_${key}`,
-            target: value,
-            type: "reference",
-          });
-      }
-    });
-    for (let i = 0; i < arrayElements.length; i++) {
-      const value = arrayElements[i];
-      if (isAddress(value) && isValidAddress(value) && pagePositions[value])
-        connections.push({
-          source: `array_cell_${i}`,
-          target: value,
-          type: "reference",
-        });
-    }
-
-    const getConnectionPoints = (sourceNode, targetNode) => {
-      const source = pagePositions[sourceNode];
-      const target = pagePositions[targetNode];
-      if (!source || !target) return { sourcePoint: null, targetPoint: null };
-      let sp, tp;
-
-      // Source points are always from the right side of variable/ref boxes for this layout
-      sp = { x: source.x + source.width, y: source.y + source.height / 2 };
-      if (sourceNode.startsWith("array_cell_")) {
-        // Except for array cells, from bottom
-        sp = { x: source.x + source.width / 2, y: source.y + source.height };
-      }
-
-      // Target points
-      if (targetNode === "array_ref") {
-        // To left of array_ref box
-        tp = { x: target.x, y: target.y + target.height / 2 };
-      } else if (targetNode.startsWith("array_cell_")) {
-        // To top-center of cell
-        tp = { x: target.x + target.width / 2, y: target.y };
-      } else if (pagePositions[targetNode]) {
-        // To left of a generic box (another var box for example)
-        tp = { x: target.x, y: target.y + target.height / 2 };
-      } else {
-        // Default center (should not happen often with this layout)
-        tp = {
-          x: target.x + target.width / 2,
-          y: target.y + target.height / 2,
-        };
-      }
-      return { sourcePoint: sp, targetPoint: tp };
-    };
-
-    connections.forEach((conn) => {
-      const points = getConnectionPoints(conn.source, conn.target);
-      if (!points.sourcePoint || !points.targetPoint) return;
-      const path = generateCurvedPath(points.sourcePoint, points.targetPoint);
-      connectionsGroup
-        .append("path")
-        .attr("d", path)
-        .attr("fill", "none")
-        .attr("stroke", styles.connection.varRefColor)
-        .attr("stroke-width", styles.connection.width)
-        .attr("marker-end", "url(#var-ref-arrow)")
-        .attr("stroke-opacity", 0.8)
-        .attr("stroke-linecap", "round")
-        .attr("stroke-linejoin", "round");
-    });
   };
 
   // Effect to monitor snapshot index changes and update the visualization
