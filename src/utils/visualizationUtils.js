@@ -468,17 +468,13 @@ export const renderVariableBox = (
       .attr("fill", isAddr ? s.addressValueFill : s.valueTextFill)
       .text(stringValue);
     if (isAddr) {
+      const fieldMidY = fieldCurrentY - s.padding / 2 + s.fieldHeight / 2;
+
       const connectionData = {
         sourceName: `${type}-${key}`,
         sourceCoords: {
           x: x + s.width,
-          y:
-            fieldCurrentY +
-            s.fieldHeight / 2 -
-            parseFloat(s.fontSize) / 3 +
-            2 -
-            s.padding / 2 +
-            s.fieldHeight / 2,
+          y: fieldMidY,
         },
         targetAddress: stringValue,
         type: type,
@@ -487,7 +483,7 @@ export const renderVariableBox = (
       if (type === "instance") {
         connectionData.leftSourceCoords = {
           x: x,
-          y: connectionData.sourceCoords.y,
+          y: fieldMidY,
         };
       }
       connectionPoints.push(connectionData);

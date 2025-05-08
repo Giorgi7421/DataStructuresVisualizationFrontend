@@ -432,8 +432,8 @@ export const renderLinkedListVectorVisualization = (
     const sNode = styles.node;
 
     const Y_THRESHOLD =
-      (sNode && typeof sNode.height === "number" ? sNode.height : 100) * 0.45;
-    // X_THRESHOLD is no longer used for path style decision but might be useful for other heuristics if needed later.
+      (sNode && typeof sNode.height === "number" ? sNode.height : 100) * 0.6; // Raised from 0.45
+    // X_THRESHOLD is no longer used for path style decision
     // const X_THRESHOLD = (sNode && typeof sNode.width === 'number' ? sNode.width : 180) * 0.30;
 
     const HORIZONTAL_OVERSHOOT = 20; // For H-V path, non-overlapping case
