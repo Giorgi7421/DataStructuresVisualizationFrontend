@@ -25,10 +25,11 @@ import {
   defineArrowheads,
   renderGenericNode,
   showNotImplementedMessage,
-} from "../utils/visualizationUtils"; // Added import
+  autoFitVisualization,
+} from "../utils/visualizationUtils";
 import { renderLinkedListVisualization } from "../visualizations/LinkedListVisualization";
 import { renderArrayVisualization } from "../visualizations/ArrayVisualization";
-import { renderWebBrowserVisualization } from "../visualizations/WebBrowserVisualization"; // ADD THIS LINE
+import { renderWebBrowserVisualization } from "../visualizations/WebBrowserVisualization";
 
 function DataStructurePage() {
   // Get location state for data structure details
@@ -496,7 +497,6 @@ function DataStructurePage() {
               );
           }
         }
-        // Auto-fit visualization after rendering completes
         autoFitVisualization(svg, contentGroup, zoom, width, height);
       } catch (error) {
         console.error("Error in renderVisualization:", error);
@@ -521,74 +521,14 @@ function DataStructurePage() {
     },
     [
       dataStructure,
-      operations, // Added operations as a dependency
+      operations,
       currentHistoryIndex,
       currentSnapshotIndex,
       enableMemoryVisualization,
       snapshotMode,
       forceRender,
-      // Removed extractElementsFromSnapshot from here, it's used internally
-      // Removed specific render functions from here, they are called internally
     ]
   );
-
-  // Add a new function to automatically fit the visualization to the view
-  const autoFitVisualization = (
-    svg,
-    contentGroup,
-    zoom,
-    viewWidth,
-    viewHeight
-  ) => {
-    try {
-      // Give the browser a moment to render the SVG content
-      setTimeout(() => {
-        // Get the bounding box of all content in the content group
-        const contentNode = contentGroup.node();
-        if (!contentNode) return;
-
-        // Check if we have any content to fit
-        if (contentNode.children.length === 0) return;
-
-        // Get the bounding box of the content
-        const contentBBox = contentNode.getBBox();
-
-        // Add some padding
-        const padding = 40;
-        const paddedWidth = contentBBox.width + padding * 2;
-        const paddedHeight = contentBBox.height + padding * 2;
-
-        // Calculate the scale to fit the content
-        const scaleX = viewWidth / paddedWidth;
-        const scaleY = viewHeight / paddedHeight;
-        const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in past 1
-
-        // Calculate the translation to center the content
-        const translateX =
-          (viewWidth - contentBBox.width * scale) / 2 - contentBBox.x * scale;
-        const translateY =
-          (viewHeight - contentBBox.height * scale) / 2 - contentBBox.y * scale;
-
-        // Apply the transform
-        console.log("Auto-fitting visualization:", {
-          contentBBox,
-          scale,
-          translateX,
-          translateY,
-        });
-
-        svg
-          .transition()
-          .duration(500)
-          .call(
-            zoom.transform,
-            d3.zoomIdentity.translate(translateX, translateY).scale(scale)
-          );
-      }, 100); // Short delay to ensure the DOM has rendered
-    } catch (error) {
-      console.error("Error in autoFitVisualization:", error);
-    }
-  };
 
   // Then all the useEffect hooks that reference renderVisualization will come after it
   useEffect(() => {
@@ -1027,14 +967,6 @@ function DataStructurePage() {
       }
     }
   };
-
-  // Add a specific useEffect to handle snapshot index updates
-  useEffect(() => {
-    if (dataStructure && operations.length > 0) {
-      // This effect will run when snapshotIndex changes
-      renderVisualization();
-    }
-  }, [dataStructure, currentSnapshotIndex, renderVisualization, operations]);
 
   // Add a new function to force render with specific operation and snapshot
   const forceRenderWithOperation = (operationIndex, snapshotIndex) => {

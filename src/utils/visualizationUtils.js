@@ -1,5 +1,7 @@
 // src/utils/visualizationUtils.js
 
+import * as d3 from "d3";
+
 // Helper function to check if a value is an address
 export const isAddress = (value) => {
   if (!value) return false;
@@ -745,4 +747,71 @@ export const showNotImplementedMessage = (
     .attr("font-size", "14px")
     .attr("fill", "#475569")
     .text(`Visualization not implemented for: ${message}`);
+};
+
+export const autoFitVisualization = (
+  svg,
+  contentGroup,
+  zoom, // This is the d3 zoom behavior instance
+  viewWidth,
+  viewHeight
+) => {
+  try {
+    // Give the browser a moment to render the SVG content
+    setTimeout(() => {
+      const contentNode = contentGroup.node();
+      if (!contentNode) {
+        console.warn("[autoFitVisualization] Content group node not found.");
+        return;
+      }
+
+      if (contentNode.children.length === 0) {
+        console.log("[autoFitVisualization] No content to fit.");
+        return;
+      }
+
+      const contentBBox = contentNode.getBBox();
+      if (contentBBox.width === 0 && contentBBox.height === 0) {
+        console.log(
+          "[autoFitVisualization] Content has zero width and height."
+        );
+        return;
+      }
+
+      const padding = 40;
+      const paddedWidth = contentBBox.width + padding * 2;
+      const paddedHeight = contentBBox.height + padding * 2;
+
+      if (paddedWidth <= 0 || paddedHeight <= 0) {
+        console.warn(
+          "[autoFitVisualization] Invalid padded dimensions for fitting."
+        );
+        return;
+      }
+
+      const scaleX = viewWidth / paddedWidth;
+      const scaleY = viewHeight / paddedHeight;
+      const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in past 1x initially
+
+      const translateX =
+        (viewWidth - contentBBox.width * scale) / 2 - contentBBox.x * scale;
+      const translateY =
+        (viewHeight - contentBBox.height * scale) / 2 - contentBBox.y * scale;
+
+      svg
+        .transition()
+        .duration(500)
+        .call(
+          zoom.transform,
+          d3.zoomIdentity.translate(translateX, translateY).scale(scale)
+        );
+      console.log("[autoFitVisualization] Applied auto-fit.", {
+        scale,
+        translateX,
+        translateY,
+      });
+    }, 100); // Short delay for rendering
+  } catch (error) {
+    console.error("Error in autoFitVisualization:", error);
+  }
 };
