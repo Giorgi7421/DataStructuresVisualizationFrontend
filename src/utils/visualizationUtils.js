@@ -8,18 +8,12 @@ export const isAddress = (value) => {
   return typeof value === "string" && value.match(/^0x[0-9a-f]+$/i);
 };
 
-// Helper function to truncate addresses for display
+// Helper function to display values (no truncation)
 export const truncateAddress = (address, length = 6) => {
-  if (!address) return "null";
+  // Length parameter is now unused
+  if (address === null || address === undefined) return "null";
   const stringAddress = String(address);
-  if (isAddress(stringAddress)) {
-    return `${stringAddress.substring(0, 2 + length)}...`;
-  }
-  // If it's not a typical address (e.g. could be "null", a number, or other string)
-  // show a bit more if it's short, or truncate if long
-  if (stringAddress.length > 10) {
-    return `${stringAddress.substring(0, 8)}...`;
-  }
+  // No truncation logic - always return the full string representation
   return stringAddress;
 };
 
