@@ -7,7 +7,7 @@ import {
   // Add any other utilities needed from visualizationUtils
 } from "../utils/visualizationUtils";
 
-export const renderArrayVisualization = (
+export const renderArrayVectorVisualization = (
   contentGroup,
   width,
   height,
@@ -15,7 +15,7 @@ export const renderArrayVisualization = (
   memorySnapshot
 ) => {
   console.log(
-    "TOP OF renderArrayVisualization. Op:",
+    "TOP OF renderArrayVectorVisualization. Op:", // Renamed Log
     operation,
     "Snap:",
     memorySnapshot
@@ -124,7 +124,7 @@ export const renderArrayVisualization = (
     actualArrayData = addressObjectMap[arrayDataAddress];
     if (!Array.isArray(actualArrayData)) {
       console.warn(
-        "ArrayVisualization: Expected array data at address but found:",
+        "ArrayVectorVisualization: Expected array data at address but found:", // Renamed Log
         actualArrayData
       );
       actualArrayData = []; // Treat as empty if not an array
@@ -136,7 +136,7 @@ export const renderArrayVisualization = (
     } else if (Array.isArray(instanceVariables?.data)) {
       actualArrayData = instanceVariables.data;
     }
-    // console.log("ArrayVisualization: No array found at address, or addressObjectMap missing.");
+    // console.log("ArrayVectorVisualization: No array found at address, or addressObjectMap missing."); // Renamed Log (if uncommented)
   }
 
   const displayableArray = actualArrayData.slice(0, size);
@@ -255,11 +255,11 @@ export const renderArrayVisualization = (
     // const sourcePos = nodePositions[conn.sourceName]; // This is from renderVariableBox
     // const targetPos = nodePositions[conn.targetAddress]; // This needs to be mapped to array cells
     // if (sourcePos && targetPos) { ... draw path ... }
-    console.log("Processing connection for Array Viz:", conn);
+    console.log("Processing connection for ArrayVector Viz:", conn); // Renamed Log
   });
 
   console.log(
-    "Finished Array Visualization render. Node Positions:",
+    "Finished ArrayVectorVisualization render. Node Positions:", // Renamed Log
     nodePositions
   );
   // Placeholder: Auto-fit or center the visualization if needed

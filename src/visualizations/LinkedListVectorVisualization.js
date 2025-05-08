@@ -1,3 +1,5 @@
+// This is a rename operation, content will be from LinkedListVisualization.js
+
 import {
   isAddress,
   truncateAddress,
@@ -8,7 +10,7 @@ import {
   generateOrthogonalPath,
 } from "../utils/visualizationUtils";
 
-export const renderLinkedListVisualization = (
+export const renderLinkedListVectorVisualization = (
   contentGroup,
   width,
   height,
@@ -16,7 +18,7 @@ export const renderLinkedListVisualization = (
   memorySnapshot
 ) => {
   console.log(
-    "TOP OF renderLinkedListVisualization. Op:",
+    "TOP OF renderLinkedListVectorVisualization. Op:", // Renamed Log
     operation,
     "Snap:",
     memorySnapshot
@@ -203,7 +205,7 @@ export const renderLinkedListVisualization = (
 
     if (!nodeData || typeof nodeData !== "object" || Array.isArray(nodeData)) {
       console.warn(
-        `LinkedListViz: Invalid node data for address ${currentAddress}.`
+        `LinkedListVectorViz: Invalid node data for address ${currentAddress}.` // Renamed Log
       );
       break;
     }
@@ -265,7 +267,7 @@ export const renderLinkedListVisualization = (
   }
 
   if (nodesProcessedCount === MAX_NODES_TO_RENDER) {
-    console.warn("LinkedListViz: Reached max node render limit.");
+    console.warn("LinkedListVectorViz: Reached max node render limit."); // Renamed Log
   }
 
   mainListSpecs.forEach((spec) => {
@@ -280,7 +282,7 @@ export const renderLinkedListVisualization = (
       );
     } catch (e) {
       console.error(
-        "[LinkedListViz] Error rendering MAIN LIST node:",
+        "[LinkedListVectorViz] Error rendering MAIN LIST node:", // Renamed Log
         spec.address,
         e
       );
@@ -408,7 +410,7 @@ export const renderLinkedListVisualization = (
       );
     } catch (e) {
       console.error(
-        "[LinkedListViz] Error rendering ORPHAN node:",
+        "[LinkedListVectorViz] Error rendering ORPHAN node:", // Renamed Log
         spec.address,
         e
       );
@@ -447,14 +449,17 @@ export const renderLinkedListVisualization = (
         y: sourcePosData.y + sourcePosData.height / 2,
       };
     } else {
-      console.warn("LL Viz Connection: Cannot find source position for:", conn);
+      console.warn(
+        "LLV Viz Connection: Cannot find source position for:",
+        conn
+      ); // Renamed Log
       return;
     }
 
     const targetPosData = nodePositions[conn.targetAddress];
     if (!targetPosData) {
       console.warn(
-        "LL Viz Connection: Cannot find target position for:",
+        "LLV Viz Connection: Cannot find target position for:", // Renamed Log
         conn.targetAddress,
         conn
       );
@@ -499,7 +504,7 @@ export const renderLinkedListVisualization = (
             .attr("fill", "red");
         } else {
           console.error(
-            "[LinkedListViz] 'end' pointer missing leftSourceCoords! Cannot draw path.",
+            "[LinkedListVectorViz] 'end' pointer missing leftSourceCoords! Cannot draw path.", // Renamed Log
             conn
           );
           path = "";
@@ -542,7 +547,7 @@ export const renderLinkedListVisualization = (
         } else {
           path = "";
           console.warn(
-            "[LinkedListViz] Unhandled var type for path generation:",
+            "[LinkedListVectorViz] Unhandled var type for path generation:", // Renamed Log
             conn.type
           );
         }
@@ -566,7 +571,7 @@ export const renderLinkedListVisualization = (
       );
     } else {
       console.warn(
-        "[LinkedListViz] Unhandled connection type for path drawing:",
+        "[LinkedListVectorViz] Unhandled connection type for path drawing:", // Renamed Log
         conn.type
       );
       path = "";
@@ -584,19 +589,19 @@ export const renderLinkedListVisualization = (
         .attr("stroke-linecap", "round");
 
       if (conn.varName === "end" && path) {
-        console.log("[LinkedListViz] 'end' pointer RENDERED path:", path);
+        console.log("[LinkedListVectorViz] 'end' pointer RENDERED path:", path); // Renamed Log
       }
     } else if (!path && conn.varName === "end" && !conn.leftSourceCoords) {
       console.error(
-        "[LinkedListViz] 'end' pointer path NOT drawn due to missing leftSourceCoords."
+        "[LinkedListVectorViz] 'end' pointer path NOT drawn due to missing leftSourceCoords." // Renamed Log
       );
     } else if (!path && sourcePoint && targetPoint) {
       console.warn(
-        "[LinkedListViz] Path was empty for a connection, not drawn. Conn:",
+        "[LinkedListVectorViz] Path was empty for a connection, not drawn. Conn:", // Renamed Log
         conn
       );
     }
   });
 
-  console.log("Finished LinkedList Visualization render.");
+  console.log("Finished LinkedListVectorVisualization render."); // Renamed Log
 };

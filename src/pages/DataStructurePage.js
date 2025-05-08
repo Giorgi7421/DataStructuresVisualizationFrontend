@@ -27,8 +27,8 @@ import {
   showNotImplementedMessage,
   autoFitVisualization,
 } from "../utils/visualizationUtils";
-import { renderLinkedListVisualization } from "../visualizations/LinkedListVisualization";
-import { renderArrayVisualization } from "../visualizations/ArrayVisualization";
+import { renderArrayVectorVisualization } from "../visualizations/ArrayVectorVisualization";
+import { renderLinkedListVectorVisualization } from "../visualizations/LinkedListVectorVisualization";
 import { renderWebBrowserVisualization } from "../visualizations/WebBrowserVisualization";
 
 function DataStructurePage() {
@@ -424,8 +424,8 @@ function DataStructurePage() {
               );
               break;
             case "ARRAY_VECTOR":
-              console.log("Using array visualization for ARRAY_VECTOR");
-              renderArrayVisualization(
+              console.log("Using array vector visualization for ARRAY_VECTOR");
+              renderArrayVectorVisualization(
                 contentGroup,
                 width,
                 height,
@@ -435,9 +435,9 @@ function DataStructurePage() {
               break;
             case "LINKED_LIST_VECTOR":
               console.log(
-                "Using linked list visualization for LINKED_LIST_VECTOR (stub)"
+                "Using linked list vector visualization for LINKED_LIST_VECTOR"
               );
-              renderLinkedListVisualization(
+              renderLinkedListVectorVisualization(
                 contentGroup,
                 width,
                 height,
@@ -1128,8 +1128,8 @@ function DataStructurePage() {
 
         switch (combinedType) {
           case "ARRAY_VECTOR":
-            console.log("Using array visualization for ARRAY_VECTOR");
-            renderArrayVisualization(
+            console.log("Using array vector visualization for ARRAY_VECTOR");
+            renderArrayVectorVisualization(
               contentGroup,
               width,
               height,
@@ -1139,9 +1139,9 @@ function DataStructurePage() {
             break;
           case "LINKED_LIST_VECTOR":
             console.log(
-              "Using linked list visualization for LINKED_LIST_VECTOR (stub)"
+              "Using linked list vector visualization for LINKED_LIST_VECTOR"
             );
-            renderLinkedListVisualization(
+            renderLinkedListVectorVisualization(
               contentGroup,
               width,
               height,
@@ -1302,7 +1302,13 @@ function DataStructurePage() {
     // Simply delegate to the appropriate visualization based on structure type
     switch (structureType) {
       case "VECTOR":
-        renderArrayVisualization(svg, width, height, operation, memorySnapshot);
+        renderArrayVectorVisualization(
+          svg,
+          width,
+          height,
+          operation,
+          memorySnapshot
+        );
         break;
       case "LINKED_LIST":
         renderLinkedListVisualization(svg, width, height, operation);
