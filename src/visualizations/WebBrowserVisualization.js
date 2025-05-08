@@ -78,12 +78,14 @@ export const renderWebBrowserVisualization = (
     connection: {
       // From LLV
       strokeWidth: 1.5,
-      // instanceVarColor: "#334155", // REMOVED - Use nextColor for all
-      nextColor: "#334155", // Black/Dark Gray for ALL connections (next, prev, instance, local)
-      // llInstanceVarMarkerId: "browser-instance-var-arrow", // REMOVED - Use llNextMarkerId for all
+      instanceVarColor: "#334155", // Dark Gray for instance/local
+      nextColor: "#2563eb", // Blue for 'next' pointers
+      prevColor: "#dc2626", // Red for 'prev' pointers (like in LLV)
+      llInstanceVarMarkerId: "browser-instance-var-arrow", // Separate marker for var arrows
       llNextMarkerId: "browser-next-arrow", // Used for ALL connections
+      llPrevMarkerId: "browser-prev-arrow", // Marker for 'prev' arrows
       cornerRadius: 8,
-      defaultColor: "#64748b", // Fallback only, should not be used ideally
+      defaultColor: "#64748b", // Fallback color
     },
     layout: {
       // From LLV
@@ -660,8 +662,8 @@ export const renderWebBrowserVisualization = (
   allConnections.forEach((conn) => {
     let sourcePoint, targetPoint;
     let path = "";
-    let markerId = null;
-    let color = styles.connection.nextColor || styles.connection.defaultColor; // Use standard blue, fallback just in case
+    let markerId = styles.connection.llNextMarkerId; // Default to next
+    let color = styles.connection.defaultColor; // Default color
     let strokeWidth = styles.connection.strokeWidth;
     const cornerRadius = styles.connection.cornerRadius || 5;
     let pathOrientationHint = "auto";
@@ -891,8 +893,24 @@ export const renderWebBrowserVisualization = (
     color = color || styles.connection.defaultColor; // Fallback if specific color undefined
     */
 
-    // New Standardized Logic: All arrows use nextColor and llNextMarkerId
-    markerId = styles.connection.llNextMarkerId; // Use the standard marker ID for all
+    // New Logic: Differentiate colors and markers based on connection type
+    if (
+      conn.sourceName &&
+      (conn.sourceName.startsWith("instance-") ||
+        conn.sourceName.startsWith("local-"))
+    ) {
+      // Connection from a variable box
+      markerId = styles.connection.llInstanceVarMarkerId;
+      color = styles.connection.instanceVarColor;
+    } else if (conn.type === "ll_next") {
+      markerId = styles.connection.llNextMarkerId;
+      color = styles.connection.nextColor;
+    } else if (conn.type === "ll_prev") {
+      markerId = styles.connection.llPrevMarkerId;
+      color = styles.connection.prevColor;
+    }
+    // Ensure color has a fallback if a specific one wasn't assigned (shouldn't happen with above logic)
+    color = color || styles.connection.defaultColor;
 
     // 7. Generate Path Offset
     let initialOffset = 15;
