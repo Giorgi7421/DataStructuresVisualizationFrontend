@@ -496,6 +496,7 @@ export const renderVariableBox = (
 // Helper function to define standard arrowhead markers in the SVG <defs>
 export const defineArrowheads = (defs, globalStyles) => {
   const createMarker = (id, color, size = 8, refX = 8) => {
+    if (!id) return; // Do not create marker if ID is invalid
     if (defs.select(`#${id}`).empty()) {
       defs
         .append("marker")
@@ -517,11 +518,45 @@ export const defineArrowheads = (defs, globalStyles) => {
   const defaultSlate = "#64748b";
   const defaultRed = "#ef4444";
   const defaultGreen = "#166534";
-  createMarker("array-arrow", connStyles.arrayArrowColor || defaultBlue);
-  createMarker("var-ref-arrow", connStyles.varRefColor || defaultDarkGray);
-  createMarker("next-arrow", connStyles.nextColor || defaultBlue);
-  createMarker("prev-arrow", connStyles.prevColor || defaultRed);
-  createMarker("current-arrow", connStyles.currentColor || defaultGreen);
+
+  // Define markers using IDs and colors from connStyles, falling back to defaults
+  // Use the IDs provided in connStyles (e.g., llNextMarkerId, llInstanceVarMarkerId)
+  createMarker(
+    connStyles.llNextMarkerId || "ll-next-arrow", // Use provided ID or fallback
+    connStyles.nextColor || defaultBlue, // Use provided color or fallback
+    7,
+    7
+  );
+  createMarker(
+    connStyles.llPrevMarkerId || "ll-prev-arrow", // Use provided ID or fallback
+    connStyles.prevColor || defaultRed, // Use provided color or fallback
+    7,
+    7
+  );
+  createMarker(
+    connStyles.llInstanceVarMarkerId || "ll-instance-var-arrow", // Use provided ID or fallback
+    connStyles.instanceVarColor || defaultDarkGray, // Use provided color or fallback
+    7,
+    7
+  );
+  createMarker(
+    connStyles.llLocalVarMarkerId || "ll-local-var-arrow", // Use provided ID or fallback (assuming local vars might need one)
+    connStyles.localVarColor || connStyles.instanceVarColor || defaultDarkGray, // Use provided color or fallback
+    7,
+    7
+  );
+
+  // You might still want some generic fallbacks if the specific IDs aren't provided
+  // createMarker("generic-arrow", defaultSlate);
+
+  // Remove the old hardcoded definitions if they are now redundant
+  // createMarker("array-arrow", connStyles.arrayArrowColor || defaultBlue);
+  // createMarker("var-ref-arrow", connStyles.varRefColor || defaultDarkGray);
+  // createMarker("next-arrow", connStyles.nextColor || defaultBlue); // Generic next
+  // createMarker("prev-arrow", connStyles.prevColor || defaultRed); // Generic prev
+  // createMarker("current-arrow", connStyles.currentColor || defaultGreen); // Generic current
+
+  /* Old hardcoded specific markers - replaced by logic above
   createMarker(
     "ll-next-arrow",
     connStyles.llNextColor || connStyles.nextColor || defaultBlue,
@@ -534,6 +569,7 @@ export const defineArrowheads = (defs, globalStyles) => {
     7,
     7
   );
+  */
 };
 
 // Helper function to render a generic node
