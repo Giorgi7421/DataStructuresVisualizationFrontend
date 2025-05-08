@@ -33,7 +33,7 @@ export const renderLinkedListVectorVisualization = (
   const styles = {
     varBox: {
       // Style for renderVariableBox
-      width: 200,
+      width: 250,
       headerHeight: 25,
       fieldHeight: 25,
       fieldSpacing: 5,
@@ -147,9 +147,8 @@ export const renderLinkedListVectorVisualization = (
   const visited = new Set();
   const MAX_NODES_TO_RENDER = 50;
 
-  nodeStartX =
-    firstColX + styles.varBox.width + styles.layout.nodesStartXOffset;
-  let currentX = nodeStartX;
+  const mainListStartX = width / 2 + 30;
+  let currentX = mainListStartX;
 
   let startAddress =
     instanceVariables.start ||
@@ -192,7 +191,7 @@ export const renderLinkedListVectorVisualization = (
   let currentAddress = startAddress;
   let nodesProcessedCount = 0;
   let middleLayerMaxNodeHeight = styles.node.height; // Use defined default
-  currentX = nodeStartX;
+  currentX = mainListStartX;
 
   while (
     currentAddress &&
@@ -290,41 +289,12 @@ export const renderLinkedListVectorVisualization = (
     }
   });
 
-  const middleLayerBottomY = middleLayerY + middleLayerMaxNodeHeight;
-  const bottomLayerStartY = middleLayerBottomY + layerSpacingY;
-
-  let bottomLayerOrphanStartX = firstColX;
-  if (Object.keys(localVariables).length > 0) {
-    const localVarsX = width / 2 - localVarsBoxWidth / 2;
-    const localVarsY = bottomLayerStartY;
-    const localVarsResult = renderVariableBox(
-      contentGroup,
-      "Local Variables",
-      localVariables,
-      localVarsX,
-      localVarsY,
-      styles.varBox,
-      "local",
-      isAddress
-    );
-    allConnections.push(...localVarsResult.connectionPoints);
-    localVarsBoxHeight = localVarsResult.height;
-    nodePositions["local_vars_box"] = {
-      x: localVarsX,
-      y: localVarsY,
-      width: localVarsBoxWidth,
-      height: localVarsBoxHeight,
-    };
-    bottomLayerOrphanStartX =
-      localVarsX + localVarsBoxWidth + (styles.layout.nodeSpacingX || 60);
-  }
-
-  let orphanNodeX = bottomLayerOrphanStartX;
-  let orphanNodeY = bottomLayerStartY;
-  let bottomLayerMaxNodeHeight = Math.max(
-    styles.node.height,
-    localVarsBoxHeight
-  );
+  // ---> START: Moved Orphan Node Logic to Middle Layer <---
+  const orphanNodeStartX = firstColX; // Start orphans on the left
+  const orphanNodeY = middleLayerY; // Render on middle layer Y
+  let currentOrphanX = orphanNodeStartX;
+  let currentOrphanY = orphanNodeY;
+  let middleLayerMaxOrphanHeight = 0; // Track orphan heights separately for row wrapping
 
   const allPotentialNodeAddresses = Object.keys(addressObjectMap).filter(
     (addr) =>
@@ -362,24 +332,31 @@ export const renderLinkedListVectorVisualization = (
         orphanNodeFields.prev = nodeData.previousAddress;
       } else if (nodeData.prev !== undefined) {
         orphanNodeFields.prev = nodeData.prev;
-      }
+      } // Note: prev field rendering might need specific handling if required
+
+      const nodeHeight = (styles.node && styles.node.height) || 100;
+      middleLayerMaxOrphanHeight = Math.max(
+        middleLayerMaxOrphanHeight,
+        nodeHeight
+      );
 
       orphanSpecs.push({
-        x: orphanNodeX,
-        y: orphanNodeY,
+        x: currentOrphanX,
+        y: currentOrphanY,
         address: addr,
         title: nodeData.title || nodeData.url || truncateAddress(addr, 6),
         fields: orphanNodeFields,
         isIsolated: true,
         style: styles.node,
       });
-      visited.add(addr);
+      visited.add(addr); // Mark as visited here
 
       if (
         nodeData.nextAddress &&
         nodeData.nextAddress !== "0x0" &&
         nodeData.nextAddress !== "null"
       ) {
+        // Connection for orphan nodes might need review based on new layout
         allConnections.push({
           sourceName: addr,
           targetAddress: nodeData.nextAddress,
@@ -387,15 +364,18 @@ export const renderLinkedListVectorVisualization = (
         });
       }
 
-      orphanNodeX += (styles.node.width || 180) + styles.layout.nodeSpacingX;
-      if (orphanNodeX + (styles.node.width || 180) > width - firstColX) {
-        orphanNodeX = firstColX;
-        orphanNodeY += bottomLayerMaxNodeHeight + styles.layout.nodeSpacingX;
+      // Basic wrapping logic for orphans on the left side
+      currentOrphanX += (styles.node.width || 180) + styles.layout.nodeSpacingX;
+      // Wrap if next node exceeds ~half the width (leaving space for main list)
+      if (
+        currentOrphanX + (styles.node.width || 180) >
+        width / 2 - styles.layout.nodeSpacingX
+      ) {
+        currentOrphanX = orphanNodeStartX;
+        currentOrphanY +=
+          middleLayerMaxOrphanHeight + styles.layout.nodeSpacingX;
+        middleLayerMaxOrphanHeight = 0; // Reset max height for the new row
       }
-      bottomLayerMaxNodeHeight = Math.max(
-        bottomLayerMaxNodeHeight,
-        styles.node.height
-      );
     }
   });
 
@@ -411,12 +391,47 @@ export const renderLinkedListVectorVisualization = (
       );
     } catch (e) {
       console.error(
-        "[LinkedListVectorViz] Error rendering ORPHAN node:", // Renamed Log
+        "[LinkedListVectorViz] Error rendering ORPHAN node:",
         spec.address,
         e
       );
     }
   });
+  // ---> END: Moved Orphan Node Logic <---
+
+  // Calculate bottom Y based on the maximum height reached in the middle layer
+  // (Consider both main list and potentially multiple rows of orphans)
+  const middleLayerMaxHeightReached = Math.max(
+    middleLayerMaxNodeHeight,
+    currentOrphanY + middleLayerMaxOrphanHeight - middleLayerY
+  ); // Check max Y reached by orphans
+  const middleLayerBottomY = middleLayerY + middleLayerMaxHeightReached;
+
+  const bottomLayerStartY = middleLayerBottomY + layerSpacingY;
+
+  if (Object.keys(localVariables).length > 0) {
+    // Position Local Vars centered
+    const localVarsX = width / 2 - localVarsBoxWidth / 2;
+    const localVarsY = bottomLayerStartY;
+    const localVarsResult = renderVariableBox(
+      contentGroup,
+      "Local Variables",
+      localVariables,
+      localVarsX,
+      localVarsY,
+      styles.varBox,
+      "local",
+      isAddress
+    );
+    allConnections.push(...localVarsResult.connectionPoints);
+    localVarsBoxHeight = localVarsResult.height;
+    nodePositions["local_vars_box"] = {
+      x: localVarsX,
+      y: localVarsY,
+      width: localVarsBoxWidth,
+      height: localVarsBoxHeight,
+    };
+  }
 
   const connectionsGroup = contentGroup
     .append("g")
