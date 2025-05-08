@@ -8,13 +8,16 @@ export const isAddress = (value) => {
   return typeof value === "string" && value.match(/^0x[0-9a-f]+$/i);
 };
 
-// Helper function to display values (no truncation)
+// Helper function to display values (now with truncation)
 export const truncateAddress = (address, length = 6) => {
-  // Length parameter is now unused
   if (address === null || address === undefined) return "null";
-  const stringAddress = String(address);
-  // No truncation logic - always return the full string representation
-  return stringAddress;
+  const stringValue = String(address);
+  const maxLength = Math.max(3, length); // Ensure length is at least 3 for ellipsis
+
+  if (stringValue.length > maxLength) {
+    return stringValue.substring(0, maxLength - 3) + "...";
+  }
+  return stringValue;
 };
 
 // Helper to generate curved path between two points
