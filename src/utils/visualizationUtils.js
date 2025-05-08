@@ -12,11 +12,11 @@ export const isAddress = (value) => {
 export const truncateAddress = (address, length = 6) => {
   if (address === null || address === undefined) return "null";
   const stringValue = String(address);
-  const maxLength = Math.max(3, length); // Ensure length is at least 3 for ellipsis
+  // const maxLength = Math.max(3, length); // Ensure length is at least 3 for ellipsis
 
-  if (stringValue.length > maxLength) {
-    return stringValue.substring(0, maxLength - 3) + "...";
-  }
+  // if (stringValue.length > maxLength) {
+  //   return stringValue.substring(0, maxLength - 3) + "...";
+  // }
   return stringValue;
 };
 
