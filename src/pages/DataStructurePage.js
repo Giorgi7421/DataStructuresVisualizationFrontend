@@ -147,8 +147,33 @@ function DataStructurePage() {
 
       // Convert the operation history to the format our visualization expects
       const formattedOperations = operationHistory.map((op) => {
-        // Get the last memory snapshot which represents the final state after the operation
-        const lastSnapshot = op.memorySnapshots[op.memorySnapshots.length - 1];
+        let resultForState = undefined;
+        if (op.memorySnapshots && op.memorySnapshots.length > 0) {
+          for (let i = op.memorySnapshots.length - 1; i >= 0; i--) {
+            const currentSnapResult = op.memorySnapshots[i].getResult;
+            if (currentSnapResult !== undefined && currentSnapResult !== null) {
+              resultForState = currentSnapResult;
+              break;
+            }
+          }
+          // If no non-null/non-undefined result was found after checking all snapshots,
+          // set resultForState to the getResult of the actual last snapshot (it might be null or undefined).
+          if (resultForState === undefined) {
+            resultForState =
+              op.memorySnapshots[op.memorySnapshots.length - 1].getResult;
+          }
+        }
+
+        // Get the last memory snapshot for other state details like instanceVariables, message etc.
+        const lastSnapshot =
+          op.memorySnapshots && op.memorySnapshots.length > 0
+            ? op.memorySnapshots[op.memorySnapshots.length - 1]
+            : {
+                instanceVariables: {},
+                addressObjectMap: {},
+                message: "",
+                getResult: undefined,
+              }; // Default if no snapshots
 
         return {
           operation: op.operationName,
@@ -157,7 +182,7 @@ function DataStructurePage() {
             // Combine instance variables, addressObjectMap and other relevant data
             ...lastSnapshot.instanceVariables,
             addressObjectMap: lastSnapshot.addressObjectMap,
-            result: lastSnapshot.getResult,
+            result: resultForState, // Use the carefully determined result
             message: lastSnapshot.message,
           },
           // Include all memory snapshots for detailed visualization
@@ -483,9 +508,29 @@ function DataStructurePage() {
 
             // Cases for which we show "not implemented"
             case "ARRAY_STACK":
+              console.log("Using array vector visualization for ARRAY_VECTOR");
+              renderArrayStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "LINKED_LIST_STACK":
             case "TWO_QUEUE_STACK":
             case "ARRAY_QUEUE":
+              console.log("Using array vector visualization for ARRAY_VECTOR");
+              renderArrayStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "LINKED_LIST_QUEUE":
             case "ARRAY_MAP":
             case "HASH_MAP":
@@ -1512,11 +1557,11 @@ function DataStructurePage() {
                                   {op.state.message}
                                 </div>
                               )}
-                              {op.state && op.state.result !== undefined && (
+                              {op.state && op.state.result !== undefined && op.state.result !== null && (
                                 <div className="mt-1">
                                   Result:{" "}
                                   <span className="text-green-600">
-                                    {op.state.result}
+                                    {String(op.state.result)}
                                   </span>
                                 </div>
                               )}
