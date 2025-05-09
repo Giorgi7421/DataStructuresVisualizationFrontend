@@ -340,6 +340,27 @@ function DataStructurePage() {
         const structureType = (dataStructure.type || "").toUpperCase();
         let effectiveOperation = operation ? { ...operation } : null;
 
+        let snapshotIdentifier = `op${currentHistoryIndex}_snap${currentSnapshotIndex}`;
+        if (directOperation && directSnapshot) {
+          // If called with direct operation/snapshot
+          // Try to find the index of directOperation and directSnapshot if possible for a more consistent ID
+          // This is a bit more complex, for now, use a generic one or a timestamp if indices are not readily available
+          const opIndex = operations.findIndex((op) => op === directOperation);
+          let snapIndex = -1;
+          if (opIndex !== -1 && directOperation.memorySnapshots) {
+            snapIndex = directOperation.memorySnapshots.findIndex(
+              (snap) => snap === directSnapshot
+            );
+          }
+          if (opIndex !== -1 && snapIndex !== -1) {
+            snapshotIdentifier = `op${opIndex}_snap${snapIndex}`;
+          } else {
+            snapshotIdentifier = `directRender_${Date.now()}`;
+          }
+        } else if (!operation) {
+          snapshotIdentifier = "no_operation";
+        }
+
         if (!effectiveOperation) {
           console.error("Effective operation is null, cannot render.");
           contentGroup
@@ -420,7 +441,8 @@ function DataStructurePage() {
                 width,
                 height,
                 effectiveOperation,
-                memorySnapshot
+                memorySnapshot,
+                snapshotIdentifier
               );
               break;
             case "ARRAY_VECTOR":
@@ -430,7 +452,8 @@ function DataStructurePage() {
                 width,
                 height,
                 effectiveOperation,
-                memorySnapshot
+                memorySnapshot,
+                snapshotIdentifier
               );
               break;
             case "LINKED_LIST_VECTOR":
@@ -442,7 +465,8 @@ function DataStructurePage() {
                 width,
                 height,
                 effectiveOperation,
-                memorySnapshot
+                memorySnapshot,
+                snapshotIdentifier
               );
               break;
 
@@ -1102,7 +1126,8 @@ function DataStructurePage() {
           width,
           height,
           effectiveOperation,
-          memorySnapshot
+          memorySnapshot,
+          snapshotIdentifier
         );
 
         // Auto-fit the visualization
@@ -1134,7 +1159,8 @@ function DataStructurePage() {
               width,
               height,
               effectiveOperation,
-              memorySnapshot
+              memorySnapshot,
+              snapshotIdentifier
             );
             break;
           case "LINKED_LIST_VECTOR":
@@ -1146,7 +1172,8 @@ function DataStructurePage() {
               width,
               height,
               effectiveOperation,
-              memorySnapshot
+              memorySnapshot,
+              snapshotIdentifier
             );
             break;
 

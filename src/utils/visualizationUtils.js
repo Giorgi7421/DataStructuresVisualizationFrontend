@@ -350,6 +350,9 @@ export const renderVariableBox = (
   type,
   isAddressFn // Use isAddress from this file implicitly
 ) => {
+  console.log(
+    `[renderVariableBox Entry] Called for title: "${title}", type: "${type}"`
+  );
   const boxGroup = group
     .append("g")
     .attr("class", `${type}-variables-box-group`);
@@ -427,6 +430,13 @@ export const renderVariableBox = (
   let fieldCurrentY = y + s.headerHeight + s.padding;
   Object.entries(variables).forEach(([key, value]) => {
     const fieldGroup = boxGroup.append("g").attr("class", `var-field-${key}`);
+    if (type === "local") {
+      const stringVal = String(value);
+      const isAddrCheck = isAddressFn(stringVal);
+      console.log(
+        `[renderVariableBox Debug] Local Var: ${key}, Value: '${stringVal}', isAddress: ${isAddrCheck}`
+      );
+    }
     if (s.fieldRectFill || s.fieldRectStroke) {
       fieldGroup
         .append("rect")
