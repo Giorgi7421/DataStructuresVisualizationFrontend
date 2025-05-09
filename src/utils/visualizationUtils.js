@@ -150,15 +150,22 @@ export const generateOrthogonalPath = (
     const turn1Y = source.y;
     const turn2X = turn1X;
     const turn2Y = target.y;
+
     const effectiveRadiusH1 = Math.min(
       cornerRadius,
       Math.abs(turn1X - source.x)
     );
-    const effectiveRadiusV = Math.min(cornerRadius, Math.abs(turn2Y - turn1Y));
+    // If turn1Y is the same as turn2Y (i.e., dy is 0), force effectiveRadiusV to be cornerRadius to create a visible bump.
+    // Otherwise, calculate it normally, ensuring it doesn't exceed the vertical segment length or cornerRadius.
+    const effectiveRadiusV =
+      turn1Y === turn2Y
+        ? cornerRadius
+        : Math.min(cornerRadius, Math.abs(turn2Y - turn1Y));
     const effectiveRadiusH2 = Math.min(
       cornerRadius,
       Math.abs(target.x - turn2X)
     );
+
     path += ` H ${turn1X - sourceSignX * effectiveRadiusH1}`;
     path += ` Q ${turn1X} ${turn1Y}, ${turn1X} ${
       turn1Y + targetSignY * effectiveRadiusV

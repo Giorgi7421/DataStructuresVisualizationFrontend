@@ -222,7 +222,14 @@ export const renderArrayVectorVisualization = (
     const boxHeight = styles.arrayCell.height;
     const boxX =
       arrayVarSourceCoords.x + (styles.layout.nodeSpacingX || 60) / 2;
-    const boxY = arrayVarSourceCoords.y - boxHeight / 2;
+
+    // Align top of intermediate box with top of instance variables box (or source field Y if no box)
+    const instanceVarsBoxTopY = nodePositions["instance_vars_box"]
+      ? nodePositions["instance_vars_box"].y
+      : arrayVarSourceCoords
+      ? arrayVarSourceCoords.y - styles.varBox.fieldHeight / 2
+      : varBoxTopMargin;
+    const boxY = instanceVarsBoxTopY;
 
     const interGroup = contentGroup
       .append("g")
