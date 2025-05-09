@@ -172,7 +172,6 @@ export const renderArrayVectorVisualization = (
   }
 
   // --- 3. Render the Array/Vector (to the right of var boxes) ---
-  const size = instanceVariables?.size || instanceVariables?.count || 0;
   let actualArrayData = [];
   if (
     arrayDataAddress &&
@@ -196,7 +195,6 @@ export const renderArrayVectorVisualization = (
     }
   }
 
-  const displayableArray = actualArrayData.slice(0, size);
   const cellWidth = styles.arrayCell.width;
   const cellHeight = styles.arrayCell.height;
   const cellSpacing = styles.arrayCell.spacing;
@@ -256,10 +254,13 @@ export const renderArrayVectorVisualization = (
     ? intermediateBoxPos.y // Align top of array with top of intermediate box
     : varBoxTopMargin; // Default if no intermediate box
 
-  if (displayableArray.length > 0) {
-    displayableArray.forEach((value, index) => {
+  if (actualArrayData && actualArrayData.length > 0) {
+    actualArrayData.forEach((value, index) => {
       const rowIndex = Math.floor(index / elementsPerRow);
       const colIndex = index % elementsPerRow;
+
+      // Direct value from actualArrayData
+      const cellValue = value;
 
       const x = arrayStartX + colIndex * cellWidth; // Use cellWidth only, no spacing
       const y = arrayStartY + rowIndex * (cellHeight + rowSpacingY);
@@ -306,7 +307,7 @@ export const renderArrayVectorVisualization = (
         .attr("text-anchor", "middle")
         .attr("fill", styles.arrayCell.textFill)
         .style("font-size", styles.arrayCell.fontSize)
-        .text(truncateAddress(String(value), 10)); // Adjusted truncation length for new width
+        .text(truncateAddress(String(cellValue), 10)); // <<< Use calculated cellValue
 
       nodePositions[`array_cell_${index}`] = {
         x,
@@ -375,6 +376,37 @@ export const renderArrayVectorVisualization = (
           ); // Use defined marker
       }
     }
+
+    /*
+    // 2. Arrow from Intermediate Box to First Array Cell (if array exists)
+    if (capacity > 0 && nodePositions["array_cell_0"]) {
+      const sourcePoint = {
+        x: intermediateBoxPos.x + intermediateBoxPos.width,
+        y: intermediateBoxPos.y + intermediateBoxPos.height / 2,
+      };
+      const firstCellPos = nodePositions["array_cell_0"];
+      const targetPoint = {
+        x: firstCellPos.x,
+        y: firstCellPos.y + firstCellPos.height / 2,
+      };
+      const path2 = generateOrthogonalPath(
+        sourcePoint,
+        targetPoint,
+        styles.connection.cornerRadius,
+        "H-V-H", // Or adjust as needed
+        15 // Shorter initial segment
+      );
+      if (path2) {
+        connectionsGroup
+          .append("path")
+          .attr("d", path2)
+          .attr("fill", "none")
+          .attr("stroke", styles.connection.instanceVarColor || styles.connection.defaultColor)
+          .attr("stroke-width", styles.connection.strokeWidth)
+          .attr("marker-end", `url(#${styles.connection.llInstanceVarMarkerId || styles.connection.markerId})`);
+      }
+    }
+    */
   }
 
   console.log(
