@@ -10,7 +10,7 @@ import {
 // Import default styles to reference colors/etc.
 import { defaultVisualizationStyles } from "../utils/visualizationUtils";
 
-export const renderArrayVectorVisualization = (
+export const renderArrayStructureVisualization = (
   contentGroup,
   width,
   height,

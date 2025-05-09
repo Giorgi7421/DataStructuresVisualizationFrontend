@@ -27,10 +27,9 @@ import {
   showNotImplementedMessage,
   autoFitVisualization,
 } from "../utils/visualizationUtils";
-import { renderArrayVectorVisualization } from "../visualizations/ArrayVectorVisualization";
+import { renderArrayStructureVisualization } from "../visualizations/ArrayStructureVisualization";
 import { renderLinkedListVectorVisualization } from "../visualizations/LinkedListVectorVisualization";
 import { renderWebBrowserVisualization } from "../visualizations/WebBrowserVisualization";
-import { renderArrayEditorBufferVisualization } from "../visualizations/ArrayEditorBufferVisualization";
 
 function DataStructurePage() {
   // Get location state for data structure details
@@ -448,7 +447,7 @@ function DataStructurePage() {
               break;
             case "ARRAY_VECTOR":
               console.log("Using array vector visualization for ARRAY_VECTOR");
-              renderArrayVectorVisualization(
+              renderArrayStructureVisualization(
                 contentGroup,
                 width,
                 height,
@@ -472,7 +471,7 @@ function DataStructurePage() {
               break;
             case "ARRAY_EDITOR_BUFFER":
               console.log("Rendering ARRAY_EDITOR_BUFFER visualization");
-              renderArrayEditorBufferVisualization(
+              renderArrayStructureVisualization(
                 contentGroup,
                 width,
                 height,
