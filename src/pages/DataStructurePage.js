@@ -30,6 +30,7 @@ import {
 import { renderArrayVectorVisualization } from "../visualizations/ArrayVectorVisualization";
 import { renderLinkedListVectorVisualization } from "../visualizations/LinkedListVectorVisualization";
 import { renderWebBrowserVisualization } from "../visualizations/WebBrowserVisualization";
+import { renderArrayEditorBufferVisualization } from "../visualizations/ArrayEditorBufferVisualization";
 
 function DataStructurePage() {
   // Get location state for data structure details
@@ -469,6 +470,17 @@ function DataStructurePage() {
                 snapshotIdentifier
               );
               break;
+            case "ARRAY_EDITOR_BUFFER":
+              console.log("Rendering ARRAY_EDITOR_BUFFER visualization");
+              renderArrayEditorBufferVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
 
             // Cases for which we show "not implemented"
             case "ARRAY_STACK":
@@ -479,7 +491,6 @@ function DataStructurePage() {
             case "ARRAY_MAP":
             case "HASH_MAP":
             case "TREE_MAP":
-            case "GRID":
             case "DEQUEUE":
             case "BS_TREE":
             case "AVL_TREE":
@@ -494,7 +505,6 @@ function DataStructurePage() {
             case "BINARY_HEAP_PRIORITY_QUEUE":
             case "BIG_INTEGER":
             case "FILE_SYSTEM":
-            case "ARRAY_EDITOR_BUFFER":
             case "TWO_STACK_EDITOR_BUFFER":
             case "LINKED_LIST_EDITOR_BUFFER":
             case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
@@ -1176,6 +1186,17 @@ function DataStructurePage() {
               snapshotIdentifier
             );
             break;
+          case "ARRAY_EDITOR_BUFFER":
+            console.log("Direct rendering ARRAY_EDITOR_BUFFER visualization");
+            renderArrayEditorBufferVisualization(
+              contentGroup,
+              width,
+              height,
+              effectiveOperation,
+              memorySnapshot,
+              snapshotIdentifier
+            );
+            break;
 
           // Cases for which we show "not implemented"
           case "ARRAY_STACK":
@@ -1186,7 +1207,6 @@ function DataStructurePage() {
           case "ARRAY_MAP":
           case "HASH_MAP":
           case "TREE_MAP":
-          case "GRID":
           case "DEQUEUE":
           case "BS_TREE":
           case "AVL_TREE":
@@ -1201,7 +1221,6 @@ function DataStructurePage() {
           case "BINARY_HEAP_PRIORITY_QUEUE":
           case "BIG_INTEGER":
           case "FILE_SYSTEM":
-          case "ARRAY_EDITOR_BUFFER":
           case "TWO_STACK_EDITOR_BUFFER":
           case "LINKED_LIST_EDITOR_BUFFER":
           case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
