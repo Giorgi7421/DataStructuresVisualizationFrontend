@@ -245,49 +245,57 @@ function HomePage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {dataStructures.map((ds) => (
-            <div
-              key={ds.id}
-              className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow"
-            >
-              <div className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-2xl mr-2">
-                      {getTypeIcon(ds.type)}
-                    </span>
-                    <h2 className="text-xl font-bold inline-block">
-                      {ds.name}
-                    </h2>
+        <div
+          className="max-h-[calc(100vh-200px)] overflow-y-auto border border-gray-200 rounded-lg bg-gray-50 p-4 w-full"
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "#94a3b8 #f1f5f9",
+          }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {dataStructures.map((ds) => (
+              <div
+                key={ds.id}
+                className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow"
+              >
+                <div className="p-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-2xl mr-2">
+                        {getTypeIcon(ds.type)}
+                      </span>
+                      <h2 className="text-xl font-bold inline-block">
+                        {ds.name}
+                      </h2>
+                    </div>
+                    <button
+                      onClick={() => handleDelete(ds.id)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Delete"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleDelete(ds.id)}
-                    className="text-red-500 hover:text-red-700"
-                    title="Delete"
-                  >
-                    <TrashIcon className="w-5 h-5" />
-                  </button>
-                </div>
-                <p className="text-gray-600 mt-1">
-                  {ds.implementation
-                    ? `${formatType(ds.type)} - ${formatImplementation(
-                        ds.implementation
-                      )}`
-                    : formatType(ds.type)}
-                </p>
-                <div className="mt-4">
-                  <Link
-                    to={`/datastructure/${ds.id}`}
-                    state={{ dataStructure: ds }}
-                    className="block w-full text-center bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600"
-                  >
-                    Open
-                  </Link>
+                  <p className="text-gray-600 mt-1">
+                    {ds.implementation
+                      ? `${formatType(ds.type)} - ${formatImplementation(
+                          ds.implementation
+                        )}`
+                      : formatType(ds.type)}
+                  </p>
+                  <div className="mt-4">
+                    <Link
+                      to={`/datastructure/${ds.id}`}
+                      state={{ dataStructure: ds }}
+                      className="block w-full text-center bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600"
+                    >
+                      Open
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
