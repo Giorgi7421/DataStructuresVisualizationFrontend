@@ -84,8 +84,8 @@ function HomePage() {
         return [{ value: "FILE_SYSTEM", label: "File System" }];
       case "WEB_BROWSER":
         return [{ value: "WEB_BROWSER", label: "Web Browser" }];
-      case "BIG_NUMBERS":
-        return [{ value: "BIG_NUMBERS", label: "Big Numbers" }];
+      case "BIG_INTEGER":
+        return [{ value: "BIG_INTEGER", label: "Big Integer" }];
       default:
         return [];
     }
@@ -151,7 +151,7 @@ function HomePage() {
       }
 
       // Add number parameter for big-integer
-      if (newDSType === "BIG_NUMBERS") {
+      if (newDSType === "BIG_INTEGER") {
         endpoint += `/${encodeURIComponent(newDSNumber)}`;
       }
 
@@ -216,7 +216,7 @@ function HomePage() {
         return "📁"; // File folder for file system
       case "WEB_BROWSER":
         return "🌐"; // Globe for web browser
-      case "BIG_NUMBERS":
+      case "BIG_INTEGER":
         return "🔢"; // Numbers for big numbers
       default:
         return "📊"; // Default chart icon
@@ -387,7 +387,7 @@ function HomePage() {
                   <option value="DEQUE">Deque</option>
                   <option value="FILE_SYSTEM">File System</option>
                   <option value="WEB_BROWSER">Web Browser</option>
-                  <option value="BIG_NUMBERS">Big Numbers</option>
+                  <option value="BIG_INTEGER">Big Integer</option>
                 </select>
               </div>
 
@@ -414,7 +414,7 @@ function HomePage() {
                 </div>
               )}
 
-              {newDSType === "BIG_NUMBERS" && (
+              {newDSType === "BIG_INTEGER" && (
                 <div className="mb-4">
                   <label className="block text-gray-700 mb-2" htmlFor="number">
                     Initial Number

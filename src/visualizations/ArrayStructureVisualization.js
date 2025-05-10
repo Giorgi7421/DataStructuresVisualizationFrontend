@@ -137,16 +137,36 @@ export const renderArrayStructureVisualization = (
   }
 
   // --- Prepare data needed for intermediate box & array ---
+  console.log(
+    `[${snapshotIdentifier || "ArrayViz"}] Instance Variables:`,
+    instanceVariables
+  );
   const arrayVarKey = Object.keys(instanceVariables).find(
-    (key) => key === "array" || key === "data"
+    (key) => key === "array" || key === "data" || key === "digits"
+  );
+  console.log(
+    `[${snapshotIdentifier || "ArrayViz"}] Found array variable key:`,
+    arrayVarKey
   );
   const arrayDataAddress = arrayVarKey ? instanceVariables[arrayVarKey] : null;
+  console.log(
+    `[${snapshotIdentifier || "ArrayViz"}] Array data address:`,
+    arrayDataAddress
+  );
   const arrayVarConnection = allConnections.find(
     (c) => c.varName === arrayVarKey && c.sourceName.startsWith("instance-")
+  );
+  console.log(
+    `[${snapshotIdentifier || "ArrayViz"}] Array variable connection:`,
+    arrayVarConnection
   );
   const arrayVarSourceCoords = arrayVarConnection
     ? arrayVarConnection.sourceCoords
     : null;
+  console.log(
+    `[${snapshotIdentifier || "ArrayViz"}] Array variable source coordinates:`,
+    arrayVarSourceCoords
+  );
 
   // --- 2. Render Local Variables (below instance vars) ---
   console.log(

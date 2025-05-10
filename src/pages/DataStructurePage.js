@@ -614,6 +614,16 @@ function DataStructurePage() {
               );
               break;
             case "BIG_INTEGER":
+              console.log("Using array vector visualization for ARRAY_VECTOR");
+              renderArrayStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "FILE_SYSTEM":
             case "TWO_STACK_EDITOR_BUFFER":
             case "LINKED_LIST_EDITOR_BUFFER":
