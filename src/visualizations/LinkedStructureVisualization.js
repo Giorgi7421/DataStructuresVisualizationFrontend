@@ -10,7 +10,7 @@ import {
   generateOrthogonalPath,
 } from "../utils/visualizationUtils";
 
-export const renderLinkedListVectorVisualization = (
+export const renderLinkedStructureVisualization = (
   contentGroup,
   width,
   height,

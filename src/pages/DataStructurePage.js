@@ -28,7 +28,7 @@ import {
   autoFitVisualization,
 } from "../utils/visualizationUtils";
 import { renderArrayStructureVisualization } from "../visualizations/ArrayStructureVisualization";
-import { renderLinkedListVectorVisualization } from "../visualizations/LinkedListVectorVisualization";
+import { renderLinkedStructureVisualization } from "../visualizations/LinkedStructureVisualization";
 import { renderWebBrowserVisualization } from "../visualizations/WebBrowserVisualization";
 
 function DataStructurePage() {
