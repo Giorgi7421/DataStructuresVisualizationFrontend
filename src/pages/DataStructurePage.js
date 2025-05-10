@@ -29,7 +29,7 @@ import {
 } from "../utils/visualizationUtils";
 import { renderArrayStructureVisualization } from "../visualizations/ArrayStructureVisualization";
 import { renderLinkedStructureVisualization } from "../visualizations/LinkedStructureVisualization";
-import { renderWebBrowserVisualization } from "../visualizations/WebBrowserVisualization";
+import { renderDoublyLinkedStructureVisualization } from "../visualizations/DoublyLinkedStructure";
 
 function DataStructurePage() {
   // Get location state for data structure details
@@ -461,7 +461,7 @@ function DataStructurePage() {
           switch (combinedType) {
             case "WEB_BROWSER":
               console.log("Rendering WEB_BROWSER visualization");
-              renderWebBrowserVisualization(
+              renderDoublyLinkedStructureVisualization(
                 contentGroup,
                 width,
                 height,
@@ -582,6 +582,16 @@ function DataStructurePage() {
               );
               break;
             case "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE":
+              console.log("Rendering WEB_BROWSER visualization");
+              renderDoublyLinkedStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "BINARY_HEAP_PRIORITY_QUEUE":
               console.log("Using array vector visualization for ARRAY_VECTOR");
               renderArrayStructureVisualization(

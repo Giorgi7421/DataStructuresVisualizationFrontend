@@ -8,7 +8,7 @@ import {
 } from "../utils/visualizationUtils";
 
 // Reimplementation: Align with LinkedListVectorVisualization standards
-export const renderWebBrowserVisualization = (
+export const renderDoublyLinkedStructureVisualization = (
   contentGroup,
   width,
   height,
