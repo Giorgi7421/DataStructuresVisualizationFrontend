@@ -1,17 +1,106 @@
 // src/pages/HomePage.js
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { dataStructureService } from "../services/api";
 import { PlusIcon, TrashIcon } from "lucide-react";
 
 function HomePage() {
+  const navigate = useNavigate();
+  // Get implementation options based on data structure type
+  const getImplementationOptions = (type) => {
+    switch (type) {
+      case "VECTOR":
+        return [
+          { value: "ARRAY", label: "Array" },
+          { value: "LINKED_LIST", label: "Linked List" },
+        ];
+      case "STACK":
+        return [
+          { value: "ARRAY", label: "Array" },
+          { value: "LINKED_LIST", label: "Linked List" },
+          { value: "TWO_QUEUE", label: "Two Queue" },
+        ];
+      case "QUEUE":
+        return [
+          { value: "ARRAY", label: "Array" },
+          { value: "LINKED_LIST", label: "Linked List" },
+          {
+            value: "UNSORTED_VECTOR_PRIORITY",
+            label: "Unsorted Vector Priority",
+          },
+          {
+            value: "SORTED_LINKED_LIST_PRIORITY",
+            label: "Sorted Linked List Priority",
+          },
+          {
+            value: "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY",
+            label: "Unsorted Doubly Linked List Priority",
+          },
+          {
+            value: "BINARY_HEAP_PRIORITY",
+            label: "Binary Heap Priority",
+          },
+        ];
+      case "MAP":
+        return [
+          { value: "ARRAY", label: "Array" },
+          { value: "HASH", label: "Hash" },
+          { value: "TREE", label: "Tree" },
+        ];
+      case "TREE":
+        return [
+          { value: "BS", label: "BS" },
+          { value: "AVL", label: "AVL" },
+          { value: "EXPRESSION", label: "Expression" },
+        ];
+      case "SET":
+        return [
+          { value: "TREE", label: "Tree" },
+          { value: "HASH", label: "Hash" },
+          { value: "SMALL_INT", label: "Small Int" },
+          { value: "MOVE_TO_FRONT", label: "Move To Front" },
+        ];
+      case "EDITOR_BUFFER":
+        return [
+          { value: "ARRAY", label: "Array" },
+          {
+            value: "TWO_STACK",
+            label: "Two Stack",
+          },
+          {
+            value: "LINKED_LIST",
+            label: "Linked List",
+          },
+          {
+            value: "DOUBLY_LINKED_LIST",
+            label: "Doubly Linked List",
+          },
+        ];
+      case "GRID":
+        return [{ value: "GRID", label: "Grid" }];
+      case "DEQUE":
+        return [{ value: "DEQUE", label: "Deque" }];
+      case "FILE_SYSTEM":
+        return [{ value: "FILE_SYSTEM", label: "File System" }];
+      case "WEB_BROWSER":
+        return [{ value: "WEB_BROWSER", label: "Web Browser" }];
+      case "BIG_NUMBERS":
+        return [{ value: "BIG_NUMBERS", label: "Big Numbers" }];
+      default:
+        return [];
+    }
+  };
+
   const [dataStructures, setDataStructures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newDSName, setNewDSName] = useState("");
   const [newDSType, setNewDSType] = useState("STACK");
-  const [newDSImplementation, setNewDSImplementation] = useState("ARRAY_STACK");
+  const [newDSImplementation, setNewDSImplementation] = useState(
+    getImplementationOptions("STACK")[0]?.value || ""
+  );
+  const [newDSNumber, setNewDSNumber] = useState("0");
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -50,16 +139,50 @@ function HomePage() {
     e.preventDefault();
     try {
       setCreating(true);
-      const response = await dataStructureService.create(
-        newDSType,
-        newDSName,
-        newDSImplementation
-      );
-      setDataStructures([...dataStructures, response.data]);
+
+      // Construct the endpoint based on type and implementation
+      let endpoint = newDSType.toLowerCase().replace(/_/g, "-");
+      if (hasMultipleImplementations(newDSType)) {
+        endpoint += `/create/${newDSImplementation}/${encodeURIComponent(
+          newDSName
+        )}`;
+      } else {
+        endpoint += `/create/${encodeURIComponent(newDSName)}`;
+      }
+
+      // Add number parameter for big-integer
+      if (newDSType === "BIG_NUMBERS") {
+        endpoint += `/${encodeURIComponent(newDSNumber)}`;
+      }
+
+      console.log("Creating data structure with endpoint:", endpoint);
+      console.log("Type:", newDSType);
+      console.log("Implementation:", newDSImplementation);
+      console.log("Name:", newDSName);
+
+      const response = await dataStructureService.create(endpoint);
+
+      // Create a complete data structure object
+      const newDataStructure = {
+        id: response.data.id,
+        name: newDSName,
+        type: newDSType,
+        implementation: newDSImplementation,
+        operations: [],
+        currentState: null,
+      };
+
+      setDataStructures([...dataStructures, newDataStructure]);
       setShowCreateModal(false);
       setNewDSName("");
       setNewDSType("STACK");
-      setNewDSImplementation("ARRAY_STACK");
+      setNewDSImplementation(getImplementationOptions("STACK")[0]?.value || "");
+      setNewDSNumber("0");
+
+      // Navigate to the new data structure's page
+      navigate(`/datastructure/${newDataStructure.id}`, {
+        state: { dataStructure: newDataStructure },
+      });
     } catch (err) {
       setError("Failed to create data structure");
       console.error(err);
@@ -102,96 +225,12 @@ function HomePage() {
 
   // Format data structure type to display name
   const formatType = (type) => {
+    if (!type) return "";
     // Convert SNAKE_CASE to Title Case
     return type
       .split("_")
       .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
       .join(" ");
-  };
-
-  // Get implementation options based on data structure type
-  const getImplementationOptions = (type) => {
-    switch (type) {
-      case "VECTOR":
-        return [
-          { value: "ARRAY_VECTOR", label: "Array Vector" },
-          { value: "LINKED_LIST_VECTOR", label: "Linked List Vector" },
-        ];
-      case "STACK":
-        return [
-          { value: "ARRAY_STACK", label: "Array Stack" },
-          { value: "LINKED_LIST_STACK", label: "Linked List Stack" },
-          { value: "TWO_QUEUE_STACK", label: "Two Queue Stack" },
-        ];
-      case "QUEUE":
-        return [
-          { value: "ARRAY_QUEUE", label: "Array Queue" },
-          { value: "LINKED_LIST_QUEUE", label: "Linked List Queue" },
-          {
-            value: "UNSORTED_VECTOR_PRIORITY_QUEUE",
-            label: "Unsorted Vector Priority Queue",
-          },
-          {
-            value: "SORTED_LINKED_LIST_PRIORITY_QUEUE",
-            label: "Sorted Linked List Priority Queue",
-          },
-          {
-            value: "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE",
-            label: "Unsorted Doubly Linked List Priority Queue",
-          },
-          {
-            value: "BINARY_HEAP_PRIORITY_QUEUE",
-            label: "Binary Heap Priority Queue",
-          },
-        ];
-      case "MAP":
-        return [
-          { value: "ARRAY_MAP", label: "Array Map" },
-          { value: "HASH_MAP", label: "Hash Map" },
-          { value: "TREE_MAP", label: "Tree Map" },
-        ];
-      case "TREE":
-        return [
-          { value: "BS_TREE", label: "BS Tree" },
-          { value: "AVL_TREE", label: "AVL Tree" },
-          { value: "EXPRESSION_TREE", label: "Expression Tree" },
-        ];
-      case "SET":
-        return [
-          { value: "TREE_SET", label: "Tree Set" },
-          { value: "HASH_SET", label: "Hash Set" },
-          { value: "SMALL_INT_SET", label: "Small Int Set" },
-          { value: "MOVE_TO_FRONT_SET", label: "Move To Front Set" },
-        ];
-      case "EDITOR_BUFFER":
-        return [
-          { value: "ARRAY_EDITOR_BUFFER", label: "Array Editor Buffer" },
-          {
-            value: "TWO_STACK_EDITOR_BUFFER",
-            label: "Two Stack Editor Buffer",
-          },
-          {
-            value: "LINKED_LIST_EDITOR_BUFFER",
-            label: "Linked List Editor Buffer",
-          },
-          {
-            value: "DOUBLY_LINKED_LIST_EDITOR_BUFFER",
-            label: "Doubly Linked List Editor Buffer",
-          },
-        ];
-      case "GRID":
-        return [{ value: "GRID", label: "Grid" }];
-      case "DEQUE":
-        return [{ value: "DEQUE", label: "Deque" }];
-      case "FILE_SYSTEM":
-        return [{ value: "FILE_SYSTEM", label: "File System" }];
-      case "WEB_BROWSER":
-        return [{ value: "WEB_BROWSER", label: "Web Browser" }];
-      case "BIG_NUMBERS":
-        return [{ value: "BIG_NUMBERS", label: "Big Numbers" }];
-      default:
-        return [];
-    }
   };
 
   // Helper function to check if a data structure type has multiple implementations
@@ -372,6 +411,22 @@ function HomePage() {
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {newDSType === "BIG_NUMBERS" && (
+                <div className="mb-4">
+                  <label className="block text-gray-700 mb-2" htmlFor="number">
+                    Initial Number
+                  </label>
+                  <input
+                    id="number"
+                    type="number"
+                    value={newDSNumber}
+                    onChange={(e) => setNewDSNumber(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
                 </div>
               )}
 

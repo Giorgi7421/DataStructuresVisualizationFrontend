@@ -53,8 +53,7 @@ export const dataStructureService = {
   getAll: () => api.get("/user/get-all-data-structures"),
 
   // Create a new data structure
-  create: (type, name, implementation) =>
-    api.post("/datastructures", { type, name, implementation }),
+  create: (endpoint) => api.post(`/${endpoint}`),
 
   // Find data structure by type, name and implementation (if needed)
   // Returns operations history with current state as the last entry
