@@ -473,7 +473,6 @@ function DataStructurePage() {
 
           switch (combinedType) {
             case "WEB_BROWSER":
-              console.log("Rendering WEB_BROWSER visualization");
               renderDoublyLinkedStructureVisualization(
                 contentGroup,
                 width,
@@ -483,8 +482,17 @@ function DataStructurePage() {
                 snapshotIdentifier
               );
               break;
+            case "BIG_INTEGER":
+              renderArrayStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "ARRAY_VECTOR":
-              console.log("Using array vector visualization for ARRAY_VECTOR");
               renderArrayStructureVisualization(
                 contentGroup,
                 width,
@@ -495,9 +503,6 @@ function DataStructurePage() {
               );
               break;
             case "LINKED_LIST_VECTOR":
-              console.log(
-                "Using linked list vector visualization for LINKED_LIST_VECTOR"
-              );
               renderLinkedStructureVisualization(
                 contentGroup,
                 width,
@@ -508,7 +513,6 @@ function DataStructurePage() {
               );
               break;
             case "ARRAY_EDITOR_BUFFER":
-              console.log("Rendering ARRAY_EDITOR_BUFFER visualization");
               renderArrayStructureVisualization(
                 contentGroup,
                 width,
@@ -518,10 +522,7 @@ function DataStructurePage() {
                 snapshotIdentifier
               );
               break;
-
-            // Cases for which we show "not implemented"
             case "ARRAY_STACK":
-              console.log("Using array vector visualization for ARRAY_VECTOR");
               renderArrayStructureVisualization(
                 contentGroup,
                 width,
@@ -532,9 +533,6 @@ function DataStructurePage() {
               );
               break;
             case "LINKED_LIST_STACK":
-              console.log(
-                "Using linked list vector visualization for LINKED_LIST_VECTOR"
-              );
               renderLinkedStructureVisualization(
                 contentGroup,
                 width,
@@ -546,7 +544,6 @@ function DataStructurePage() {
               break;
             case "TWO_QUEUE_STACK":
             case "ARRAY_QUEUE":
-              console.log("Using array vector visualization for ARRAY_VECTOR");
               renderArrayStructureVisualization(
                 contentGroup,
                 width,
@@ -557,9 +554,6 @@ function DataStructurePage() {
               );
               break;
             case "LINKED_LIST_QUEUE":
-              console.log(
-                "Using linked list vector visualization for LINKED_LIST_VECTOR"
-              );
               renderLinkedStructureVisualization(
                 contentGroup,
                 width,
@@ -573,7 +567,6 @@ function DataStructurePage() {
             case "HASH_MAP":
             case "TREE_MAP":
             case "DEQUE":
-              console.log("Rendering WEB_BROWSER visualization");
               renderDoublyLinkedStructureVisualization(
                 contentGroup,
                 width,
@@ -590,11 +583,17 @@ function DataStructurePage() {
             case "TREE_SET":
             case "SMALL_INT_SET":
             case "MOVE_TO_FRONT_SET":
+              renderLinkedStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "UNSORTED_VECTOR_PRIORITY_QUEUE":
             case "SORTED_LINKED_LIST_PRIORITY_QUEUE":
-              console.log(
-                "Using linked list vector visualization for LINKED_LIST_VECTOR"
-              );
               renderLinkedStructureVisualization(
                 contentGroup,
                 width,
@@ -605,7 +604,6 @@ function DataStructurePage() {
               );
               break;
             case "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE":
-              console.log("Rendering WEB_BROWSER visualization");
               renderDoublyLinkedStructureVisualization(
                 contentGroup,
                 width,
@@ -616,7 +614,6 @@ function DataStructurePage() {
               );
               break;
             case "BINARY_HEAP_PRIORITY_QUEUE":
-              console.log("Using array vector visualization for ARRAY_VECTOR");
               renderArrayStructureVisualization(
                 contentGroup,
                 width,
@@ -629,8 +626,16 @@ function DataStructurePage() {
             case "FILE_SYSTEM":
             case "TWO_STACK_EDITOR_BUFFER":
             case "LINKED_LIST_EDITOR_BUFFER":
+              renderLinkedStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
-              console.log("Rendering WEB_BROWSER visualization");
               renderDoublyLinkedStructureVisualization(
                 contentGroup,
                 width,
@@ -640,17 +645,6 @@ function DataStructurePage() {
                 snapshotIdentifier
               );
               break;
-
-            default:
-              console.log(
-                `Default: No specific implementation for ${combinedType}, showing message.`
-              );
-              showNotImplementedMessage(
-                contentGroup,
-                width,
-                height,
-                combinedType
-              );
           }
         }
         autoFitVisualization(svg, contentGroup, zoom, width, height);
@@ -1185,230 +1179,9 @@ function DataStructurePage() {
       return;
     }
 
-    if (!svgRef.current) {
-      console.error("SVG reference is not available");
-      return;
-    }
-
-    // Clear existing visualization
-    const svg = d3.select(svgRef.current);
-    svg.selectAll("*").remove();
-    console.log("Cleared previous visualization for direct rendering");
-
-    const width = parseInt(svg.style("width")) || 800;
-    const height = parseInt(svg.style("height")) || 600;
-
-    // Create background and content layers
-    const backgroundLayer = svg.append("g").attr("class", "fixed-background");
-    backgroundLayer
-      .append("rect")
-      .attr("width", width)
-      .attr("height", height)
-      .attr("fill", "#f8fafc")
-      .attr("stroke", "#d1d5db");
-
-    const contentGroup = svg.append("g").attr("class", "zoom-container");
-
-    // Set up zoom behavior
-    const zoom = d3
-      .zoom()
-      .scaleExtent([0.1, 5])
-      .translateExtent([
-        [-width * 3, -height * 3],
-        [width * 3, height * 3],
-      ])
-      .on("zoom", (event) => {
-        contentGroup.attr("transform", event.transform);
-        setZoomLevel(event.transform.k);
-      });
-
-    zoomRef.current = zoom;
-    svg.call(zoom);
-    svg.call(zoom.transform, d3.zoomIdentity);
-
-    console.log("Direct rendering operation:", visualState.operation);
-    console.log("Direct rendering snapshot:", visualState.snapshot);
-
-    try {
-      const structureType = (dataStructure.type || "").toUpperCase();
-
-      // Create an effective operation with the snapshot data
-      const effectiveOperation = { ...visualState.operation };
-      const memorySnapshot = visualState.snapshot;
-
-      // Override operation state with snapshot data
-      effectiveOperation.state = {
-        ...effectiveOperation.state,
-        instanceVariables: memorySnapshot.instanceVariables || {},
-        localVariables: memorySnapshot.localVariables || {},
-        addressObjectMap: memorySnapshot.addressObjectMap || {},
-        elements: extractElementsFromSnapshot(
-          memorySnapshot,
-          dataStructure.type
-        ),
-        result: memorySnapshot.getResult,
-        message: memorySnapshot.message,
-      };
-
-      // Special case for web browser visualization
-      if (structureType === "WEB_BROWSER") {
-        console.log("Direct rendering WEB_BROWSER visualization");
-        renderWebBrowserVisualization(
-          contentGroup,
-          width,
-          height,
-          effectiveOperation,
-          memorySnapshot,
-          snapshotIdentifier
-        );
-
-        // Auto-fit the visualization
-        autoFitVisualization(svg, contentGroup, zoom, width, height);
-        return;
-      }
-
-      // For other data structures
-      if (enableMemoryVisualization) {
-        console.log("Direct rendering using memory visualization");
-        renderMemoryVisualization(effectiveOperation, svgRef);
-      } else {
-        const type = (dataStructure.type || "").toUpperCase();
-        const impl = (dataStructure.implementation || "").toUpperCase();
-        let combinedType;
-
-        // Special cases that should not combine implementation with type
-        const specialTypes = [
-          "BIG_INTEGER",
-          "WEB_BROWSER",
-          "DEQUE",
-          "FILE_SYSTEM",
-          "GRID",
-        ];
-        if (
-          impl &&
-          impl !== "NULL" &&
-          impl !== "" &&
-          !specialTypes.includes(type)
-        ) {
-          combinedType = `${impl}_${type}`;
-        } else {
-          combinedType = type;
-        }
-        console.log("Combined structure type for switch:", combinedType);
-
-        switch (combinedType) {
-          case "ARRAY_VECTOR":
-            console.log("Using array vector visualization for ARRAY_VECTOR");
-            renderArrayVectorVisualization(
-              contentGroup,
-              width,
-              height,
-              effectiveOperation,
-              memorySnapshot,
-              snapshotIdentifier
-            );
-            break;
-          case "LINKED_LIST_VECTOR":
-            console.log(
-              "Using linked list vector visualization for LINKED_LIST_VECTOR"
-            );
-            renderLinkedListVectorVisualization(
-              contentGroup,
-              width,
-              height,
-              effectiveOperation,
-              memorySnapshot,
-              snapshotIdentifier
-            );
-            break;
-          case "ARRAY_EDITOR_BUFFER":
-            console.log("Direct rendering ARRAY_EDITOR_BUFFER visualization");
-            renderArrayEditorBufferVisualization(
-              contentGroup,
-              width,
-              height,
-              effectiveOperation,
-              memorySnapshot,
-              snapshotIdentifier
-            );
-            break;
-
-          // Cases for which we show "not implemented"
-          case "ARRAY_STACK":
-          case "LINKED_LIST_STACK":
-          case "TWO_QUEUE_STACK":
-          case "ARRAY_QUEUE":
-          case "LINKED_LIST_QUEUE":
-          case "ARRAY_MAP":
-          case "HASH_MAP":
-          case "TREE_MAP":
-          case "DEQUEUE":
-          case "BS_TREE":
-          case "AVL_TREE":
-          case "EXPRESSION_TREE":
-          case "HASH_SET":
-          case "TREE_SET":
-          case "SMALL_INT_SET":
-          case "MOVE_TO_FRONT_SET":
-          case "UNSORTED_VECTOR_PRIORITY_QUEUE":
-          case "SORTED_LINKED_LIST_PRIORITY_QUEUE":
-          case "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE":
-          case "BINARY_HEAP_PRIORITY_QUEUE":
-          case "BIG_INTEGER":
-          case "FILE_SYSTEM":
-          case "TWO_STACK_EDITOR_BUFFER":
-          case "LINKED_LIST_EDITOR_BUFFER":
-          case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
-            console.log(
-              `No specific implementation for ${combinedType}, showing message.`
-            );
-            showNotImplementedMessage(
-              contentGroup,
-              width,
-              height,
-              combinedType
-            );
-            break;
-
-          default:
-            console.log(
-              `Default: No specific implementation for ${combinedType}, showing message.`
-            );
-            showNotImplementedMessage(
-              contentGroup,
-              width,
-              height,
-              combinedType
-            );
-        }
-      }
-
-      // Auto-fit the visualization
-      autoFitVisualization(svg, contentGroup, zoom, width, height);
-    } catch (error) {
-      console.error("Error in renderSelectedOperation:", error);
-
-      // Show error message
-      const contentGroup = svg.append("g");
-      contentGroup
-        .append("text")
-        .attr("x", width / 2)
-        .attr("y", height / 2)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "16px")
-        .attr("fill", "#ef4444")
-        .text("Error rendering visualization");
-
-      contentGroup
-        .append("text")
-        .attr("x", width / 2)
-        .attr("y", height / 2 + 25)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "12px")
-        .attr("fill", "#ef4444")
-        .text(error.message);
-    }
-  }, [visualState, dataStructure, enableMemoryVisualization]);
+    // Use the main renderVisualization function with the selected operation and snapshot
+    renderVisualization(visualState.operation, visualState.snapshot);
+  }, [visualState, renderVisualization]);
 
   // Effect to render selected operation when visual state changes
   useEffect(() => {
