@@ -559,7 +559,17 @@ function DataStructurePage() {
             case "ARRAY_MAP":
             case "HASH_MAP":
             case "TREE_MAP":
-            case "DEQUEUE":
+            case "DEQUE":
+              console.log("Rendering WEB_BROWSER visualization");
+              renderDoublyLinkedStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "BS_TREE":
             case "AVL_TREE":
             case "EXPRESSION_TREE":
