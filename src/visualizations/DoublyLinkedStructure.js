@@ -97,6 +97,8 @@ export const renderDoublyLinkedStructureVisualization = (
       mainChainRightMargin: 60,
       topToMainSpacing: 40,
       sectionWidth: width / 3, // Divide width into three equal sections
+      sectionHeight: height / 4, // Divide height into four equal sections
+      sectionSpacingY: 40, // Increased from 20 to 40 for more vertical spacing
     },
   };
 
@@ -104,59 +106,52 @@ export const renderDoublyLinkedStructureVisualization = (
   const leftSectionEnd = styles.layout.sectionWidth;
   const rightSectionStart = width - styles.layout.sectionWidth;
   const rightSectionWidth =
-    styles.layout.sectionWidth - styles.layout.mainChainRightMargin; // Available width for main chain
+    styles.layout.sectionWidth - styles.layout.mainChainRightMargin;
+
+  // Calculate section heights
+  const topSectionHeight = styles.layout.sectionHeight;
+  const mainSectionHeight = styles.layout.sectionHeight;
+  const orphanSectionHeight = styles.layout.sectionHeight;
+  const bottomSectionHeight = styles.layout.sectionHeight;
+
+  // Calculate layer positions with proper spacing
+  const topLayerY = styles.layout.sectionSpacingY;
+  const mainChainLayerY =
+    topLayerY + topSectionHeight + styles.layout.sectionSpacingY;
+  const orphanLayerY =
+    mainChainLayerY + mainSectionHeight + styles.layout.sectionSpacingY;
+  const localVarsLayerY =
+    orphanLayerY + orphanSectionHeight + styles.layout.sectionSpacingY;
 
   // --- Define Arrowheads ---
   let defs = contentGroup.select("defs");
   if (defs.empty()) {
     defs = contentGroup.append("defs");
   }
-  defineArrowheads(defs, styles); // Uses generic arrowheads + specific ones if IDs match
-  // Ensure 'browser-prev-arrow' is defined (might be redundant if defineArrowheads is smart)
-  /*
-  if (defs.select(`#${styles.connection.llPrevMarkerId}`).empty()) {
-    defs
-      .append("marker")
-      .attr("id", styles.connection.llPrevMarkerId)
-      .attr("viewBox", "0 -5 10 10").attr("refX", 8).attr("refY", 0)
-      .attr("markerWidth", 7).attr("markerHeight", 7).attr("orient", "auto-start-reverse")
-      .append("path").attr("d", "M10,-5L0,0L10,5").attr("fill", styles.connection.prevColor);
-  }
-  */
+  defineArrowheads(defs, styles);
 
   // --- Initialization ---
   const nodePositions = {};
   const allConnections = [];
-  const visited = new Set(); // To track all rendered nodes (main chain + orphans)
+  const visited = new Set();
   const MAX_NODES_TO_RENDER = 50;
 
-  const firstColX = 30; // Align to this X for var boxes and start of node chains
-  const varBoxTopMargin = 30;
-  const nodeHeight = styles.node.height; // Use default from styles
+  const firstColX = 30;
+  const nodeHeight = styles.node.height;
   const nodeSpacingX = styles.layout.nodeSpacingX;
 
   // Define var box width reliably first
   const instanceVarsBoxWidth = styles.varBox.width;
-  const localVarsBoxWidth = styles.varBox.width; // Also define local box width here for clarity
-  const layerSpacingY = styles.layout.layerSpacingY; // <<<--- ADD BACK
-  const nodeWidth = styles.node.width; // <<<--- ADD BACK
-
-  // Calculate layer positions
-  const topLayerY = varBoxTopMargin;
-  const mainChainLayerY =
-    topLayerY +
-    (instanceVarsBoxWidth > 0
-      ? instanceVarsBoxWidth + styles.layout.topToMainSpacing
-      : 0);
-  const orphanLayerY = mainChainLayerY + styles.layout.layerSpacingY;
-  const localVarsLayerY = orphanLayerY + styles.layout.layerSpacingY;
+  const localVarsBoxWidth = styles.varBox.width;
+  const nodeWidth = styles.node.width;
 
   // --- 1. Render Instance Variables (Top, Center) ---
-  let topLayerBottomY = varBoxTopMargin;
+  let topLayerBottomY = topLayerY;
   let instanceVarsBoxInfo = null;
   if (Object.keys(instanceVariables).length > 0) {
-    const instanceVarsX = width / 2 - instanceVarsBoxWidth / 2; // Center in middle section
-    const instanceVarsY = varBoxTopMargin;
+    const instanceVarsX = width / 2 - instanceVarsBoxWidth / 2;
+    const instanceVarsY =
+      topLayerY + (topSectionHeight - instanceVarsBoxWidth) / 2;
     const instanceVarsResult = renderVariableBox(
       contentGroup,
       "Instance Variables",
@@ -177,10 +172,10 @@ export const renderDoublyLinkedStructureVisualization = (
     nodePositions["instance_vars_box"] = instanceVarsBoxInfo;
     topLayerBottomY = instanceVarsY + instanceVarsResult.height;
   } else {
-    topLayerBottomY = 0;
+    topLayerBottomY = topLayerY;
     instanceVarsBoxInfo = {
       x: width / 2 - instanceVarsBoxWidth / 2,
-      y: varBoxTopMargin,
+      y: topLayerY,
       width: 0,
       height: 0,
     };
@@ -190,300 +185,271 @@ export const renderDoublyLinkedStructureVisualization = (
     `[WebBrowserViz Layout Debug] Instance Vars Box X: ${instanceVarsBoxInfo?.x}`
   );
 
-  // --- 2. Render Main History Chain (Second Layer, Right Section) ---
+  // --- 2. Render Main Chain (Second Layer, Right Section) ---
   // Calculate the rightmost position for the main chain
   const mainChainRightX = width - styles.layout.mainChainRightMargin;
   let currentX = mainChainRightX;
 
-  // Remove all the wrapping-related variables and logic
   let mainHistoryMaxNodeHeight = nodeHeight;
   const mainHistorySpecs = [];
   let middleLayerBottomY = mainChainLayerY;
 
-  // Determine the actual current page address
-  const currentVisiblePageAddress =
-    instanceVariables?.current || instanceVariables?.currentPageAddress;
-  console.log(
-    `[WebBrowserViz Layout - Simplified] Current Page Addr: ${currentVisiblePageAddress}` // Updated log message
-  );
+  // Find the start of the chain from instance variables or by finding a node with null prev
+  let startAddress =
+    instanceVariables.head ||
+    instanceVariables.front ||
+    instanceVariables.start ||
+    instanceVariables.first ||
+    instanceVariables.root;
 
-  // --- Pre-calculate Back History Length ---
-  let numBackNodes = 0;
-  let tempBackAddr =
-    instanceVariables?.current || instanceVariables?.currentPageAddress;
-  if (tempBackAddr && addressObjectMap[tempBackAddr]) {
-    tempBackAddr = addressObjectMap[tempBackAddr].previousAddress; // Start one step back
-    let backVisited = new Set([
-      instanceVariables?.current || instanceVariables?.currentPageAddress,
-    ]); // Avoid cycles starting from current
-    while (
-      tempBackAddr &&
-      tempBackAddr !== "0x0" &&
-      addressObjectMap[tempBackAddr] &&
-      !backVisited.has(tempBackAddr) &&
-      numBackNodes < MAX_NODES_TO_RENDER / 2 // Sanity limit
-    ) {
-      backVisited.add(tempBackAddr);
-      numBackNodes++;
-      tempBackAddr = addressObjectMap[tempBackAddr].previousAddress;
+  // If no start address found in instance variables, look for a node with null prev
+  if (!startAddress || !addressObjectMap[startAddress]) {
+    const allNodeAddrs = Object.keys(addressObjectMap).filter(
+      (addr) =>
+        addressObjectMap[addr] &&
+        typeof addressObjectMap[addr] === "object" &&
+        !Array.isArray(addressObjectMap[addr])
+    );
+
+    // Find nodes that are not pointed to by any other node's previousAddress
+    const pointedToAddrs = new Set();
+    allNodeAddrs.forEach((addr) => {
+      const nodeData = addressObjectMap[addr];
+      if (
+        nodeData &&
+        nodeData.previousAddress &&
+        nodeData.previousAddress !== "0x0" &&
+        nodeData.previousAddress !== "null"
+      ) {
+        pointedToAddrs.add(nodeData.previousAddress);
+      }
+    });
+
+    // Nodes that are not pointed to by any other node's previousAddress are potential starts
+    const potentialStarts = allNodeAddrs.filter(
+      (addr) => !pointedToAddrs.has(addr)
+    );
+
+    if (potentialStarts.length > 0) {
+      startAddress = potentialStarts[0];
+    } else if (allNodeAddrs.length > 0) {
+      startAddress = allNodeAddrs[0];
     }
   }
-  console.log(
-    `[WebBrowserViz Layout Debug] Calculated numBackNodes: ${numBackNodes}`
-  );
 
-  // --- Simplified Rendering: Place CURRENT node first at mainChainRightX ---
-  if (
-    currentVisiblePageAddress &&
-    addressObjectMap[currentVisiblePageAddress]
-  ) {
-    const nodeData = addressObjectMap[currentVisiblePageAddress];
-    visited.add(currentVisiblePageAddress); // Mark current page as visited
+  console.log(`[DoublyLinkedViz Layout] Start Address: ${startAddress}`);
+  console.log(`[DoublyLinkedViz Layout] Address Object Map:`, addressObjectMap);
 
-    const nodeFields = {
-      value: nodeData.url || nodeData.value || nodeData.data || "N/A",
-      prev: nodeData.previousAddress || nodeData.prev || "null",
-      next: nodeData.nextAddress || nodeData.next || "null",
+  // --- Simplified Rendering: Start from the head of the list ---
+  if (startAddress && addressObjectMap[startAddress]) {
+    // First, find the current node's position
+    const startNodeData = addressObjectMap[startAddress];
+    const startNodeFields = {
+      value: startNodeData.value || startNodeData.data || "N/A",
+      prev: startNodeData.previousAddress || startNodeData.prev || "null",
+      next: startNodeData.nextAddress || startNodeData.next || "null",
     };
 
-    // Place current page at the rightmost position
-    const currentPageX = currentX;
-    const currentPageY = mainChainLayerY;
-    const currentPageStyle = {
+    // Place start node at the rightmost position
+    const startNodeX = mainChainRightX;
+    const startNodeY = mainChainLayerY;
+    const startNodeStyle = {
       ...styles.node,
       fill: styles.node.currentFill,
       stroke: styles.node.currentStroke,
       strokeWidth: 1.5,
     };
 
-    console.log(
-      `[WebBrowserViz Layout Debug] Placing CURRENT node (${currentVisiblePageAddress}) at X: ${currentPageX}`
-    ); // Log current node placement
-
     mainHistorySpecs.push({
-      x: currentPageX,
-      y: currentPageY,
-      address: currentVisiblePageAddress,
+      x: startNodeX,
+      y: startNodeY,
+      address: startAddress,
       title:
-        nodeData.title ||
-        truncateAddress(nodeFields.value) ||
-        truncateAddress(currentVisiblePageAddress, 6),
-      fields: nodeFields,
+        startNodeData.title ||
+        truncateAddress(startNodeFields.value) ||
+        truncateAddress(startAddress, 6),
+      fields: startNodeFields,
       isIsolated: false,
-      isCurrent: true,
-      style: currentPageStyle,
+      style: startNodeStyle,
     });
-    nodePositions[currentVisiblePageAddress] = {
-      x: currentPageX,
-      y: currentPageY,
+
+    nodePositions[startAddress] = {
+      x: startNodeX,
+      y: startNodeY,
       width: nodeWidth,
       height: nodeHeight,
-      fields: nodeFields,
+      fields: startNodeFields,
     };
-    mainHistoryMaxNodeHeight = Math.max(mainHistoryMaxNodeHeight, nodeHeight);
-    middleLayerBottomY = Math.max(
-      middleLayerBottomY,
-      currentPageY + nodeHeight
-    );
 
-    // Update position for next node
-    currentX -= nodeWidth + nodeSpacingX;
+    // Render previous nodes to the left
+    let currentPrevAddress = startNodeFields.prev;
+    let currentPrevX = startNodeX - nodeWidth - nodeSpacingX;
+    let nodesProcessedPrev = 0;
 
-    // Add connections for current page (same as before)
+    while (
+      currentPrevAddress &&
+      currentPrevAddress !== "0x0" &&
+      currentPrevAddress !== "null" &&
+      !visited.has(currentPrevAddress) &&
+      nodesProcessedPrev < MAX_NODES_TO_RENDER / 2
+    ) {
+      visited.add(currentPrevAddress);
+      const prevNodeData = addressObjectMap[currentPrevAddress];
+      if (!prevNodeData) break;
+
+      const prevNodeFields = {
+        value: prevNodeData.value || prevNodeData.data || "N/A",
+        prev: prevNodeData.previousAddress || prevNodeData.prev || "null",
+        next: prevNodeData.nextAddress || prevNodeData.next || "null",
+      };
+
+      mainHistorySpecs.push({
+        x: currentPrevX,
+        y: startNodeY,
+        address: currentPrevAddress,
+        title:
+          prevNodeData.title ||
+          truncateAddress(prevNodeFields.value) ||
+          truncateAddress(currentPrevAddress, 6),
+        fields: prevNodeFields,
+        isIsolated: false,
+        style: styles.node,
+      });
+
+      nodePositions[currentPrevAddress] = {
+        x: currentPrevX,
+        y: startNodeY,
+        width: nodeWidth,
+        height: nodeHeight,
+        fields: prevNodeFields,
+      };
+
+      // Add connections
+      if (
+        prevNodeFields.next &&
+        prevNodeFields.next !== "0x0" &&
+        prevNodeFields.next !== "null"
+      ) {
+        allConnections.push({
+          sourceName: currentPrevAddress,
+          targetAddress: prevNodeFields.next,
+          type: "ll_next",
+        });
+      }
+      if (
+        prevNodeFields.prev &&
+        prevNodeFields.prev !== "0x0" &&
+        prevNodeFields.prev !== "null"
+      ) {
+        allConnections.push({
+          sourceName: currentPrevAddress,
+          targetAddress: prevNodeFields.prev,
+          type: "ll_prev",
+        });
+      }
+
+      currentPrevAddress = prevNodeFields.prev;
+      currentPrevX -= nodeWidth + nodeSpacingX;
+      nodesProcessedPrev++;
+    }
+
+    // Render next nodes to the right
+    let currentNextAddress = startNodeFields.next;
+    let currentNextX = startNodeX + nodeWidth + nodeSpacingX;
+    let nodesProcessedNext = 0;
+
+    while (
+      currentNextAddress &&
+      currentNextAddress !== "0x0" &&
+      currentNextAddress !== "null" &&
+      !visited.has(currentNextAddress) &&
+      nodesProcessedNext < MAX_NODES_TO_RENDER / 2
+    ) {
+      visited.add(currentNextAddress);
+      const nextNodeData = addressObjectMap[currentNextAddress];
+      if (!nextNodeData) break;
+
+      const nextNodeFields = {
+        value: nextNodeData.value || nextNodeData.data || "N/A",
+        prev: nextNodeData.previousAddress || nextNodeData.prev || "null",
+        next: nextNodeData.nextAddress || nextNodeData.next || "null",
+      };
+
+      mainHistorySpecs.push({
+        x: currentNextX,
+        y: startNodeY,
+        address: currentNextAddress,
+        title:
+          nextNodeData.title ||
+          truncateAddress(nextNodeFields.value) ||
+          truncateAddress(currentNextAddress, 6),
+        fields: nextNodeFields,
+        isIsolated: false,
+        style: styles.node,
+      });
+
+      nodePositions[currentNextAddress] = {
+        x: currentNextX,
+        y: startNodeY,
+        width: nodeWidth,
+        height: nodeHeight,
+        fields: nextNodeFields,
+      };
+
+      // Add connections
+      if (
+        nextNodeFields.next &&
+        nextNodeFields.next !== "0x0" &&
+        nextNodeFields.next !== "null"
+      ) {
+        allConnections.push({
+          sourceName: currentNextAddress,
+          targetAddress: nextNodeFields.next,
+          type: "ll_next",
+        });
+      }
+      if (
+        nextNodeFields.prev &&
+        nextNodeFields.prev !== "0x0" &&
+        nextNodeFields.prev !== "null"
+      ) {
+        allConnections.push({
+          sourceName: currentNextAddress,
+          targetAddress: nextNodeFields.prev,
+          type: "ll_prev",
+        });
+      }
+
+      currentNextAddress = nextNodeFields.next;
+      currentNextX += nodeWidth + nodeSpacingX;
+      nodesProcessedNext++;
+    }
+
+    // Add connections for start node
     if (
-      nodeFields.next &&
-      nodeFields.next !== "0x0" &&
-      nodeFields.next !== "null"
+      startNodeFields.next &&
+      startNodeFields.next !== "0x0" &&
+      startNodeFields.next !== "null"
     ) {
       allConnections.push({
-        sourceName: currentVisiblePageAddress,
-        targetAddress: nodeFields.next,
+        sourceName: startAddress,
+        targetAddress: startNodeFields.next,
         type: "ll_next",
       });
     }
     if (
-      nodeFields.prev &&
-      nodeFields.prev !== "0x0" &&
-      nodeFields.prev !== "null"
+      startNodeFields.prev &&
+      startNodeFields.prev !== "0x0" &&
+      startNodeFields.prev !== "null"
     ) {
       allConnections.push({
-        sourceName: currentVisiblePageAddress,
-        targetAddress: nodeFields.prev,
+        sourceName: startAddress,
+        targetAddress: startNodeFields.prev,
         type: "ll_prev",
       });
     }
 
-    // --- Render BACK history to the LEFT of current (relative to currentPageX) ---
-    let currentBackAddress = nodeFields.prev;
-    let currentBackX = currentPageX - nodeWidth - nodeSpacingX; // <<<--- Relative to current X
-    let nodesProcessedBack = 0;
-    while (
-      currentBackAddress &&
-      currentBackAddress !== "0x0" &&
-      !visited.has(currentBackAddress) &&
-      nodesProcessedBack < MAX_NODES_TO_RENDER / 2
-    ) {
-      // ---> Log X of First Back Node <---
-      if (nodesProcessedBack === 0) {
-        console.log(
-          `[WebBrowserViz Layout Debug] Placing FIRST BACK node (${currentBackAddress}) relative to current, at calculated X: ${currentBackX}`
-        );
-      }
-      visited.add(currentBackAddress);
-      const backNodeData = addressObjectMap[currentBackAddress];
-      if (!backNodeData) break;
-      const backNodeFields = {
-        value:
-          backNodeData.url || backNodeData.value || backNodeData.data || "N/A",
-        prev: backNodeData.previousAddress || backNodeData.prev || "null",
-        next: backNodeData.nextAddress || backNodeData.next || "null",
-      };
-      const backNodeHeight = nodeHeight;
-      mainHistorySpecs.push({
-        x: currentBackX,
-        y: currentPageY,
-        address: currentBackAddress,
-        title:
-          backNodeData.title ||
-          truncateAddress(backNodeFields.value) ||
-          truncateAddress(currentBackAddress, 6),
-        fields: backNodeFields,
-        isIsolated: false,
-        isCurrent: false,
-        style: styles.node,
-      });
-      nodePositions[currentBackAddress] = {
-        x: currentBackX,
-        y: currentPageY,
-        width: nodeWidth,
-        height: backNodeHeight,
-        fields: backNodeFields,
-      };
-      mainHistoryMaxNodeHeight = Math.max(
-        mainHistoryMaxNodeHeight,
-        backNodeHeight
-      );
-      middleLayerBottomY = Math.max(
-        middleLayerBottomY,
-        currentPageY + backNodeHeight
-      );
-      // Add connections (same as before)
-      if (
-        backNodeFields.next &&
-        backNodeFields.next !== "0x0" &&
-        backNodeFields.next !== "null"
-      ) {
-        allConnections.push({
-          sourceName: currentBackAddress,
-          targetAddress: backNodeFields.next,
-          type: "ll_next",
-        });
-      }
-      if (
-        backNodeFields.prev &&
-        backNodeFields.prev !== "0x0" &&
-        backNodeFields.prev !== "null"
-      ) {
-        allConnections.push({
-          sourceName: currentBackAddress,
-          targetAddress: backNodeFields.prev,
-          type: "ll_prev",
-        });
-      }
-      currentBackAddress = backNodeFields.prev;
-      currentBackX -= nodeWidth + nodeSpacingX;
-      nodesProcessedBack++;
-
-      // Update position
-      currentX -= nodeWidth + nodeSpacingX;
-    }
-
-    // --- Render FORWARD history to the RIGHT of current (relative to currentPageX) ---
-    let currentFwdAddress = nodeFields.next;
-    let currentFwdX = currentPageX + nodeWidth + nodeSpacingX; // <<<--- Relative to current X
-    let nodesProcessedFwd = 0;
-    while (
-      currentFwdAddress &&
-      currentFwdAddress !== "0x0" &&
-      !visited.has(currentFwdAddress) &&
-      nodesProcessedFwd < MAX_NODES_TO_RENDER / 2
-    ) {
-      // ---> Log X of First Forward Node <---
-      if (nodesProcessedFwd === 0) {
-        console.log(
-          `[WebBrowserViz Layout Debug] Placing FIRST FORWARD node (${currentFwdAddress}) relative to current, at calculated X: ${currentFwdX}`
-        );
-      }
-      visited.add(currentFwdAddress);
-      const fwdNodeData = addressObjectMap[currentFwdAddress];
-      if (!fwdNodeData) break;
-      const fwdNodeFields = {
-        value:
-          fwdNodeData.url || fwdNodeData.value || fwdNodeData.data || "N/A",
-        prev: fwdNodeData.previousAddress || fwdNodeData.prev || "null",
-        next: fwdNodeData.nextAddress || fwdNodeData.next || "null",
-      };
-      const fwdNodeHeight = nodeHeight;
-      mainHistorySpecs.push({
-        x: currentFwdX,
-        y: currentPageY,
-        address: currentFwdAddress,
-        title:
-          fwdNodeData.title ||
-          truncateAddress(fwdNodeFields.value) ||
-          truncateAddress(currentFwdAddress, 6),
-        fields: fwdNodeFields,
-        isIsolated: false,
-        isCurrent: false,
-        style: styles.node,
-      });
-      nodePositions[currentFwdAddress] = {
-        x: currentFwdX,
-        y: currentPageY,
-        width: nodeWidth,
-        height: fwdNodeHeight,
-        fields: fwdNodeFields,
-      };
-      mainHistoryMaxNodeHeight = Math.max(
-        mainHistoryMaxNodeHeight,
-        fwdNodeHeight
-      );
-      middleLayerBottomY = Math.max(
-        middleLayerBottomY,
-        currentPageY + fwdNodeHeight
-      );
-      // Add connections (same as before)
-      if (
-        fwdNodeFields.next &&
-        fwdNodeFields.next !== "0x0" &&
-        fwdNodeFields.next !== "null"
-      ) {
-        allConnections.push({
-          sourceName: currentFwdAddress,
-          targetAddress: fwdNodeFields.next,
-          type: "ll_next",
-        });
-      }
-      if (
-        fwdNodeFields.prev &&
-        fwdNodeFields.prev !== "0x0" &&
-        fwdNodeFields.prev !== "null"
-      ) {
-        allConnections.push({
-          sourceName: currentFwdAddress,
-          targetAddress: fwdNodeFields.prev,
-          type: "ll_prev",
-        });
-      }
-      currentFwdAddress = fwdNodeFields.next;
-      currentFwdX += nodeWidth + nodeSpacingX;
-      nodesProcessedFwd++;
-
-      // Update position
-      currentX -= nodeWidth + nodeSpacingX;
-    }
-
-    // Render all collected main history nodes
+    // Render all collected nodes
     mainHistorySpecs.forEach((spec) => {
       try {
         renderGenericNode(
@@ -496,34 +462,69 @@ export const renderDoublyLinkedStructureVisualization = (
         );
       } catch (e) {
         console.error(
-          `[WebBrowserViz Layout - Simplified] Error rendering MAIN HISTORY node (${spec.address}):`,
+          `[DoublyLinkedViz] Error rendering node (${spec.address}):`,
           e
         );
       }
     });
   } else {
-    // Handle case where current page couldn't be determined
-    console.warn(
-      "[WebBrowserViz Layout - Simplified] No valid current page found."
-    );
+    // Handle case where no valid start node was found
+    console.warn("[DoublyLinkedViz] No valid start node found.");
     contentGroup
       .append("text")
       .attr("x", width / 2)
       .attr("y", mainChainLayerY + 20)
       .attr("text-anchor", "middle")
-      .text("Could not determine current page.");
-    middleLayerBottomY = mainChainLayerY + 40; // Allocate some space for the message
+      .text("Could not determine start of list.");
+    middleLayerBottomY = mainChainLayerY + 40;
   }
 
-  const mainHistoryChainBottomY = middleLayerBottomY;
+  const mainChainBottomY = middleLayerBottomY;
 
   // --- 3. Render Orphan Nodes (Third Layer, Left Section) ---
   const orphanNodeStartX = firstColX;
-  const orphanNodeY = orphanLayerY;
+  const orphanNodeY = orphanLayerY + (orphanSectionHeight - nodeHeight) / 2; // Center vertically in orphan section
   let currentOrphanX = orphanNodeStartX;
   let currentOrphanY = orphanNodeY;
   let orphanRowHeight = 0;
   const orphanSpecs = [];
+
+  // Get all nodes that are part of the main chain
+  const mainChainNodes = new Set();
+  if (startAddress && addressObjectMap[startAddress]) {
+    // Add start node
+    mainChainNodes.add(startAddress);
+
+    // Add all previous nodes
+    let currentPrevAddress =
+      addressObjectMap[startAddress].previousAddress ||
+      addressObjectMap[startAddress].prev;
+    while (
+      currentPrevAddress &&
+      currentPrevAddress !== "0x0" &&
+      currentPrevAddress !== "null"
+    ) {
+      mainChainNodes.add(currentPrevAddress);
+      currentPrevAddress =
+        addressObjectMap[currentPrevAddress]?.previousAddress ||
+        addressObjectMap[currentPrevAddress]?.prev;
+    }
+
+    // Add all next nodes
+    let currentNextAddress =
+      addressObjectMap[startAddress].nextAddress ||
+      addressObjectMap[startAddress].next;
+    while (
+      currentNextAddress &&
+      currentNextAddress !== "0x0" &&
+      currentNextAddress !== "null"
+    ) {
+      mainChainNodes.add(currentNextAddress);
+      currentNextAddress =
+        addressObjectMap[currentNextAddress]?.nextAddress ||
+        addressObjectMap[currentNextAddress]?.next;
+    }
+  }
 
   const allPotentialNodeAddresses = Object.keys(addressObjectMap).filter(
     (addr) =>
@@ -532,19 +533,23 @@ export const renderDoublyLinkedStructureVisualization = (
       !Array.isArray(addressObjectMap[addr]) &&
       (addressObjectMap[addr].hasOwnProperty("data") ||
         addressObjectMap[addr].hasOwnProperty("value") ||
-        addressObjectMap[addr].hasOwnProperty("url") ||
         addressObjectMap[addr].hasOwnProperty("nextAddress") ||
         addressObjectMap[addr].hasOwnProperty("previousAddress"))
   );
 
   allPotentialNodeAddresses.forEach((addr) => {
+    // Skip if node is part of the main chain
+    if (mainChainNodes.has(addr)) {
+      return;
+    }
+
     if (!visited.has(addr)) {
       visited.add(addr);
       const nodeData = addressObjectMap[addr];
       if (!nodeData) return;
 
       const orphanNodeFields = {
-        value: nodeData.url || nodeData.value || nodeData.data || "N/A",
+        value: nodeData.value || nodeData.data || "N/A",
         prev: nodeData.previousAddress || nodeData.prev || "null",
         next: nodeData.nextAddress || nodeData.next || "null",
       };
@@ -638,7 +643,8 @@ export const renderDoublyLinkedStructureVisualization = (
   // --- 4. Render Local Variables (Bottom, Center) ---
   if (Object.keys(localVariables).length > 0) {
     const localVarsX = width / 2 - localVarsBoxWidth / 2; // Center in middle section
-    const localVarsY = localVarsLayerY;
+    const localVarsY =
+      localVarsLayerY + (bottomSectionHeight - localVarsBoxWidth) / 2; // Center vertically in bottom section
     const localVarsResult = renderVariableBox(
       contentGroup,
       "Local Variables",
