@@ -1430,22 +1430,20 @@ function DataStructurePage() {
                                       ", "
                                     )})`
                                   : ""}
+                                {op.state &&
+                                  op.state.result !== undefined &&
+                                  op.state.result !== null && (
+                                    <span className="text-black">
+                                      {" "}
+                                      Result: {String(op.state.result)}
+                                    </span>
+                                  )}
                               </div>
                               {op.state && op.state.message && (
                                 <div className="mt-1 text-gray-600">
                                   {op.state.message}
                                 </div>
                               )}
-                              {op.state &&
-                                op.state.result !== undefined &&
-                                op.state.result !== null && (
-                                  <div className="mt-1">
-                                    Result:{" "}
-                                    <span className="text-green-600">
-                                      {String(op.state.result)}
-                                    </span>
-                                  </div>
-                                )}
                             </div>
                           );
                         })}
