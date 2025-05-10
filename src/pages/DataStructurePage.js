@@ -1015,10 +1015,7 @@ function DataStructurePage() {
   };
 
   // Check if the selected operation needs a value input
-  const needsValueInput = () => {
-    if (!operation) return false;
-
-    // Operations that don't need a value input
+  const needsValueInput = (opValue) => {
     const noValueOperations = [
       "CLEAR",
       "IS_EMPTY",
@@ -1029,15 +1026,14 @@ function DataStructurePage() {
       "FRONT",
       "POP_BACK",
     ];
-
-    return !noValueOperations.includes(operation);
+    return !noValueOperations.includes(opValue);
   };
 
   // Handle operation form submission
   const handleOperationSubmit = async (e) => {
     e.preventDefault();
 
-    if (!operation || (needsValueInput() && !value)) return;
+    if (!operation || (needsValueInput(operation) && !value)) return;
 
     try {
       setProcessingOperation(true);
@@ -1231,8 +1227,6 @@ function DataStructurePage() {
       return;
     }
 
-    const structureType = (dataStructure.type || "").toUpperCase();
-
     // Try to get the memory snapshot if available
     let memorySnapshot = null;
     if (operation.memorySnapshots && operation.memorySnapshots.length > 0) {
@@ -1253,33 +1247,8 @@ function DataStructurePage() {
       }
     }
 
-    // Simply delegate to the appropriate visualization based on structure type
-    switch (structureType) {
-      case "VECTOR":
-        renderArrayVectorVisualization(
-          svg,
-          width,
-          height,
-          operation,
-          memorySnapshot
-        );
-        break;
-      case "LINKED_LIST":
-        renderLinkedListVisualization(svg, width, height, operation);
-        break;
-      case "TREE":
-        renderTreeVisualization(svg, width, height, operation);
-        break;
-      case "STACK":
-      case "QUEUE":
-        renderStackQueueVisualization(svg, width, height, operation);
-        break;
-      case "MAP":
-        renderHashMapVisualization(svg, width, height, operation);
-        break;
-      default:
-        renderDefaultVisualization(svg, width, height, operation);
-    }
+    // Use the main renderVisualization function
+    renderVisualization(operation, memorySnapshot);
   };
 
   return (
@@ -1330,63 +1299,58 @@ function DataStructurePage() {
                 <div className="h-1/2 overflow-y-auto no-scrollbar">
                   <form
                     onSubmit={handleOperationSubmit}
-                    className="flex flex-col"
+                    className="flex flex-col divide-y divide-gray-200"
                   >
-                    <div className="mb-2">
-                      <label
-                        className="block text-gray-700 mb-1 text-xs"
-                        htmlFor="operation"
+                    {getOperationOptions().map((op) => (
+                      <div
+                        key={op.value}
+                        className="flex items-center justify-between py-0.5 h-7"
                       >
-                        Operation
-                      </label>
-                      <select
-                        id="operation"
-                        value={operation}
-                        onChange={(e) => setOperation(e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        required
-                      >
-                        <option value="">Select an operation</option>
-                        {getOperationOptions().map((op) => (
-                          <option key={op.value} value={op.value}>
-                            {op.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {operation && needsValueInput() && (
-                      <div className="mb-2">
-                        <label
-                          className="block text-gray-700 mb-1 text-xs"
-                          htmlFor="value"
+                        <div className="flex items-center">
+                          {needsValueInput(op.value) ? (
+                            <>
+                              <span className="text-gray-700 text-xs font-semibold whitespace-nowrap">
+                                {op.label}(element:
+                              </span>
+                              <input
+                                id={`operation-${op.value}`}
+                                type="text"
+                                value={operation === op.value ? value : ""}
+                                onChange={(e) => {
+                                  setOperation(op.value);
+                                  setValue(e.target.value);
+                                }}
+                                className="w-20 px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6 mx-1"
+                              />
+                              <span className="text-gray-700 text-xs font-semibold">
+                                )
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-gray-700 text-xs font-semibold whitespace-nowrap">
+                              {op.label}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="submit"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setOperation(op.value);
+                            handleOperationSubmit(e);
+                          }}
+                          disabled={
+                            needsValueInput(op.value) &&
+                            (!value || value.trim() === "")
+                          }
+                          className="bg-blue-500 text-white py-0.5 px-3 rounded text-xs font-semibold hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-300 disabled:text-gray-500 h-6 whitespace-nowrap"
                         >
-                          Value
-                        </label>
-                        <input
-                          id="value"
-                          type="text"
-                          value={value}
-                          onChange={(e) => setValue(e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          required
-                        />
+                          {processingOperation && operation === op.value
+                            ? "Processing..."
+                            : "Perform"}
+                        </button>
                       </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={
-                        !operation ||
-                        (needsValueInput() && !value) ||
-                        processingOperation
-                      }
-                      className="w-full bg-blue-500 text-white py-1 px-2 rounded text-sm hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-blue-300"
-                    >
-                      {processingOperation
-                        ? "Processing..."
-                        : "Perform Operation"}
-                    </button>
+                    ))}
                   </form>
                 </div>
 
