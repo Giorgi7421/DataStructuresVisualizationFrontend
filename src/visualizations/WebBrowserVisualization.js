@@ -95,9 +95,16 @@ export const renderWebBrowserVisualization = (
       layerSpacingY: 120,
       orphanNodeSpacingX: 40,
       mainChainRightMargin: 60,
-      topToMainSpacing: 40, // Added for smaller spacing between top and main chain
+      topToMainSpacing: 40,
+      sectionWidth: width / 3, // Divide width into three equal sections
     },
   };
+
+  // Calculate section boundaries
+  const leftSectionEnd = styles.layout.sectionWidth;
+  const rightSectionStart = width - styles.layout.sectionWidth;
+  const rightSectionWidth =
+    styles.layout.sectionWidth - styles.layout.mainChainRightMargin; // Available width for main chain
 
   // --- Define Arrowheads ---
   let defs = contentGroup.select("defs");
@@ -148,7 +155,7 @@ export const renderWebBrowserVisualization = (
   let topLayerBottomY = varBoxTopMargin;
   let instanceVarsBoxInfo = null;
   if (Object.keys(instanceVariables).length > 0) {
-    const instanceVarsX = width / 2 - instanceVarsBoxWidth / 2; // Center the instance vars
+    const instanceVarsX = width / 2 - instanceVarsBoxWidth / 2; // Center in middle section
     const instanceVarsY = varBoxTopMargin;
     const instanceVarsResult = renderVariableBox(
       contentGroup,
@@ -183,17 +190,15 @@ export const renderWebBrowserVisualization = (
     `[WebBrowserViz Layout Debug] Instance Vars Box X: ${instanceVarsBoxInfo?.x}`
   );
 
-  // --- 2. Render Main History Chain (Second Layer, Right Aligned) ---
+  // --- 2. Render Main History Chain (Second Layer, Right Section) ---
   // Calculate the rightmost position for the main chain
   const mainChainRightX = width - styles.layout.mainChainRightMargin;
   let currentX = mainChainRightX;
 
-  console.log(
-    `[WebBrowserViz Layout Debug] Calculated Main Chain Start X (Center Offset): ${mainChainRightX}` // Updated log
-  );
+  // Remove all the wrapping-related variables and logic
   let mainHistoryMaxNodeHeight = nodeHeight;
   const mainHistorySpecs = [];
-  let middleLayerBottomY = mainChainLayerY; // Track bottom edge
+  let middleLayerBottomY = mainChainLayerY;
 
   // Determine the actual current page address
   const currentVisiblePageAddress =
@@ -281,7 +286,7 @@ export const renderWebBrowserVisualization = (
       currentPageY + nodeHeight
     );
 
-    // Update currentX for next node (going left)
+    // Update position for next node
     currentX -= nodeWidth + nodeSpacingX;
 
     // Add connections for current page (same as before)
@@ -336,7 +341,7 @@ export const renderWebBrowserVisualization = (
       const backNodeHeight = nodeHeight;
       mainHistorySpecs.push({
         x: currentBackX,
-        y: mainChainLayerY,
+        y: currentPageY,
         address: currentBackAddress,
         title:
           backNodeData.title ||
@@ -349,7 +354,7 @@ export const renderWebBrowserVisualization = (
       });
       nodePositions[currentBackAddress] = {
         x: currentBackX,
-        y: mainChainLayerY,
+        y: currentPageY,
         width: nodeWidth,
         height: backNodeHeight,
         fields: backNodeFields,
@@ -360,7 +365,7 @@ export const renderWebBrowserVisualization = (
       );
       middleLayerBottomY = Math.max(
         middleLayerBottomY,
-        mainChainLayerY + backNodeHeight
+        currentPageY + backNodeHeight
       );
       // Add connections (same as before)
       if (
@@ -388,6 +393,9 @@ export const renderWebBrowserVisualization = (
       currentBackAddress = backNodeFields.prev;
       currentBackX -= nodeWidth + nodeSpacingX;
       nodesProcessedBack++;
+
+      // Update position
+      currentX -= nodeWidth + nodeSpacingX;
     }
 
     // --- Render FORWARD history to the RIGHT of current (relative to currentPageX) ---
@@ -418,7 +426,7 @@ export const renderWebBrowserVisualization = (
       const fwdNodeHeight = nodeHeight;
       mainHistorySpecs.push({
         x: currentFwdX,
-        y: mainChainLayerY,
+        y: currentPageY,
         address: currentFwdAddress,
         title:
           fwdNodeData.title ||
@@ -431,7 +439,7 @@ export const renderWebBrowserVisualization = (
       });
       nodePositions[currentFwdAddress] = {
         x: currentFwdX,
-        y: mainChainLayerY,
+        y: currentPageY,
         width: nodeWidth,
         height: fwdNodeHeight,
         fields: fwdNodeFields,
@@ -442,7 +450,7 @@ export const renderWebBrowserVisualization = (
       );
       middleLayerBottomY = Math.max(
         middleLayerBottomY,
-        mainChainLayerY + fwdNodeHeight
+        currentPageY + fwdNodeHeight
       );
       // Add connections (same as before)
       if (
@@ -470,6 +478,9 @@ export const renderWebBrowserVisualization = (
       currentFwdAddress = fwdNodeFields.next;
       currentFwdX += nodeWidth + nodeSpacingX;
       nodesProcessedFwd++;
+
+      // Update position
+      currentX -= nodeWidth + nodeSpacingX;
     }
 
     // Render all collected main history nodes
@@ -506,7 +517,7 @@ export const renderWebBrowserVisualization = (
 
   const mainHistoryChainBottomY = middleLayerBottomY;
 
-  // --- 3. Render Orphan Nodes (Third Layer, Left Aligned) ---
+  // --- 3. Render Orphan Nodes (Third Layer, Left Section) ---
   const orphanNodeStartX = firstColX;
   const orphanNodeY = orphanLayerY;
   let currentOrphanX = orphanNodeStartX;
@@ -593,10 +604,10 @@ export const renderWebBrowserVisualization = (
 
       // Update position for next orphan + wrapping logic
       currentOrphanX += nodeWidth + styles.layout.orphanNodeSpacingX;
-      // Wrap if exceeding main chain's leftmost position
+      // Wrap if exceeding left section boundary
       if (
         currentOrphanX + nodeWidth >
-        mainChainRightX - styles.layout.nodeSpacingX
+        leftSectionEnd - styles.layout.nodeSpacingX
       ) {
         currentOrphanX = orphanNodeStartX;
         currentOrphanY += orphanRowHeight + styles.layout.nodeSpacingX;
@@ -626,7 +637,7 @@ export const renderWebBrowserVisualization = (
 
   // --- 4. Render Local Variables (Bottom, Center) ---
   if (Object.keys(localVariables).length > 0) {
-    const localVarsX = width / 2 - localVarsBoxWidth / 2; // Center the local vars
+    const localVarsX = width / 2 - localVarsBoxWidth / 2; // Center in middle section
     const localVarsY = localVarsLayerY;
     const localVarsResult = renderVariableBox(
       contentGroup,
