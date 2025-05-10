@@ -451,7 +451,20 @@ function DataStructurePage() {
           const impl = (dataStructure.implementation || "").toUpperCase();
           let combinedType;
 
-          if (impl && impl !== "NULL" && impl !== "") {
+          // Special cases that should not combine implementation with type
+          const specialTypes = [
+            "BIG_INTEGER",
+            "WEB_BROWSER",
+            "DEQUE",
+            "FILE_SYSTEM",
+            "GRID",
+          ];
+          if (
+            impl &&
+            impl !== "NULL" &&
+            impl !== "" &&
+            !specialTypes.includes(type)
+          ) {
             combinedType = `${impl}_${type}`;
           } else {
             combinedType = type;
@@ -603,17 +616,6 @@ function DataStructurePage() {
               );
               break;
             case "BINARY_HEAP_PRIORITY_QUEUE":
-              console.log("Using array vector visualization for ARRAY_VECTOR");
-              renderArrayStructureVisualization(
-                contentGroup,
-                width,
-                height,
-                effectiveOperation,
-                memorySnapshot,
-                snapshotIdentifier
-              );
-              break;
-            case "BIG_INTEGER":
               console.log("Using array vector visualization for ARRAY_VECTOR");
               renderArrayStructureVisualization(
                 contentGroup,
@@ -1274,7 +1276,20 @@ function DataStructurePage() {
         const impl = (dataStructure.implementation || "").toUpperCase();
         let combinedType;
 
-        if (impl && impl !== "NULL" && impl !== "") {
+        // Special cases that should not combine implementation with type
+        const specialTypes = [
+          "BIG_INTEGER",
+          "WEB_BROWSER",
+          "DEQUE",
+          "FILE_SYSTEM",
+          "GRID",
+        ];
+        if (
+          impl &&
+          impl !== "NULL" &&
+          impl !== "" &&
+          !specialTypes.includes(type)
+        ) {
           combinedType = `${impl}_${type}`;
         } else {
           combinedType = type;
