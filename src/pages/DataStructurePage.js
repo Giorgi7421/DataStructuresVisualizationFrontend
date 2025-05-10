@@ -519,6 +519,18 @@ function DataStructurePage() {
               );
               break;
             case "LINKED_LIST_STACK":
+              console.log(
+                "Using linked list vector visualization for LINKED_LIST_VECTOR"
+              );
+              renderLinkedListVectorVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "TWO_QUEUE_STACK":
             case "ARRAY_QUEUE":
               console.log("Using array vector visualization for ARRAY_VECTOR");
@@ -532,6 +544,18 @@ function DataStructurePage() {
               );
               break;
             case "LINKED_LIST_QUEUE":
+              console.log(
+                "Using linked list vector visualization for LINKED_LIST_VECTOR"
+              );
+              renderLinkedListVectorVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "ARRAY_MAP":
             case "HASH_MAP":
             case "TREE_MAP":
@@ -545,8 +569,30 @@ function DataStructurePage() {
             case "MOVE_TO_FRONT_SET":
             case "UNSORTED_VECTOR_PRIORITY_QUEUE":
             case "SORTED_LINKED_LIST_PRIORITY_QUEUE":
+              console.log(
+                "Using linked list vector visualization for LINKED_LIST_VECTOR"
+              );
+              renderLinkedListVectorVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE":
             case "BINARY_HEAP_PRIORITY_QUEUE":
+              console.log("Using array vector visualization for ARRAY_VECTOR");
+              renderArrayStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "BIG_INTEGER":
             case "FILE_SYSTEM":
             case "TWO_STACK_EDITOR_BUFFER":
@@ -1557,14 +1603,16 @@ function DataStructurePage() {
                                   {op.state.message}
                                 </div>
                               )}
-                              {op.state && op.state.result !== undefined && op.state.result !== null && (
-                                <div className="mt-1">
-                                  Result:{" "}
-                                  <span className="text-green-600">
-                                    {String(op.state.result)}
-                                  </span>
-                                </div>
-                              )}
+                              {op.state &&
+                                op.state.result !== undefined &&
+                                op.state.result !== null && (
+                                  <div className="mt-1">
+                                    Result:{" "}
+                                    <span className="text-green-600">
+                                      {String(op.state.result)}
+                                    </span>
+                                  </div>
+                                )}
                             </div>
                           );
                         })}
