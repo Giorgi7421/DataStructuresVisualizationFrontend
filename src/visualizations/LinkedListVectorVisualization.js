@@ -87,7 +87,8 @@ export const renderLinkedListVectorVisualization = (
       nodeSpacingX: 60, // Increased from 40
       varBoxSpacingY: 20,
       nodesStartXOffset: 60, // Space between var boxes and first node
-      layerSpacingY: 120, // NEW: Vertical space between layers
+      layerSpacingY: 120, // Vertical space between layers
+      orphanNodeSpacingX: 40, // Spacing between orphan nodes
     },
   };
 
@@ -193,6 +194,19 @@ export const renderLinkedListVectorVisualization = (
   let middleLayerMaxNodeHeight = styles.node.height; // Use defined default
   currentX = mainListStartX;
 
+  // Calculate layer positions
+  const topLayerY = varBoxTopMargin;
+  const mainChainLayerY =
+    topLayerY +
+    (instanceVarsBoxHeight > 0
+      ? instanceVarsBoxHeight + styles.layout.layerSpacingY
+      : 0);
+  const orphanLayerY = mainChainLayerY + styles.layout.layerSpacingY;
+  const localVarsLayerY = orphanLayerY + styles.layout.layerSpacingY;
+
+  // Track the leftmost position of the main chain
+  let mainChainLeftmostX = mainListStartX;
+
   while (
     currentAddress &&
     currentAddress !== "0x0" &&
@@ -264,6 +278,7 @@ export const renderLinkedListVectorVisualization = (
     currentX += styles.node.width + styles.layout.nodeSpacingX;
     currentAddress = nodeData.nextAddress;
     nodesProcessedCount++;
+    mainChainLeftmostX = Math.min(mainChainLeftmostX, currentX);
   }
 
   if (nodesProcessedCount === MAX_NODES_TO_RENDER) {
@@ -289,12 +304,12 @@ export const renderLinkedListVectorVisualization = (
     }
   });
 
-  // ---> START: Moved Orphan Node Logic to Middle Layer <---
-  const orphanNodeStartX = firstColX; // Start orphans on the left
-  const orphanNodeY = middleLayerY; // Render on middle layer Y
+  // Modify orphan nodes rendering to use the new layer and position
+  const orphanNodeStartX = firstColX;
+  const orphanNodeY = orphanLayerY;
   let currentOrphanX = orphanNodeStartX;
   let currentOrphanY = orphanNodeY;
-  let middleLayerMaxOrphanHeight = 0; // Track orphan heights separately for row wrapping
+  let orphanRowHeight = 0;
 
   const allPotentialNodeAddresses = Object.keys(addressObjectMap).filter(
     (addr) =>
@@ -335,10 +350,7 @@ export const renderLinkedListVectorVisualization = (
       } // Note: prev field rendering might need specific handling if required
 
       const nodeHeight = (styles.node && styles.node.height) || 100;
-      middleLayerMaxOrphanHeight = Math.max(
-        middleLayerMaxOrphanHeight,
-        nodeHeight
-      );
+      orphanRowHeight = Math.max(orphanRowHeight, nodeHeight);
 
       orphanSpecs.push({
         x: currentOrphanX,
@@ -349,14 +361,14 @@ export const renderLinkedListVectorVisualization = (
         isIsolated: true,
         style: styles.node,
       });
-      visited.add(addr); // Mark as visited here
+      visited.add(addr);
 
+      // Update connection logic for orphan nodes
       if (
         nodeData.nextAddress &&
         nodeData.nextAddress !== "0x0" &&
         nodeData.nextAddress !== "null"
       ) {
-        // Connection for orphan nodes might need review based on new layout
         allConnections.push({
           sourceName: addr,
           targetAddress: nodeData.nextAddress,
@@ -364,17 +376,16 @@ export const renderLinkedListVectorVisualization = (
         });
       }
 
-      // Basic wrapping logic for orphans on the left side
-      currentOrphanX += (styles.node.width || 180) + styles.layout.nodeSpacingX;
-      // Wrap if next node exceeds ~half the width (leaving space for main list)
+      // Wrap orphan nodes if they would overlap with main chain
+      currentOrphanX +=
+        (styles.node.width || 180) + styles.layout.orphanNodeSpacingX;
       if (
         currentOrphanX + (styles.node.width || 180) >
-        width / 2 - styles.layout.nodeSpacingX
+        mainChainLeftmostX - styles.layout.nodeSpacingX
       ) {
         currentOrphanX = orphanNodeStartX;
-        currentOrphanY +=
-          middleLayerMaxOrphanHeight + styles.layout.nodeSpacingX;
-        middleLayerMaxOrphanHeight = 0; // Reset max height for the new row
+        currentOrphanY += orphanRowHeight + styles.layout.nodeSpacingX;
+        orphanRowHeight = 0;
       }
     }
   });
@@ -397,22 +408,21 @@ export const renderLinkedListVectorVisualization = (
       );
     }
   });
-  // ---> END: Moved Orphan Node Logic <---
 
   // Calculate bottom Y based on the maximum height reached in the middle layer
   // (Consider both main list and potentially multiple rows of orphans)
   const middleLayerMaxHeightReached = Math.max(
     middleLayerMaxNodeHeight,
-    currentOrphanY + middleLayerMaxOrphanHeight - middleLayerY
+    currentOrphanY + orphanRowHeight - middleLayerY
   ); // Check max Y reached by orphans
   const middleLayerBottomY = middleLayerY + middleLayerMaxHeightReached;
 
   const bottomLayerStartY = middleLayerBottomY + layerSpacingY;
 
+  // Update local variables rendering to use the new layer position
   if (Object.keys(localVariables).length > 0) {
-    // Position Local Vars centered
     const localVarsX = width / 2 - localVarsBoxWidth / 2;
-    const localVarsY = bottomLayerStartY;
+    const localVarsY = localVarsLayerY;
     const localVarsResult = renderVariableBox(
       contentGroup,
       "Local Variables",
