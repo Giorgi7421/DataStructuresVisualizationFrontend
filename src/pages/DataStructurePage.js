@@ -485,7 +485,7 @@ function DataStructurePage() {
               console.log(
                 "Using linked list vector visualization for LINKED_LIST_VECTOR"
               );
-              renderLinkedListVectorVisualization(
+              renderLinkedStructureVisualization(
                 contentGroup,
                 width,
                 height,
@@ -522,7 +522,7 @@ function DataStructurePage() {
               console.log(
                 "Using linked list vector visualization for LINKED_LIST_VECTOR"
               );
-              renderLinkedListVectorVisualization(
+              renderLinkedStructureVisualization(
                 contentGroup,
                 width,
                 height,
@@ -547,7 +547,7 @@ function DataStructurePage() {
               console.log(
                 "Using linked list vector visualization for LINKED_LIST_VECTOR"
               );
-              renderLinkedListVectorVisualization(
+              renderLinkedStructureVisualization(
                 contentGroup,
                 width,
                 height,
@@ -572,7 +572,7 @@ function DataStructurePage() {
               console.log(
                 "Using linked list vector visualization for LINKED_LIST_VECTOR"
               );
-              renderLinkedListVectorVisualization(
+              renderLinkedStructureVisualization(
                 contentGroup,
                 width,
                 height,
@@ -608,14 +608,14 @@ function DataStructurePage() {
             case "TWO_STACK_EDITOR_BUFFER":
             case "LINKED_LIST_EDITOR_BUFFER":
             case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
-              console.log(
-                `No specific implementation for ${combinedType}, showing message.`
-              );
-              showNotImplementedMessage(
+              console.log("Rendering WEB_BROWSER visualization");
+              renderDoublyLinkedStructureVisualization(
                 contentGroup,
                 width,
                 height,
-                combinedType
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
               );
               break;
 
