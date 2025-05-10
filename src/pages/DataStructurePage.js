@@ -1325,72 +1325,87 @@ function DataStructurePage() {
               <h2 className="text-md font-bold mb-2 flex-shrink-0">
                 Operations
               </h2>
-              <div className="overflow-y-auto flex-1 no-scrollbar">
-                <form
-                  onSubmit={handleOperationSubmit}
-                  className="flex flex-col"
-                >
-                  <div className="mb-2">
-                    <label
-                      className="block text-gray-700 mb-1 text-xs"
-                      htmlFor="operation"
-                    >
-                      Operation
-                    </label>
-                    <select
-                      id="operation"
-                      value={operation}
-                      onChange={(e) => setOperation(e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      required
-                    >
-                      <option value="">Select an operation</option>
-                      {getOperationOptions().map((op) => (
-                        <option key={op.value} value={op.value}>
-                          {op.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {operation && needsValueInput() && (
+              <div className="flex flex-col h-full">
+                {/* Operation Form - Takes up half the space */}
+                <div className="h-1/2 overflow-y-auto no-scrollbar">
+                  <form
+                    onSubmit={handleOperationSubmit}
+                    className="flex flex-col"
+                  >
                     <div className="mb-2">
                       <label
                         className="block text-gray-700 mb-1 text-xs"
-                        htmlFor="value"
+                        htmlFor="operation"
                       >
-                        Value
+                        Operation
                       </label>
-                      <input
-                        id="value"
-                        type="text"
-                        value={value}
-                        onChange={(e) => setValue(e.target.value)}
+                      <select
+                        id="operation"
+                        value={operation}
+                        onChange={(e) => setOperation(e.target.value)}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         required
-                      />
+                      >
+                        <option value="">Select an operation</option>
+                        {getOperationOptions().map((op) => (
+                          <option key={op.value} value={op.value}>
+                            {op.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  )}
 
-                  <button
-                    type="submit"
-                    disabled={
-                      !operation ||
-                      (needsValueInput() && !value) ||
-                      processingOperation
-                    }
-                    className="w-full bg-blue-500 text-white py-1 px-2 rounded text-sm hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-blue-300"
-                  >
-                    {processingOperation
-                      ? "Processing..."
-                      : "Perform Operation"}
-                  </button>
-                </form>
+                    {operation && needsValueInput() && (
+                      <div className="mb-2">
+                        <label
+                          className="block text-gray-700 mb-1 text-xs"
+                          htmlFor="value"
+                        >
+                          Value
+                        </label>
+                        <input
+                          id="value"
+                          type="text"
+                          value={value}
+                          onChange={(e) => setValue(e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                    )}
 
-                {/* Operation History List */}
-                <div className="mt-4">
+                    <button
+                      type="submit"
+                      disabled={
+                        !operation ||
+                        (needsValueInput() && !value) ||
+                        processingOperation
+                      }
+                      className="w-full bg-blue-500 text-white py-1 px-2 rounded text-sm hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-blue-300"
+                    >
+                      {processingOperation
+                        ? "Processing..."
+                        : "Perform Operation"}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Operation History List - Takes up the other half */}
+                <div
+                  className="h-1/2 overflow-y-auto"
+                  style={{
+                    scrollbarWidth: "thin",
+                    scrollbarColor: "#94a3b8 #f1f5f9",
+                  }}
+                >
                   <h3 className="font-bold mb-1 text-xs">Operation History</h3>
-                  <div className="bg-gray-100 p-2 rounded max-h-96 overflow-y-auto no-scrollbar">
+                  <div
+                    className="bg-gray-100 p-2 rounded h-[calc(100%-24px)] overflow-y-auto"
+                    style={{
+                      scrollbarWidth: "thin",
+                      scrollbarColor: "#94a3b8 #f1f5f9",
+                    }}
+                  >
                     {operations.length > 0 ? (
                       <ul className="divide-y divide-gray-200">
                         {[...operations].reverse().map((op, index) => {
