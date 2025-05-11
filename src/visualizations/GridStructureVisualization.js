@@ -95,6 +95,9 @@ export function renderGridStructureVisualization(
   let varBoxY = 30; // temporary for addressesArrayY calculation
   const addressesArrayX = varBoxX + styles.varBox.width + 60;
   const addressesArrayY = varBoxY + 10; // align with varBox
+  // Define addressBoxX and addressBoxY so they are in scope for both uses
+  const addressBoxX = addressesArrayX;
+  const addressBoxY = addressesArrayY - styles.cell.height;
   // Now align the 'elems' field with the address tag box
   varBoxY =
     addressesArrayY +
@@ -104,7 +107,11 @@ export function renderGridStructureVisualization(
   renderVariableBox(
     contentGroup,
     "Instance Variables",
-    { elems: elemsAddress },
+    {
+      elems: elemsAddress,
+      rows: instanceVariables.rows,
+      columns: instanceVariables.columns,
+    },
     varBoxX,
     varBoxY,
     styles.varBox,
@@ -119,25 +126,28 @@ export function renderGridStructureVisualization(
   }
   const cellSpacingY = 0;
 
-  // Draw arrow from 'elems' to addresses array (vertical)
+  // Draw arrow from 'elems' to addresses array (horizontal)
   if (elemsAddress) {
-    const path = generateOrthogonalPath(
-      {
-        x: varBoxX + styles.varBox.width,
-        y: varBoxY + styles.varBox.headerHeight + styles.varBox.fieldHeight / 2,
-      },
-      {
-        x: addressesArrayX,
-        y: addressesArrayY + styles.cell.height / 2,
-      },
-      styles.connection.cornerRadius,
-      "H-V",
-      20,
-      null
-    );
+    // Calculate the y-position of the 'elems' field in the instance variable box
+    const instanceVars = {
+      elems: elemsAddress,
+      rows: instanceVariables.rows,
+      columns: instanceVariables.columns,
+    };
+    const instanceVarKeys = Object.keys(instanceVars);
+    const fieldIndex = instanceVarKeys.indexOf("elems");
+    const startX = varBoxX + styles.varBox.width;
+    const startY =
+      varBoxY +
+      styles.varBox.headerHeight +
+      styles.varBox.padding +
+      fieldIndex * (styles.varBox.fieldHeight + styles.varBox.fieldSpacing) +
+      styles.varBox.fieldHeight / 2;
+    const endX = addressBoxX;
+    const endY = addressBoxY + styles.cell.height / 2;
     contentGroup
       .append("path")
-      .attr("d", path)
+      .attr("d", `M ${startX} ${startY} L ${endX} ${endY}`)
       .attr("fill", "none")
       .attr("stroke", styles.connection.color)
       .attr("stroke-width", styles.connection.strokeWidth)
