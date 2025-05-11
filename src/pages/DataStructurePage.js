@@ -110,6 +110,11 @@ const dsOperationArgs = {
   },
 };
 
+// Add this utility function near the top
+function camelToKebab(str) {
+  return str.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+}
+
 function DataStructurePage() {
   // Get location state for data structure details
   const navigate = useNavigate();
@@ -1083,7 +1088,8 @@ function DataStructurePage() {
       const type = dataStructure.type.toUpperCase();
       const impl = dataStructure.implementation;
       const dsName = dataStructure.name;
-      const opName = opValue;
+      // Convert opValue to kebab-case for API call
+      const opName = camelToKebab(opValue);
       const argVals = Array.isArray(value) ? value : value ? [value] : [];
 
       const controllerMap = {
@@ -1416,48 +1422,60 @@ function DataStructurePage() {
                       >
                         <div className="flex items-center">
                           <span className="text-gray-700 text-xs font-semibold whitespace-nowrap">
-                            {op.label}
-                            {getOperationArgs(op.value).length > 0 &&
-                              `(${getOperationArgs(op.value).join(", ")}:`}
+                            {op.label}(
                           </span>
-                          {getOperationArgs(op.value).map((arg, idx) => (
-                            <input
-                              key={arg}
-                              id={`operation-${op.value}-${arg}`}
-                              type="text"
-                              value={
-                                Array.isArray(operationValues[op.value])
-                                  ? operationValues[op.value][idx] || ""
-                                  : getOperationArgs(op.value).length > 1
-                                  ? ""
-                                  : operationValues[op.value] || ""
-                              }
-                              onChange={(e) => {
-                                setOperationValues((prev) => {
-                                  if (getOperationArgs(op.value).length > 1) {
-                                    const newVals = Array.isArray(
-                                      prev[op.value]
-                                    )
-                                      ? [...prev[op.value]]
-                                      : [];
-                                    newVals[idx] = e.target.value;
-                                    return { ...prev, [op.value]: newVals };
-                                  } else {
-                                    return {
-                                      ...prev,
-                                      [op.value]: e.target.value,
-                                    };
-                                  }
-                                });
-                              }}
-                              className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6 mx-1"
-                            />
-                          ))}
-                          {getOperationArgs(op.value).length > 0 && (
+                          {getOperationArgs(op.value).length === 0 && (
                             <span className="text-gray-700 text-xs font-semibold">
                               )
                             </span>
                           )}
+                          {getOperationArgs(op.value).map((arg, idx, arr) => (
+                            <span key={arg} className="flex items-center">
+                              <span className="text-gray-700 text-xs font-semibold ml-1">
+                                {arg}
+                              </span>
+                              <input
+                                id={`operation-${op.value}-${arg}`}
+                                type="text"
+                                value={
+                                  Array.isArray(operationValues[op.value])
+                                    ? operationValues[op.value][idx] || ""
+                                    : getOperationArgs(op.value).length > 1
+                                    ? ""
+                                    : operationValues[op.value] || ""
+                                }
+                                onChange={(e) => {
+                                  setOperationValues((prev) => {
+                                    if (getOperationArgs(op.value).length > 1) {
+                                      const newVals = Array.isArray(
+                                        prev[op.value]
+                                      )
+                                        ? [...prev[op.value]]
+                                        : [];
+                                      newVals[idx] = e.target.value;
+                                      return { ...prev, [op.value]: newVals };
+                                    } else {
+                                      return {
+                                        ...prev,
+                                        [op.value]: e.target.value,
+                                      };
+                                    }
+                                  });
+                                }}
+                                className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6 mx-1"
+                              />
+                              {idx < arr.length - 1 && (
+                                <span className="text-gray-700 text-xs font-semibold ml-1">
+                                  ,
+                                </span>
+                              )}
+                              {idx === arr.length - 1 && (
+                                <span className="text-gray-700 text-xs font-semibold">
+                                  )
+                                </span>
+                              )}
+                            </span>
+                          ))}
                         </div>
                         <button
                           type="submit"
