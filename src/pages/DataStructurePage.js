@@ -1107,19 +1107,20 @@ function DataStructurePage() {
       const controller = controllerMap[type];
       let endpoint = "";
       let method = "patch";
+      // Use kebab-case opName for getOps check
       const getOps = [
         "size",
-        "isEmpty",
+        "is-empty",
         "get",
         "peek",
         "contains",
-        "numRows",
-        "numColumns",
-        "inBounds",
-        "getFront",
-        "getBack",
+        "num-rows",
+        "num-columns",
+        "in-bounds",
+        "get-front",
+        "get-back",
         "search",
-        "isGreaterThan",
+        "is-greater-than",
       ];
       if (getOps.includes(opName)) method = "get";
 
