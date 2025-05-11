@@ -1431,7 +1431,11 @@ function DataStructurePage() {
                           )}
                           {getOperationArgs(op.value).map((arg, idx, arr) => (
                             <span key={arg} className="flex items-center">
-                              <span className="text-gray-700 text-xs font-semibold ml-1">
+                              <span
+                                className={`text-gray-700 text-xs font-semibold${
+                                  idx === 0 ? "" : " ml-1"
+                                }`}
+                              >
                                 {arg}
                               </span>
                               <input
