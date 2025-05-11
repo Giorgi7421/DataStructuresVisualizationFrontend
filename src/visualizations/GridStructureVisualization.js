@@ -62,7 +62,7 @@ export function renderGridStructureVisualization(
       strokeWidth: 1.5,
       color: "#334155",
       cornerRadius: 8,
-      markerId: "grid-arrow",
+      markerId: "array-arrow",
     },
   };
 
@@ -72,6 +72,22 @@ export function renderGridStructureVisualization(
     defs = contentGroup.append("defs");
   }
   defineArrowheads(defs, styles);
+  // Explicitly define the array-arrow marker
+  if (defs.select("#array-arrow").empty()) {
+    defs
+      .append("marker")
+      .attr("id", "array-arrow")
+      .attr("viewBox", "0 0 10 10")
+      .attr("refX", 10)
+      .attr("refY", 5)
+      .attr("markerWidth", 6)
+      .attr("markerHeight", 6)
+      .attr("orient", "auto")
+      .attr("markerUnits", "strokeWidth")
+      .append("path")
+      .attr("d", "M 0 0 L 10 5 L 0 10 z")
+      .attr("fill", styles.connection.color || "#334155");
+  }
 
   // 1. Render 'elems' variable box
   const elemsAddress = instanceVariables.elems;
@@ -119,7 +135,7 @@ export function renderGridStructureVisualization(
       .attr("fill", "none")
       .attr("stroke", styles.connection.color)
       .attr("stroke-width", styles.connection.strokeWidth)
-      .attr("marker-end", `url(#${styles.connection.markerId})`);
+      .attr("marker-end", "url(#array-arrow)");
   }
 
   // Render addresses array as vertical array
@@ -215,25 +231,29 @@ export function renderGridStructureVisualization(
       .attr("fill", "none")
       .attr("stroke", styles.connection.color)
       .attr("stroke-width", styles.connection.strokeWidth)
-      .attr("marker-end", `url(#${styles.connection.markerId})`);
+      .attr("marker-end", "url(#array-arrow)");
+
     // Draw horizontal arrow from right center of row address box to left center of first cell in row array
     if (
       addressObjectMap[rowAddress] &&
       addressObjectMap[rowAddress].length > 0
     ) {
+      const start = {
+        x: rowAddressBoxX + rowAddressBoxWidth,
+        y: rowStartY + styles.cell.height / 2,
+      };
+      const end = {
+        x: rowStartX + 6,
+        y: rowStartY + styles.cell.height / 2,
+      };
+      console.log("Row connection path:", { start, end });
       contentGroup
         .append("path")
         .attr(
           "d",
           generateOrthogonalPath(
-            {
-              x: rowAddressBoxX + rowAddressBoxWidth,
-              y: rowStartY + styles.cell.height / 2,
-            },
-            {
-              x: rowStartX,
-              y: rowStartY + styles.cell.height / 2,
-            },
+            start,
+            end,
             styles.connection.cornerRadius,
             "H-V",
             10,
@@ -242,8 +262,7 @@ export function renderGridStructureVisualization(
         )
         .attr("fill", "none")
         .attr("stroke", styles.connection.color)
-        .attr("stroke-width", styles.connection.strokeWidth)
-        .attr("marker-end", `url(#${styles.connection.markerId})`);
+        .attr("stroke-width", styles.connection.strokeWidth);
     }
 
     // Render the row array horizontally
@@ -338,7 +357,6 @@ export function renderGridStructureVisualization(
       )
       .attr("fill", "none")
       .attr("stroke", styles.connection.color)
-      .attr("stroke-width", styles.connection.strokeWidth)
-      .attr("marker-end", `url(#${styles.connection.markerId})`);
+      .attr("stroke-width", styles.connection.strokeWidth);
   }
 }
