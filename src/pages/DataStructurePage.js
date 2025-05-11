@@ -30,6 +30,7 @@ import {
 import { renderArrayStructureVisualization } from "../visualizations/ArrayStructureVisualization";
 import { renderLinkedStructureVisualization } from "../visualizations/LinkedStructureVisualization";
 import { renderDoublyLinkedStructureVisualization } from "../visualizations/DoublyLinkedStructure";
+import { renderGridStructureVisualization } from "../visualizations/GridStructureVisualization";
 
 // Add this mapping near the top, after imports
 const dsOperationArgs = {
@@ -715,6 +716,16 @@ function DataStructurePage() {
               break;
             case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
               renderDoublyLinkedStructureVisualization(
+                contentGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
+            case "GRID":
+              renderGridStructureVisualization(
                 contentGroup,
                 width,
                 height,
@@ -1437,7 +1448,7 @@ function DataStructurePage() {
                                   idx === 0 ? "" : " ml-1"
                                 }`}
                               >
-                                {arg}
+                                {arg}:&nbsp;
                               </span>
                               <input
                                 id={`operation-${op.value}-${arg}`}
@@ -1467,7 +1478,11 @@ function DataStructurePage() {
                                     }
                                   });
                                 }}
-                                className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6 mx-1"
+                                className={`${
+                                  getOperationArgs(op.value).length === 3
+                                    ? "w-12"
+                                    : "w-16"
+                                } px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6`}
                               />
                               {idx < arr.length - 1 && (
                                 <span className="text-gray-700 text-xs font-semibold ml-1">
