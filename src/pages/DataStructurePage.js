@@ -136,6 +136,8 @@ function DataStructurePage() {
   const [zoomLevel, setZoomLevel] = useState(1);
   // Add a forceRender state to help with UI updates
   const [forceRender, setForceRender] = useState(0);
+  // Add this state near the top with other useState hooks
+  const [pendingOperation, setPendingOperation] = useState(false);
 
   // Create completely separate visualization state
   const [visualState, setVisualState] = useState({
@@ -194,7 +196,7 @@ function DataStructurePage() {
     }
   };
 
-  // Define fetchDataStructure as a useCallback to avoid dependency issues
+  // Refactor fetchDataStructure to return the new operations array
   const fetchDataStructure = useCallback(async () => {
     try {
       setLoading(true);
@@ -235,15 +237,11 @@ function DataStructurePage() {
               break;
             }
           }
-          // If no non-null/non-undefined result was found after checking all snapshots,
-          // set resultForState to the getResult of the actual last snapshot (it might be null or undefined).
           if (resultForState === undefined) {
             resultForState =
               op.memorySnapshots[op.memorySnapshots.length - 1].getResult;
           }
         }
-
-        // Get the last memory snapshot for other state details like instanceVariables, message etc.
         const lastSnapshot =
           op.memorySnapshots && op.memorySnapshots.length > 0
             ? op.memorySnapshots[op.memorySnapshots.length - 1]
@@ -252,19 +250,16 @@ function DataStructurePage() {
                 addressObjectMap: {},
                 message: "",
                 getResult: undefined,
-              }; // Default if no snapshots
-
+              };
         return {
           operation: op.operationName,
           parameters: op.parameters,
           state: {
-            // Combine instance variables, addressObjectMap and other relevant data
             ...lastSnapshot.instanceVariables,
             addressObjectMap: lastSnapshot.addressObjectMap,
-            result: resultForState, // Use the carefully determined result
+            result: resultForState,
             message: lastSnapshot.message,
           },
-          // Include all memory snapshots for detailed visualization
           memorySnapshots: op.memorySnapshots,
         };
       });
@@ -275,19 +270,16 @@ function DataStructurePage() {
       if (formattedOperations.length > 0) {
         const lastOperationIndex = formattedOperations.length - 1;
         setCurrentHistoryIndex(lastOperationIndex);
-
-        // Set the last snapshot of the last operation
-        const lastOperation = formattedOperations[lastOperationIndex];
         if (
-          lastOperation.memorySnapshots &&
-          lastOperation.memorySnapshots.length > 0
+          formattedOperations[lastOperationIndex].memorySnapshots &&
+          formattedOperations[lastOperationIndex].memorySnapshots.length > 0
         ) {
-          const lastSnapshotIndex = lastOperation.memorySnapshots.length - 1;
+          const lastSnapshotIndex =
+            formattedOperations[lastOperationIndex].memorySnapshots.length - 1;
           setCurrentSnapshotIndex(lastSnapshotIndex);
         }
       }
 
-      // Set the data structure details
       setDataStructure({
         id: dsDetails.id,
         name: dsDetails.name,
@@ -296,10 +288,12 @@ function DataStructurePage() {
       });
 
       setLoading(false);
+      return formattedOperations;
     } catch (err) {
       setError("Failed to load data structure: " + err.message);
       console.error(err);
       setLoading(false);
+      return [];
     }
   }, [dsDetails]);
 
@@ -1064,31 +1058,99 @@ function DataStructurePage() {
     return !noValueOperations.includes(opValue);
   };
 
-  // Handle operation form submission
+  // Replace handleOperationSubmit with dynamic endpoint logic
   const handleOperationSubmit = async (e) => {
     e.preventDefault();
 
-    if (!operation || (needsValueInput(operation) && !value)) return;
+    if (!operation) return;
+    const args = getOperationArgs(operation);
+    if (args.length > 0) {
+      if (
+        !value ||
+        (Array.isArray(value)
+          ? value.some((v) => !v || v.trim() === "")
+          : value.trim() === "")
+      ) {
+        return;
+      }
+    }
 
     try {
       setProcessingOperation(true);
+      setLoading(true);
+      setPendingOperation(true);
 
-      const response = await dataStructureService.performOperation(
-        dataStructure.type,
-        dataStructure.name,
-        dataStructure.implementation,
-        operation,
-        value
-      );
+      const type = dataStructure.type.toUpperCase();
+      const impl = dataStructure.implementation;
+      const dsName = dataStructure.name;
+      const opName = operation;
+      const argVals = Array.isArray(value) ? value : value ? [value] : [];
 
-      // Update operations list with the new operation
-      const updatedOperations = [...operations, response.data];
-      setOperations(updatedOperations);
+      const controllerMap = {
+        VECTOR: "vector",
+        TREE: "tree",
+        STACK: "stack",
+        SET: "set",
+        QUEUE: "queue",
+        EDITOR_BUFFER: "editor-buffer",
+        DEQUE: "deque",
+        BIG_INTEGER: "big-integer",
+        GRID: "grid",
+        WEB_BROWSER: "web-browser",
+      };
+      const controller = controllerMap[type];
+      let endpoint = "";
+      let method = "patch";
+      const getOps = [
+        "size",
+        "isEmpty",
+        "get",
+        "peek",
+        "contains",
+        "numRows",
+        "numColumns",
+        "inBounds",
+        "getFront",
+        "getBack",
+        "search",
+        "isGreaterThan",
+      ];
+      if (getOps.includes(opName)) method = "get";
 
-      // Navigate to the new operation
-      setCurrentHistoryIndex(updatedOperations.length - 1);
+      if (
+        ["VECTOR", "TREE", "STACK", "SET", "QUEUE", "EDITOR_BUFFER"].includes(
+          type
+        )
+      ) {
+        endpoint = `/${controller}/${opName}/${
+          impl ? impl + "/" : ""
+        }${dsName}`;
+        if (args.length > 0) {
+          endpoint += "/" + argVals.map(encodeURIComponent).join("/");
+        }
+      } else if (
+        ["DEQUE", "BIG_INTEGER", "GRID", "WEB_BROWSER"].includes(type)
+      ) {
+        endpoint = `/${controller}/${opName}/${dsName}`;
+        if (args.length > 0) {
+          endpoint += "/" + argVals.map(encodeURIComponent).join("/");
+        }
+      }
 
-      // Reset form fields
+      const api = require("../services/api").default;
+      let response;
+      if (method === "get") {
+        response = await api.get(endpoint);
+      } else {
+        response = await api.patch(endpoint);
+      }
+
+      // Instead of updating operations directly, re-fetch the full data structure and history
+      const newOperations = await fetchDataStructure();
+      if (newOperations && newOperations.length > 0) {
+        setCurrentHistoryIndex(newOperations.length - 1);
+      }
+
       setOperation("");
       setValue("");
       setError(null);
@@ -1100,8 +1162,17 @@ function DataStructurePage() {
       console.error(err);
     } finally {
       setProcessingOperation(false);
+      setLoading(false);
     }
   };
+
+  // Add this useEffect after operations state is defined
+  useEffect(() => {
+    if (pendingOperation && operations && operations.length > 0) {
+      setCurrentHistoryIndex(operations.length - 1);
+      setPendingOperation(false);
+    }
+  }, [operations, pendingOperation]);
 
   // Direct zoom controls that manipulate both the zoom behavior and content group
   const zoomIn = () => {
