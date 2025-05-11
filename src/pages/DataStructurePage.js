@@ -1379,6 +1379,26 @@ function DataStructurePage() {
     renderVisualization(operation, memorySnapshot);
   };
 
+  // Add this function to handle deletion
+  const handleDelete = async () => {
+    if (!dataStructure?.name) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete '${dataStructure.name}'? This action cannot be undone.`
+      )
+    )
+      return;
+    try {
+      await dataStructureService.deleteByName(dataStructure.name);
+      navigate("/home");
+    } catch (err) {
+      setError(
+        "Failed to delete data structure: " +
+          (err.response?.data?.message || err.message)
+      );
+    }
+  };
+
   return (
     <div className="h-full overflow-hidden flex flex-col">
       {loading ? (

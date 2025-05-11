@@ -94,4 +94,7 @@ export const dataStructureService = {
 
   // Delete a data structure
   delete: (id) => api.delete(`/datastructures/${id}`),
+
+  // Delete a data structure by name
+  deleteByName: (name) => api.delete(`/user/delete/${name}`),
 };

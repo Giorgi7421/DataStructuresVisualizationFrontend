@@ -121,13 +121,12 @@ function HomePage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (
-      window.confirm("Are you sure you want to delete this data structure?")
-    ) {
+  const handleDelete = async (name) => {
+    if (window.confirm(`Are you sure you want to delete '${name}'?`)) {
       try {
-        await dataStructureService.delete(id);
-        setDataStructures(dataStructures.filter((ds) => ds.id !== id));
+        await dataStructureService.deleteByName(name);
+        // Refresh the list after deletion
+        fetchDataStructures();
       } catch (err) {
         setError("Failed to delete data structure");
         console.error(err);
@@ -308,7 +307,7 @@ function HomePage() {
                       </h2>
                     </div>
                     <button
-                      onClick={() => handleDelete(ds.id)}
+                      onClick={() => handleDelete(ds.name)}
                       className="text-red-500 hover:text-red-700"
                       title="Delete"
                     >
