@@ -92,7 +92,15 @@ export function renderGridStructureVisualization(
   // 1. Render 'elems' variable box
   const elemsAddress = instanceVariables.elems;
   const varBoxX = 30;
-  const varBoxY = 30;
+  let varBoxY = 30; // temporary for addressesArrayY calculation
+  const addressesArrayX = varBoxX + styles.varBox.width + 60;
+  const addressesArrayY = varBoxY + 10; // align with varBox
+  // Now align the 'elems' field with the address tag box
+  varBoxY =
+    addressesArrayY +
+    styles.cell.height / 2 -
+    styles.varBox.headerHeight -
+    styles.varBox.fieldHeight / 2;
   renderVariableBox(
     contentGroup,
     "Instance Variables",
@@ -109,8 +117,6 @@ export function renderGridStructureVisualization(
   if (elemsAddress && addressObjectMap[elemsAddress]) {
     addresses = addressObjectMap[elemsAddress];
   }
-  const addressesArrayX = varBoxX + styles.varBox.width + 60;
-  const addressesArrayY = varBoxY + 10; // align with varBox
   const cellSpacingY = 0;
 
   // Draw arrow from 'elems' to addresses array (vertical)
