@@ -31,6 +31,85 @@ import { renderArrayStructureVisualization } from "../visualizations/ArrayStruct
 import { renderLinkedStructureVisualization } from "../visualizations/LinkedStructureVisualization";
 import { renderDoublyLinkedStructureVisualization } from "../visualizations/DoublyLinkedStructure";
 
+// Add this mapping near the top, after imports
+const dsOperationArgs = {
+  VECTOR: {
+    set: ["index", "element"],
+    removeAt: ["index"],
+    insertAt: ["index", "element"],
+    clear: [],
+    add: ["element"],
+    size: [],
+    isEmpty: [],
+    get: ["index"],
+  },
+  TREE: {
+    remove: ["element"],
+    insert: ["element"],
+    clear: [],
+    search: ["element"],
+  },
+  STACK: {
+    push: ["element"],
+    pop: [],
+    clear: [],
+    size: [],
+    peek: [],
+    isEmpty: [],
+  },
+  SET: {
+    remove: ["element"],
+    clear: [],
+    add: ["element"],
+    size: [],
+    isEmpty: [],
+    contains: ["element"],
+  },
+  QUEUE: {
+    enqueue: ["element"],
+    dequeue: [],
+    clear: [],
+    size: [],
+    peek: [],
+    isEmpty: [],
+  },
+  EDITOR_BUFFER: {
+    moveCursorToStart: [],
+    moveCursorToEnd: [],
+    moveCursorForward: [],
+    moveCursorBackward: [],
+    insertCharacter: ["character"],
+    deleteCharacter: [],
+  },
+  DEQUE: {
+    pushFront: ["element"],
+    pushBack: ["element"],
+    popFront: [],
+    popBack: [],
+    clear: [],
+    size: [],
+    isEmpty: [],
+    getFront: [],
+    getBack: [],
+  },
+  BIG_INTEGER: {
+    add: ["number"],
+    isGreaterThan: ["number"],
+  },
+  GRID: {
+    set: ["row", "column", "element"],
+    numRows: [],
+    numColumns: [],
+    inBounds: ["row", "column"],
+    get: ["row", "column"],
+  },
+  WEB_BROWSER: {
+    visit: ["url"],
+    forward: [],
+    back: [],
+  },
+};
+
 function DataStructurePage() {
   // Get location state for data structure details
   const navigate = useNavigate();
@@ -956,62 +1035,18 @@ function DataStructurePage() {
     }
   };
 
-  // Get operation options based on the data structure type
+  // Replace getOperationOptions and needsValueInput with dynamic logic
   const getOperationOptions = () => {
     if (!dataStructure) return [];
-
     const type = dataStructure.type.toUpperCase();
+    const ops = dsOperationArgs[type] || {};
+    return Object.keys(ops).map((op) => ({ value: op, label: op }));
+  };
 
-    const commonOperations = [
-      { value: "CLEAR", label: "Clear" },
-      { value: "IS_EMPTY", label: "Is Empty?" },
-      { value: "SIZE", label: "Size" },
-    ];
-
-    switch (type) {
-      case "VECTOR":
-        return [
-          ...commonOperations,
-          { value: "GET", label: "Get Element" },
-          { value: "SET", label: "Set Element" },
-          { value: "PUSH_BACK", label: "Push Back" },
-          { value: "POP_BACK", label: "Pop Back" },
-          { value: "INSERT", label: "Insert" },
-          { value: "ERASE", label: "Erase" },
-        ];
-      case "STACK":
-        return [
-          ...commonOperations,
-          { value: "PUSH", label: "Push" },
-          { value: "POP", label: "Pop" },
-          { value: "TOP", label: "Top" },
-        ];
-      case "QUEUE":
-        return [
-          ...commonOperations,
-          { value: "ENQUEUE", label: "Enqueue" },
-          { value: "DEQUEUE", label: "Dequeue" },
-          { value: "FRONT", label: "Front" },
-        ];
-      case "MAP":
-        return [
-          ...commonOperations,
-          { value: "GET", label: "Get" },
-          { value: "PUT", label: "Put" },
-          { value: "REMOVE", label: "Remove" },
-          { value: "CONTAINS_KEY", label: "Contains Key" },
-        ];
-      case "TREE":
-        return [
-          ...commonOperations,
-          { value: "INSERT", label: "Insert" },
-          { value: "REMOVE", label: "Remove" },
-          { value: "FIND", label: "Find" },
-          { value: "TRAVERSAL", label: "Traversal" },
-        ];
-      default:
-        return commonOperations;
-    }
+  const getOperationArgs = (opValue) => {
+    if (!dataStructure) return [];
+    const type = dataStructure.type.toUpperCase();
+    return (dsOperationArgs[type] && dsOperationArgs[type][opValue]) || [];
   };
 
   // Check if the selected operation needs a value input
@@ -1307,28 +1342,41 @@ function DataStructurePage() {
                         className="flex items-center justify-between py-0.5 h-7"
                       >
                         <div className="flex items-center">
-                          {needsValueInput(op.value) ? (
-                            <>
-                              <span className="text-gray-700 text-xs font-semibold whitespace-nowrap">
-                                {op.label}(element:
-                              </span>
-                              <input
-                                id={`operation-${op.value}`}
-                                type="text"
-                                value={operation === op.value ? value : ""}
-                                onChange={(e) => {
-                                  setOperation(op.value);
+                          <span className="text-gray-700 text-xs font-semibold whitespace-nowrap">
+                            {op.label}
+                            {getOperationArgs(op.value).length > 0 &&
+                              `(${getOperationArgs(op.value).join(", ")}:`}
+                          </span>
+                          {getOperationArgs(op.value).map((arg, idx) => (
+                            <input
+                              key={arg}
+                              id={`operation-${op.value}-${arg}`}
+                              type="text"
+                              value={
+                                operation === op.value
+                                  ? Array.isArray(value)
+                                    ? value[idx] || ""
+                                    : value || ""
+                                  : ""
+                              }
+                              onChange={(e) => {
+                                setOperation(op.value);
+                                if (getOperationArgs(op.value).length > 1) {
+                                  const newVals = Array.isArray(value)
+                                    ? [...value]
+                                    : [];
+                                  newVals[idx] = e.target.value;
+                                  setValue(newVals);
+                                } else {
                                   setValue(e.target.value);
-                                }}
-                                className="w-20 px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6 mx-1"
-                              />
-                              <span className="text-gray-700 text-xs font-semibold">
-                                )
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-gray-700 text-xs font-semibold whitespace-nowrap">
-                              {op.label}
+                                }
+                              }}
+                              className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6 mx-1"
+                            />
+                          ))}
+                          {getOperationArgs(op.value).length > 0 && (
+                            <span className="text-gray-700 text-xs font-semibold">
+                              )
                             </span>
                           )}
                         </div>
@@ -1340,8 +1388,11 @@ function DataStructurePage() {
                             handleOperationSubmit(e);
                           }}
                           disabled={
-                            needsValueInput(op.value) &&
-                            (!value || value.trim() === "")
+                            getOperationArgs(op.value).length > 0 &&
+                            (!value ||
+                              (Array.isArray(value)
+                                ? value.some((v) => !v || v.trim() === "")
+                                : value.trim() === ""))
                           }
                           className="bg-blue-500 text-white py-0.5 px-3 rounded text-xs font-semibold hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-300 disabled:text-gray-500 h-6 whitespace-nowrap"
                         >
