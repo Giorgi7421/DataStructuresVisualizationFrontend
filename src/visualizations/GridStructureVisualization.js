@@ -104,7 +104,7 @@ export function renderGridStructureVisualization(
     styles.cell.height / 2 -
     styles.varBox.headerHeight -
     styles.varBox.fieldHeight / 2;
-  renderVariableBox(
+  const instanceVarBoxResult = renderVariableBox(
     contentGroup,
     "Instance Variables",
     {
@@ -118,6 +118,23 @@ export function renderGridStructureVisualization(
     "instance",
     isAddress
   );
+
+  // Render local variable box below instance variable box if local variables exist
+  const localVariables = state.localVariables || {};
+  if (Object.keys(localVariables).length > 0) {
+    const localVarsX = varBoxX;
+    const localVarsY = varBoxY + instanceVarBoxResult.height + 20; // 20px spacing
+    renderVariableBox(
+      contentGroup,
+      "Local Variables",
+      localVariables,
+      localVarsX,
+      localVarsY,
+      styles.varBox,
+      "local",
+      isAddress
+    );
+  }
 
   // 2. Render the addresses array as a vertical array (like array visualization, but vertical)
   let addresses = [];
