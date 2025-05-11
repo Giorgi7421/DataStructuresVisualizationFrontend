@@ -101,6 +101,8 @@ function HomePage() {
     getImplementationOptions("STACK")[0]?.value || ""
   );
   const [newDSNumber, setNewDSNumber] = useState("0");
+  const [newGridRows, setNewGridRows] = useState("3");
+  const [newGridColumns, setNewGridColumns] = useState("3");
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -154,6 +156,13 @@ function HomePage() {
         endpoint += `/${encodeURIComponent(newDSNumber)}`;
       }
 
+      // Add rows and columns for grid
+      if (newDSType === "GRID") {
+        endpoint += `/${encodeURIComponent(newGridRows)}/${encodeURIComponent(
+          newGridColumns
+        )}`;
+      }
+
       console.log("Creating data structure with endpoint:", endpoint);
       console.log("Type:", newDSType);
       console.log("Implementation:", newDSImplementation);
@@ -177,6 +186,8 @@ function HomePage() {
       setNewDSType("STACK");
       setNewDSImplementation(getImplementationOptions("STACK")[0]?.value || "");
       setNewDSNumber("0");
+      setNewGridRows("3");
+      setNewGridColumns("3");
 
       // Navigate to the new data structure's page
       navigate(`/datastructure/${newDataStructure.id}`, {
@@ -426,6 +437,45 @@ function HomePage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
+                </div>
+              )}
+
+              {newDSType === "GRID" && (
+                <div className="mb-4 flex space-x-2">
+                  <div className="flex-1">
+                    <label
+                      className="block text-gray-700 mb-2"
+                      htmlFor="grid-rows"
+                    >
+                      Rows
+                    </label>
+                    <input
+                      id="grid-rows"
+                      type="number"
+                      min="1"
+                      value={newGridRows}
+                      onChange={(e) => setNewGridRows(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label
+                      className="block text-gray-700 mb-2"
+                      htmlFor="grid-columns"
+                    >
+                      Columns
+                    </label>
+                    <input
+                      id="grid-columns"
+                      type="number"
+                      min="1"
+                      value={newGridColumns}
+                      onChange={(e) => setNewGridColumns(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
                 </div>
               )}
 
