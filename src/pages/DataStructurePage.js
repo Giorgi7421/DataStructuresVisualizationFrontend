@@ -123,7 +123,7 @@ function DataStructurePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [operation, setOperation] = useState("");
-  const [value, setValue] = useState("");
+  const [operationValues, setOperationValues] = useState({});
   const [processingOperation, setProcessingOperation] = useState(false);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(0);
   const [currentSnapshotIndex, setCurrentSnapshotIndex] = useState(0);
@@ -1059,11 +1059,11 @@ function DataStructurePage() {
   };
 
   // Replace handleOperationSubmit with dynamic endpoint logic
-  const handleOperationSubmit = async (e) => {
+  const handleOperationSubmit = async (e, opValue) => {
     e.preventDefault();
 
-    if (!operation) return;
-    const args = getOperationArgs(operation);
+    const args = getOperationArgs(opValue);
+    const value = operationValues[opValue];
     if (args.length > 0) {
       if (
         !value ||
@@ -1083,7 +1083,7 @@ function DataStructurePage() {
       const type = dataStructure.type.toUpperCase();
       const impl = dataStructure.implementation;
       const dsName = dataStructure.name;
-      const opName = operation;
+      const opName = opValue;
       const argVals = Array.isArray(value) ? value : value ? [value] : [];
 
       const controllerMap = {
@@ -1145,14 +1145,16 @@ function DataStructurePage() {
         response = await api.patch(endpoint);
       }
 
-      // Instead of updating operations directly, re-fetch the full data structure and history
       const newOperations = await fetchDataStructure();
       if (newOperations && newOperations.length > 0) {
         setCurrentHistoryIndex(newOperations.length - 1);
       }
 
-      setOperation("");
-      setValue("");
+      // Clear only the value for this operation
+      setOperationValues((prev) => ({
+        ...prev,
+        [opValue]: args.length > 1 ? [] : "",
+      }));
       setError(null);
     } catch (err) {
       setError(
@@ -1404,7 +1406,7 @@ function DataStructurePage() {
                 {/* Operation Form - Takes up half the space */}
                 <div className="h-1/2 overflow-y-auto no-scrollbar">
                   <form
-                    onSubmit={handleOperationSubmit}
+                    onSubmit={(e) => handleOperationSubmit(e, operation)}
                     className="flex flex-col divide-y divide-gray-200"
                   >
                     {getOperationOptions().map((op) => (
@@ -1424,23 +1426,29 @@ function DataStructurePage() {
                               id={`operation-${op.value}-${arg}`}
                               type="text"
                               value={
-                                operation === op.value
-                                  ? Array.isArray(value)
-                                    ? value[idx] || ""
-                                    : value || ""
-                                  : ""
+                                Array.isArray(operationValues[op.value])
+                                  ? operationValues[op.value][idx] || ""
+                                  : getOperationArgs(op.value).length > 1
+                                  ? ""
+                                  : operationValues[op.value] || ""
                               }
                               onChange={(e) => {
-                                setOperation(op.value);
-                                if (getOperationArgs(op.value).length > 1) {
-                                  const newVals = Array.isArray(value)
-                                    ? [...value]
-                                    : [];
-                                  newVals[idx] = e.target.value;
-                                  setValue(newVals);
-                                } else {
-                                  setValue(e.target.value);
-                                }
+                                setOperationValues((prev) => {
+                                  if (getOperationArgs(op.value).length > 1) {
+                                    const newVals = Array.isArray(
+                                      prev[op.value]
+                                    )
+                                      ? [...prev[op.value]]
+                                      : [];
+                                    newVals[idx] = e.target.value;
+                                    return { ...prev, [op.value]: newVals };
+                                  } else {
+                                    return {
+                                      ...prev,
+                                      [op.value]: e.target.value,
+                                    };
+                                  }
+                                });
                               }}
                               className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6 mx-1"
                             />
@@ -1453,23 +1461,19 @@ function DataStructurePage() {
                         </div>
                         <button
                           type="submit"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setOperation(op.value);
-                            handleOperationSubmit(e);
-                          }}
+                          onClick={(e) => handleOperationSubmit(e, op.value)}
                           disabled={
                             getOperationArgs(op.value).length > 0 &&
-                            (!value ||
-                              (Array.isArray(value)
-                                ? value.some((v) => !v || v.trim() === "")
-                                : value.trim() === ""))
+                            (!operationValues[op.value] ||
+                              (Array.isArray(operationValues[op.value])
+                                ? operationValues[op.value].some(
+                                    (v) => !v || v.trim() === ""
+                                  )
+                                : operationValues[op.value]?.trim() === ""))
                           }
                           className="bg-blue-500 text-white py-0.5 px-3 rounded text-xs font-semibold hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-300 disabled:text-gray-500 h-6 whitespace-nowrap"
                         >
-                          {processingOperation && operation === op.value
-                            ? "Processing..."
-                            : "Perform"}
+                          {processingOperation ? "Processing..." : "Perform"}
                         </button>
                       </div>
                     ))}
