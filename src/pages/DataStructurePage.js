@@ -1765,7 +1765,7 @@ function DataStructurePage() {
     const pdf = new jsPDF();
     let yOffset = 20;
 
-    // Add title
+    // Add title to first page
     pdf.setFontSize(16);
     pdf.text(`Operation: ${currentOp.operation}`, 20, yOffset);
     yOffset += 10;
@@ -1794,6 +1794,12 @@ function DataStructurePage() {
 
     // Capture and add each snapshot
     for (let i = 0; i < currentOp.memorySnapshots.length; i++) {
+      // Add new page for each snapshot (except the first one which already has the title)
+      if (i > 0) {
+        pdf.addPage();
+        yOffset = 20;
+      }
+
       // Set current snapshot
       setCurrentSnapshotIndex(i);
 
@@ -1855,8 +1861,8 @@ function DataStructurePage() {
             height: 600,
           });
 
-          // Add snapshot number
-          pdf.setFontSize(12);
+          // Add snapshot number at the top
+          pdf.setFontSize(14);
           pdf.text(`Snapshot ${i + 1}`, 20, yOffset);
           yOffset += 10;
 
@@ -1865,12 +1871,6 @@ function DataStructurePage() {
           const imgWidth = 170;
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-          // Check if we need a new page
-          if (yOffset + imgHeight > 280) {
-            pdf.addPage();
-            yOffset = 20;
-          }
-
           pdf.addImage(imgData, "PNG", 20, yOffset, imgWidth, imgHeight);
           yOffset += imgHeight + 10;
 
@@ -1878,7 +1878,11 @@ function DataStructurePage() {
           const result = currentOp.memorySnapshots[i]?.getResult;
           if (result !== undefined && result !== null) {
             pdf.setFontSize(12);
-            pdf.text(`Result: ${result}`, 20, yOffset);
+            pdf.setFont(undefined, "bold");
+            pdf.text("Result:", 20, yOffset);
+            yOffset += 7;
+            pdf.setFont(undefined, "normal");
+            pdf.text(String(result), 20, yOffset);
             yOffset += 10;
           }
         } finally {
