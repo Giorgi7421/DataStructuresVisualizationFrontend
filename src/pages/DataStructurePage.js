@@ -111,6 +111,231 @@ const dsOperationArgs = {
   },
 };
 
+// Big O notation mapping for all data structures and their implementations
+const bigONotations = {
+  VECTOR: {
+    set: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    removeAt: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    insertAt: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    clear: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    add: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    size: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    isEmpty: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    get: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+  },
+  TREE: {
+    remove: {
+      BS_TREE: "O(n)",
+      AVL_TREE: "O(n)",
+    },
+    insert: {
+      BS_TREE: "O(n)",
+      AVL_TREE: "O(n)",
+    },
+    clear: {
+      BS_TREE: "O(n)",
+      AVL_TREE: "O(n)",
+    },
+    search: {
+      BS_TREE: "O(n)",
+      AVL_TREE: "O(n)",
+    },
+  },
+  STACK: {
+    push: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    pop: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    clear: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    size: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    peek: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    isEmpty: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+  },
+  SET: {
+    remove: {
+      HASH_SET: "O(n)",
+      TREE_SET: "O(n)",
+    },
+    clear: {
+      HASH_SET: "O(n)",
+      TREE_SET: "O(n)",
+    },
+    add: {
+      HASH_SET: "O(n)",
+      TREE_SET: "O(n)",
+    },
+    size: {
+      HASH_SET: "O(n)",
+      TREE_SET: "O(n)",
+    },
+    isEmpty: {
+      HASH_SET: "O(n)",
+      TREE_SET: "O(n)",
+    },
+    contains: {
+      HASH_SET: "O(n)",
+      TREE_SET: "O(n)",
+    },
+  },
+  QUEUE: {
+    enqueue: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    dequeue: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    clear: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    size: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    peek: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    isEmpty: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+  },
+  EDITOR_BUFFER: {
+    moveCursorToStart: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    moveCursorToEnd: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    moveCursorForward: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    moveCursorBackward: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    insertCharacter: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+    deleteCharacter: {
+      ARRAY: "O(n)",
+      LINKED_LIST: "O(n)",
+    },
+  },
+  DEQUE: {
+    pushFront: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    pushBack: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    popFront: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    popBack: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    clear: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    size: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    isEmpty: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    getFront: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    getBack: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+  },
+  BIG_INTEGER: {
+    add: {
+      ARRAY: "O(n)",
+    },
+    isGreaterThan: {
+      ARRAY: "O(n)",
+    },
+  },
+  GRID: {
+    set: {
+      ARRAY: "O(n)",
+    },
+    numRows: {
+      ARRAY: "O(n)",
+    },
+    numColumns: {
+      ARRAY: "O(n)",
+    },
+    inBounds: {
+      ARRAY: "O(n)",
+    },
+    get: {
+      ARRAY: "O(n)",
+    },
+  },
+  WEB_BROWSER: {
+    visit: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    forward: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+    back: {
+      DOUBLY_LINKED_LIST: "O(n)",
+    },
+  },
+};
+
 // Add this utility function near the top
 function camelToKebab(str) {
   return str.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
@@ -1061,6 +1286,14 @@ function DataStructurePage() {
     );
   };
 
+  // Function to get Big O notation for an operation
+  const getBigONotation = (opValue) => {
+    if (!dataStructure) return "O(n)";
+    const type = dataStructure.type.toUpperCase();
+    const impl = dataStructure.implementation?.toUpperCase() || "ARRAY";
+    return bigONotations[type]?.[opValue]?.[impl] || "O(n)";
+  };
+
   // Check if the selected operation needs a value input
   const needsValueInput = (opValue) => {
     const noValueOperations = [
@@ -1521,7 +1754,7 @@ function DataStructurePage() {
                         </div>
                         <div className="flex items-center">
                           <span className="text-xs text-black font-mono font-bold">
-                            O(n)
+                            {getBigONotation(op.value)}
                           </span>
                           <button
                             type="submit"
