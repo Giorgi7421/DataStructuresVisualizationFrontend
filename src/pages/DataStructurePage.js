@@ -1628,10 +1628,42 @@ function DataStructurePage() {
 
     if (svgRef.current && zoomRef.current) {
       try {
-        // Directly reset to identity transform
         const svg = d3.select(svgRef.current);
-        svg.call(zoomRef.current.transform, d3.zoomIdentity);
-        console.log("Zoom reset applied");
+        const contentGroup = svg.select(".zoom-container");
+
+        if (!contentGroup.node()) {
+          console.error("Content group not found");
+          return;
+        }
+
+        // Get the bounds of the content
+        const bounds = contentGroup.node().getBBox();
+
+        // Get the SVG dimensions
+        const width = parseInt(svg.style("width")) || 800;
+        const height = parseInt(svg.style("height")) || 600;
+
+        // Calculate the scale to fit the content
+        const padding = 40; // Add some padding around the content
+        const scaleX = (width - padding * 2) / bounds.width;
+        const scaleY = (height - padding * 2) / bounds.height;
+        const scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
+
+        // Calculate the translation to center the content
+        const translateX =
+          (width - bounds.width * scale) / 2 - bounds.x * scale;
+        const translateY =
+          (height - bounds.height * scale) / 2 - bounds.y * scale;
+
+        // Create and apply the transform
+        const transform = d3.zoomIdentity
+          .translate(translateX, translateY)
+          .scale(scale);
+
+        svg.call(zoomRef.current.transform, transform);
+        setZoomLevel(scale);
+
+        console.log("Zoom reset applied with fit");
       } catch (error) {
         console.error("Error during zoom reset:", error);
       }
