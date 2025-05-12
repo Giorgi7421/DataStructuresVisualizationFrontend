@@ -13,6 +13,7 @@ import {
   ZoomOutIcon,
   RefreshCwIcon,
   MoveIcon,
+  DownloadIcon,
 } from "lucide-react";
 import {
   isAddress,
@@ -31,6 +32,8 @@ import { renderArrayStructureVisualization } from "../visualizations/ArrayStruct
 import { renderLinkedStructureVisualization } from "../visualizations/LinkedStructureVisualization";
 import { renderDoublyLinkedStructureVisualization } from "../visualizations/DoublyLinkedStructure";
 import { renderGridStructureVisualization } from "../visualizations/GridStructureVisualization";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 // Add this mapping near the top, after imports
 const dsOperationArgs = {
@@ -1755,6 +1758,140 @@ function DataStructurePage() {
     }
   };
 
+  const exportCurrentOperationToPDF = async () => {
+    if (!operations.length || currentHistoryIndex === -1) return;
+
+    const currentOp = operations[currentHistoryIndex];
+    const pdf = new jsPDF();
+    let yOffset = 20;
+
+    // Add title
+    pdf.setFontSize(16);
+    pdf.text(`Operation: ${currentOp.operation}`, 20, yOffset);
+    yOffset += 10;
+
+    // Add parameters if any
+    if (currentOp.parameters && Object.keys(currentOp.parameters).length > 0) {
+      pdf.setFontSize(12);
+      pdf.text(
+        `Parameters: ${Object.entries(currentOp.parameters)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(", ")}`,
+        20,
+        yOffset
+      );
+      yOffset += 10;
+    }
+
+    // Add Big O notation
+    pdf.setFontSize(12);
+    pdf.text(
+      `Time Complexity: ${getBigONotation(currentOp.operation)}`,
+      20,
+      yOffset
+    );
+    yOffset += 10;
+
+    // Capture and add each snapshot
+    for (let i = 0; i < currentOp.memorySnapshots.length; i++) {
+      // Set current snapshot
+      setCurrentSnapshotIndex(i);
+
+      // Wait for visualization to update
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Capture the visualization
+      const svgElement = svgRef.current;
+      if (svgElement) {
+        // Create a clone of the SVG to avoid modifying the original
+        const svgClone = svgElement.cloneNode(true);
+
+        // Create a temporary container
+        const container = document.createElement("div");
+        container.style.position = "absolute";
+        container.style.left = "-9999px";
+        container.style.top = "-9999px";
+        container.style.width = "800px";
+        container.style.height = "600px";
+        container.style.backgroundColor = "#f8fafc";
+        container.appendChild(svgClone);
+        document.body.appendChild(container);
+
+        try {
+          // Get the SVG and content group
+          const svg = d3.select(svgClone);
+          const contentGroup = svg.select(".zoom-container");
+
+          // Reset any existing transform
+          contentGroup.attr("transform", null);
+
+          // Get the bounds of all elements in the content group
+          const bounds = contentGroup.node().getBBox();
+
+          // Calculate the scale to fit the content
+          const padding = 40;
+          const scaleX = (800 - padding * 2) / bounds.width;
+          const scaleY = (600 - padding * 2) / bounds.height;
+          const scale = Math.min(scaleX, scaleY);
+
+          // Calculate the translation to center the content
+          const translateX =
+            (800 - bounds.width * scale) / 2 - bounds.x * scale;
+          const translateY =
+            (600 - bounds.height * scale) / 2 - bounds.y * scale;
+
+          // Apply the transform
+          contentGroup.attr(
+            "transform",
+            `translate(${translateX},${translateY}) scale(${scale})`
+          );
+
+          const canvas = await html2canvas(container, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: "#f8fafc",
+            width: 800,
+            height: 600,
+          });
+
+          // Add snapshot number
+          pdf.setFontSize(12);
+          pdf.text(`Snapshot ${i + 1}`, 20, yOffset);
+          yOffset += 10;
+
+          // Add the image
+          const imgData = canvas.toDataURL("image/png");
+          const imgWidth = 170;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+          // Check if we need a new page
+          if (yOffset + imgHeight > 280) {
+            pdf.addPage();
+            yOffset = 20;
+          }
+
+          pdf.addImage(imgData, "PNG", 20, yOffset, imgWidth, imgHeight);
+          yOffset += imgHeight + 10;
+
+          // Add result if present
+          const result = currentOp.memorySnapshots[i]?.getResult;
+          if (result !== undefined && result !== null) {
+            pdf.setFontSize(12);
+            pdf.text(`Result: ${result}`, 20, yOffset);
+            yOffset += 10;
+          }
+        } finally {
+          // Clean up
+          document.body.removeChild(container);
+        }
+      }
+    }
+
+    // Save the PDF
+    pdf.save(`${currentOp.operation}_snapshots.pdf`);
+  };
+
   return (
     <div className="h-full overflow-hidden flex flex-col">
       {loading ? (
@@ -1999,6 +2136,15 @@ function DataStructurePage() {
                   >
                     <RefreshCwIcon className="w-4 h-4" />
                   </button>
+                  {operations.length > 0 && currentHistoryIndex !== -1 && (
+                    <button
+                      onClick={exportCurrentOperationToPDF}
+                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                      title="Export Current Operation to PDF"
+                    >
+                      <DownloadIcon className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 
