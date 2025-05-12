@@ -754,9 +754,6 @@ function DataStructurePage() {
       // Initialize zoom on the SVG
       svg.call(zoom);
 
-      // Reset zoom to initial position
-      svg.call(zoom.transform, d3.zoomIdentity);
-
       // Determine which operation to render:
       let operation;
       let memorySnapshot = null;
@@ -896,12 +893,15 @@ function DataStructurePage() {
           // Potentially return here or let individual renderers handle it
         }
 
+        // Create a temporary group to measure content bounds
+        const tempGroup = contentGroup.append("g").attr("class", "temp-group");
+
         if (enableMemoryVisualization) {
           console.log("Using memory visualization");
           // Assuming renderMemoryVisualization is also refactored to use contentGroup
           renderMemoryVisualization(
             effectiveOperation,
-            contentGroup,
+            tempGroup,
             width,
             height,
             memorySnapshot
@@ -931,10 +931,11 @@ function DataStructurePage() {
           }
           console.log("Combined structure type for switch:", combinedType);
 
+          // Render the appropriate visualization in the temporary group
           switch (combinedType) {
             case "WEB_BROWSER":
               renderDoublyLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -944,7 +945,7 @@ function DataStructurePage() {
               break;
             case "BIG_INTEGER":
               renderArrayStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -954,7 +955,7 @@ function DataStructurePage() {
               break;
             case "ARRAY_VECTOR":
               renderArrayStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -964,7 +965,7 @@ function DataStructurePage() {
               break;
             case "LINKED_LIST_VECTOR":
               renderLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -974,7 +975,7 @@ function DataStructurePage() {
               break;
             case "ARRAY_EDITOR_BUFFER":
               renderArrayStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -984,7 +985,7 @@ function DataStructurePage() {
               break;
             case "ARRAY_STACK":
               renderArrayStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -994,7 +995,7 @@ function DataStructurePage() {
               break;
             case "LINKED_LIST_STACK":
               renderLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1005,7 +1006,7 @@ function DataStructurePage() {
             case "TWO_QUEUE_STACK":
             case "ARRAY_QUEUE":
               renderArrayStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1015,7 +1016,7 @@ function DataStructurePage() {
               break;
             case "LINKED_LIST_QUEUE":
               renderLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1028,7 +1029,7 @@ function DataStructurePage() {
             case "TREE_MAP":
             case "DEQUE":
               renderDoublyLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1044,7 +1045,7 @@ function DataStructurePage() {
             case "SMALL_INT_SET":
             case "MOVE_TO_FRONT_SET":
               renderLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1055,7 +1056,7 @@ function DataStructurePage() {
             case "UNSORTED_VECTOR_PRIORITY_QUEUE":
             case "SORTED_LINKED_LIST_PRIORITY_QUEUE":
               renderLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1065,7 +1066,7 @@ function DataStructurePage() {
               break;
             case "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE":
               renderDoublyLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1075,7 +1076,7 @@ function DataStructurePage() {
               break;
             case "BINARY_HEAP_PRIORITY_QUEUE":
               renderArrayStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1087,7 +1088,7 @@ function DataStructurePage() {
             case "TWO_STACK_EDITOR_BUFFER":
             case "LINKED_LIST_EDITOR_BUFFER":
               renderLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1097,7 +1098,7 @@ function DataStructurePage() {
               break;
             case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
               renderDoublyLinkedStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1107,7 +1108,7 @@ function DataStructurePage() {
               break;
             case "GRID":
               renderGridStructureVisualization(
-                contentGroup,
+                tempGroup,
                 width,
                 height,
                 effectiveOperation,
@@ -1115,9 +1116,52 @@ function DataStructurePage() {
                 snapshotIdentifier
               );
               break;
+            default:
+              renderArrayStructureVisualization(
+                tempGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
           }
         }
-        autoFitVisualization(svg, contentGroup, zoom, width, height);
+
+        // Get the bounds of the rendered content
+        const bounds = tempGroup.node().getBBox();
+
+        // Calculate the transform to center and fit the content
+        const padding = 40;
+        const scaleX = (width - padding * 2) / bounds.width;
+        const scaleY = (height - padding * 2) / bounds.height;
+        const scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
+
+        const translateX =
+          (width - bounds.width * scale) / 2 - bounds.x * scale;
+        const translateY =
+          (height - bounds.height * scale) / 2 - bounds.y * scale;
+
+        // Apply the transform to the content group
+        contentGroup.attr(
+          "transform",
+          `translate(${translateX},${translateY}) scale(${scale})`
+        );
+
+        // Move content from temp group to main content group
+        while (tempGroup.node().firstChild) {
+          contentGroup.node().appendChild(tempGroup.node().firstChild);
+        }
+
+        // Remove the temporary group
+        tempGroup.remove();
+
+        // Set the initial zoom transform
+        svg.call(
+          zoom.transform,
+          d3.zoomIdentity.translate(translateX, translateY).scale(scale)
+        );
+        setZoomLevel(scale);
       } catch (error) {
         console.error("Error in renderVisualization:", error);
         contentGroup.selectAll("*").remove(); // Clear potentially broken content
