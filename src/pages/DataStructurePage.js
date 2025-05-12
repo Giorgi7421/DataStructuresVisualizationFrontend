@@ -518,6 +518,30 @@ function DataStructurePage() {
     };
   }, []);
 
+  // Add the export modal component
+  const ExportModal = () => {
+    if (!isExporting) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-6 shadow-xl max-w-md w-full mx-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+            Exporting PDF
+          </h3>
+          <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
+            <div
+              className="bg-blue-500 h-4 rounded-full transition-all duration-300"
+              style={{ width: `${exportProgress}%` }}
+            />
+          </div>
+          <p className="text-sm text-gray-600 text-center">
+            Please wait while we generate your PDF... {exportProgress}%
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   // Extract elements from memory snapshot
   const extractElementsFromSnapshot = (snapshot, structureType) => {
     try {
@@ -1823,30 +1847,27 @@ function DataStructurePage() {
       document.body.appendChild(tempContainer);
 
       try {
-        // Create a temporary SVG for rendering
-        const tempSvg = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "svg"
-        );
-        tempSvg.setAttribute("width", "800");
-        tempSvg.setAttribute("height", "600");
-        tempContainer.appendChild(tempSvg);
-
-        // Capture and add each snapshot
+        // Process snapshots sequentially
         for (let i = 0; i < currentOp.memorySnapshots.length; i++) {
-          // Update progress
-          setExportProgress(
-            Math.round((i / currentOp.memorySnapshots.length) * 100)
-          );
+          const snapshot = currentOp.memorySnapshots[i];
 
-          // Add new page for each snapshot (except the first one which already has the title)
+          // Add new page for each snapshot (except the first one)
           if (i > 0) {
             pdf.addPage();
             yOffset = 20;
           }
 
           // Clear previous content
-          tempSvg.innerHTML = "";
+          tempContainer.innerHTML = "";
+
+          // Create a temporary SVG for rendering
+          const tempSvg = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "svg"
+          );
+          tempSvg.setAttribute("width", "800");
+          tempSvg.setAttribute("height", "600");
+          tempContainer.appendChild(tempSvg);
 
           // Create background and content groups
           const backgroundLayer = d3
@@ -1866,8 +1887,7 @@ function DataStructurePage() {
             .attr("fill", "#f8fafc")
             .attr("stroke", "#d1d5db");
 
-          // Prepare the operation state for rendering
-          const snapshot = currentOp.memorySnapshots[i];
+          // Prepare operation state
           const operationState = {
             ...currentOp,
             state: {
@@ -1884,29 +1904,22 @@ function DataStructurePage() {
             },
           };
 
-          // Render the snapshot directly
+          // Render the snapshot
           const structureType = (dataStructure.type || "").toUpperCase();
           const impl = (dataStructure.implementation || "").toUpperCase();
-          let combinedType;
-
-          // Special cases that should not combine implementation with type
-          const specialTypes = [
-            "BIG_INTEGER",
-            "WEB_BROWSER",
-            "DEQUE",
-            "FILE_SYSTEM",
-            "GRID",
-          ];
-          if (
+          let combinedType =
             impl &&
             impl !== "NULL" &&
             impl !== "" &&
-            !specialTypes.includes(structureType)
-          ) {
-            combinedType = `${impl}_${structureType}`;
-          } else {
-            combinedType = structureType;
-          }
+            ![
+              "BIG_INTEGER",
+              "WEB_BROWSER",
+              "DEQUE",
+              "FILE_SYSTEM",
+              "GRID",
+            ].includes(structureType)
+              ? `${impl}_${structureType}`
+              : structureType;
 
           // Render the appropriate visualization
           switch (combinedType) {
@@ -1942,6 +1955,16 @@ function DataStructurePage() {
               break;
             case "LINKED_LIST_VECTOR":
               renderLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "ARRAY_EDITOR_BUFFER":
+              renderArrayStructureVisualization(
                 contentGroup,
                 800,
                 600,
@@ -2094,30 +2117,27 @@ function DataStructurePage() {
               );
           }
 
-          // Wait for the visualization to render
-          await new Promise((resolve) => setTimeout(resolve, 500));
-
-          // Get the bounds of all elements in the content group
+          // Get the bounds and apply transform
           const bounds = contentGroup.node().getBBox();
-
-          // Calculate the scale to fit the content
           const padding = 40;
           const scaleX = (800 - padding * 2) / bounds.width;
           const scaleY = (600 - padding * 2) / bounds.height;
           const scale = Math.min(scaleX, scaleY);
-
-          // Calculate the translation to center the content
           const translateX =
             (800 - bounds.width * scale) / 2 - bounds.x * scale;
           const translateY =
             (600 - bounds.height * scale) / 2 - bounds.y * scale;
-
-          // Apply the transform
           contentGroup.attr(
             "transform",
             `translate(${translateX},${translateY}) scale(${scale})`
           );
 
+          // Add snapshot number
+          pdf.setFontSize(14);
+          pdf.text(`Snapshot ${i + 1}`, 20, yOffset);
+          yOffset += 10;
+
+          // Capture the visualization
           const canvas = await html2canvas(tempContainer, {
             scale: 2,
             useCORS: true,
@@ -2127,16 +2147,10 @@ function DataStructurePage() {
             height: 600,
           });
 
-          // Add snapshot number at the top
-          pdf.setFontSize(14);
-          pdf.text(`Snapshot ${i + 1}`, 20, yOffset);
-          yOffset += 10;
-
-          // Add the image
+          // Add image to PDF
           const imgData = canvas.toDataURL("image/png");
           const imgWidth = 170;
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
           pdf.addImage(imgData, "PNG", 20, yOffset, imgWidth, imgHeight);
           yOffset += imgHeight + 10;
 
@@ -2151,6 +2165,16 @@ function DataStructurePage() {
             pdf.text(String(result), 20, yOffset);
             yOffset += 10;
           }
+
+          // Update progress
+          setExportProgress(
+            Math.round(((i + 1) / currentOp.memorySnapshots.length) * 100)
+          );
+
+          // Clean up
+          canvas.width = 0;
+          canvas.height = 0;
+          tempSvg.innerHTML = "";
         }
       } finally {
         // Clean up
@@ -2159,9 +2183,10 @@ function DataStructurePage() {
 
       // Save the PDF
       pdf.save(`${currentOp.operation}_snapshots.pdf`);
+      setIsExporting(false);
+      setExportProgress(0);
     } catch (error) {
       console.error("Error exporting PDF:", error);
-    } finally {
       setIsExporting(false);
       setExportProgress(0);
     }
@@ -2169,6 +2194,9 @@ function DataStructurePage() {
 
   return (
     <div className="h-full overflow-hidden flex flex-col">
+      {/* Add the export modal */}
+      <ExportModal />
+
       {loading ? (
         <div className="flex justify-center items-center h-full">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
