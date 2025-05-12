@@ -1653,6 +1653,28 @@ function DataStructurePage() {
                 ></svg>
               </div>
 
+              {/* Result display - only show for current snapshot if it has a result */}
+              {operations.length > 0 &&
+                operations[currentHistoryIndex]?.memorySnapshots?.[
+                  currentSnapshotIndex
+                ]?.getResult !== undefined &&
+                operations[currentHistoryIndex]?.memorySnapshots?.[
+                  currentSnapshotIndex
+                ]?.getResult !== null && (
+                  <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200 flex-shrink-0">
+                    <div className="text-sm font-semibold text-gray-700">
+                      Result:
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      {String(
+                        operations[currentHistoryIndex].memorySnapshots[
+                          currentSnapshotIndex
+                        ].getResult
+                      )}
+                    </div>
+                  </div>
+                )}
+
               {/* Playback controls with reduced vertical space */}
               {operations.length > 0 &&
                 operations[currentHistoryIndex]?.memorySnapshots?.length >
