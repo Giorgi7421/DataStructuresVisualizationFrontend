@@ -1519,22 +1519,27 @@ function DataStructurePage() {
                             </span>
                           ))}
                         </div>
-                        <button
-                          type="submit"
-                          onClick={(e) => handleOperationSubmit(e, op.value)}
-                          disabled={
-                            getOperationArgs(op.value).length > 0 &&
-                            (!operationValues[op.value] ||
-                              (Array.isArray(operationValues[op.value])
-                                ? operationValues[op.value].some(
-                                    (v) => !v || v.trim() === ""
-                                  )
-                                : operationValues[op.value]?.trim() === ""))
-                          }
-                          className="bg-blue-500 text-white py-0.5 px-3 rounded text-xs font-semibold hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-300 disabled:text-gray-500 h-6 whitespace-nowrap"
-                        >
-                          {processingOperation ? "Processing..." : "Perform"}
-                        </button>
+                        <div className="flex items-center">
+                          <span className="text-xs text-black font-mono font-bold">
+                            O(n)
+                          </span>
+                          <button
+                            type="submit"
+                            onClick={(e) => handleOperationSubmit(e, op.value)}
+                            disabled={
+                              getOperationArgs(op.value).length > 0 &&
+                              (!operationValues[op.value] ||
+                                (Array.isArray(operationValues[op.value])
+                                  ? operationValues[op.value].some(
+                                      (v) => !v || v.trim() === ""
+                                    )
+                                  : operationValues[op.value]?.trim() === ""))
+                            }
+                            className="bg-blue-500 text-white py-0.5 px-3 rounded text-xs font-semibold hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-300 disabled:text-gray-500 h-6 whitespace-nowrap"
+                          >
+                            {processingOperation ? "Processing..." : "Perform"}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </form>
