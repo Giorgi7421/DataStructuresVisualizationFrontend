@@ -1407,6 +1407,13 @@ function DataStructurePage() {
     if (!dataStructure) return "O(n)";
     const type = dataStructure.type.toUpperCase();
     const impl = dataStructure.implementation?.toUpperCase() || "ARRAY";
+
+    // Special cases for data structures with single implementations
+    const singleImplTypes = ["GRID", "DEQUE", "BIG_INTEGER", "WEB_BROWSER"];
+    if (singleImplTypes.includes(type)) {
+      return bigONotations[type]?.[opValue]?.[type] || "O(n)";
+    }
+
     return bigONotations[type]?.[opValue]?.[impl] || "O(n)";
   };
 
