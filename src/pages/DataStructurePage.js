@@ -1251,17 +1251,26 @@ function DataStructurePage() {
     }
   }, [dataStructure, currentHistoryIndex, renderVisualization, operations]);
 
+  // Modify the auto-play effect to handle snapshots
   useEffect(() => {
     if (autoPlay) {
       autoPlayRef.current = setInterval(() => {
-        setCurrentHistoryIndex((prevIndex) => {
-          if (prevIndex < operations.length - 1) {
-            return prevIndex + 1;
-          } else {
-            setAutoPlay(false);
-            return prevIndex;
-          }
-        });
+        if (snapshotMode && operations[currentHistoryIndex]?.memorySnapshots) {
+          const maxSnapshot =
+            operations[currentHistoryIndex].memorySnapshots.length - 1;
+          setCurrentSnapshotIndex((prevIndex) => {
+            if (prevIndex < maxSnapshot) {
+              return prevIndex + 1;
+            } else {
+              // If we're at the last snapshot, stop auto-play
+              setAutoPlay(false);
+              return prevIndex;
+            }
+          });
+        } else {
+          // If not in snapshot mode, stop auto-play
+          setAutoPlay(false);
+        }
       }, autoPlaySpeed);
     } else if (autoPlayRef.current) {
       clearInterval(autoPlayRef.current);
@@ -1272,7 +1281,7 @@ function DataStructurePage() {
         clearInterval(autoPlayRef.current);
       }
     };
-  }, [autoPlay, autoPlaySpeed, operations.length]);
+  }, [autoPlay, autoPlaySpeed, operations, currentHistoryIndex, snapshotMode]);
 
   // Add a resize observer to update the visualization when the container size changes
   useEffect(() => {
@@ -1387,7 +1396,13 @@ function DataStructurePage() {
   };
 
   const toggleAutoPlay = () => {
-    setAutoPlay(!autoPlay);
+    // Only allow auto-play if we're in snapshot mode and have snapshots
+    if (
+      snapshotMode &&
+      operations[currentHistoryIndex]?.memorySnapshots?.length > 1
+    ) {
+      setAutoPlay(!autoPlay);
+    }
   };
 
   const toggleSnapshotMode = () => {
@@ -2268,6 +2283,13 @@ function DataStructurePage() {
     }
   };
 
+  // Modify the playback speed options to be more suitable for snapshot transitions
+  const playbackSpeedOptions = [
+    { value: 2000, label: "Slow" },
+    { value: 1000, label: "Normal" },
+    { value: 500, label: "Fast" },
+  ];
+
   return (
     <div className="h-full overflow-hidden flex flex-col">
       {/* Add the export modal */}
@@ -2715,9 +2737,11 @@ function DataStructurePage() {
                           }
                           className="border border-gray-300 rounded px-1 py-0 text-xs"
                         >
-                          <option value={2000}>Slow</option>
-                          <option value={1000}>Normal</option>
-                          <option value={500}>Fast</option>
+                          {playbackSpeedOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
