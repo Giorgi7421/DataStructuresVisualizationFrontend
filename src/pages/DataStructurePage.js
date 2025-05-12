@@ -2386,52 +2386,56 @@ function DataStructurePage() {
               <div className="flex justify-between items-center mb-2 flex-shrink-0">
                 <h2 className="text-md font-bold">Visualization</h2>
                 {/* Zoom Controls */}
-                <div className="flex space-x-1">
-                  <div className="text-xs mr-2 text-gray-600">
-                    Zoom: {(zoomLevel * 100).toFixed(0)}%
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <div className="text-xs mr-2 text-gray-600">
+                      Zoom: {(zoomLevel * 100).toFixed(0)}%
+                    </div>
+                    <button
+                      onClick={zoomIn}
+                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                      title="Zoom In"
+                    >
+                      <ZoomInIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={zoomOut}
+                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                      title="Zoom Out"
+                    >
+                      <ZoomOutIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={resetZoom}
+                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                      title="Reset Zoom"
+                    >
+                      <RefreshCwIcon className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    onClick={zoomIn}
-                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
-                    title="Zoom In"
-                  >
-                    <ZoomInIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={zoomOut}
-                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
-                    title="Zoom Out"
-                  >
-                    <ZoomOutIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={resetZoom}
-                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
-                    title="Reset Zoom"
-                  >
-                    <RefreshCwIcon className="w-4 h-4" />
-                  </button>
+
+                  {isExporting && (
+                    <div className="flex items-center space-x-2">
+                      <div className="text-xs text-gray-600">
+                        Exporting PDF...
+                      </div>
+                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 transition-all duration-300"
+                          style={{ width: `${exportProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {operations.length > 0 && currentHistoryIndex !== -1 && (
                     <button
                       onClick={exportCurrentOperationToPDF}
                       disabled={isExporting}
-                      className="p-1 rounded hover:bg-gray-200 text-gray-700 relative"
+                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
                       title="Export Current Operation to PDF"
                     >
                       <DownloadIcon className="w-4 h-4" />
-                      {isExporting && (
-                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-white p-2 rounded shadow-lg">
-                          <div className="text-xs text-gray-600 mb-1">
-                            Exporting PDF...
-                          </div>
-                          <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-blue-500 transition-all duration-300"
-                              style={{ width: `${exportProgress}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
                     </button>
                   )}
                 </div>
