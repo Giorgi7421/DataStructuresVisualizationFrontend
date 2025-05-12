@@ -505,6 +505,19 @@ function DataStructurePage() {
   const selectedOperationRef = useRef(null);
   const selectedSnapshotRef = useRef(null);
 
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const exportWorkerRef = useRef(null);
+
+  // Add this useEffect for worker cleanup
+  useEffect(() => {
+    return () => {
+      if (exportWorkerRef.current) {
+        exportWorkerRef.current.terminate();
+      }
+    };
+  }, []);
+
   // Extract elements from memory snapshot
   const extractElementsFromSnapshot = (snapshot, structureType) => {
     try {
@@ -1761,75 +1774,328 @@ function DataStructurePage() {
   const exportCurrentOperationToPDF = async () => {
     if (!operations.length || currentHistoryIndex === -1) return;
 
-    const currentOp = operations[currentHistoryIndex];
-    const pdf = new jsPDF();
-    let yOffset = 20;
+    try {
+      setIsExporting(true);
+      setExportProgress(0);
 
-    // Add title to first page
-    pdf.setFontSize(16);
-    pdf.text(`Operation: ${currentOp.operation}`, 20, yOffset);
-    yOffset += 10;
+      const currentOp = operations[currentHistoryIndex];
+      const pdf = new jsPDF();
+      let yOffset = 20;
 
-    // Add parameters if any
-    if (currentOp.parameters && Object.keys(currentOp.parameters).length > 0) {
+      // Add title to first page
+      pdf.setFontSize(16);
+      pdf.text(`Operation: ${currentOp.operation}`, 20, yOffset);
+      yOffset += 10;
+
+      // Add parameters if any
+      if (
+        currentOp.parameters &&
+        Object.keys(currentOp.parameters).length > 0
+      ) {
+        pdf.setFontSize(12);
+        pdf.text(
+          `Parameters: ${Object.entries(currentOp.parameters)
+            .map(([key, value]) => `${key}=${value}`)
+            .join(", ")}`,
+          20,
+          yOffset
+        );
+        yOffset += 10;
+      }
+
+      // Add Big O notation
       pdf.setFontSize(12);
       pdf.text(
-        `Parameters: ${Object.entries(currentOp.parameters)
-          .map(([key, value]) => `${key}=${value}`)
-          .join(", ")}`,
+        `Time Complexity: ${getBigONotation(currentOp.operation)}`,
         20,
         yOffset
       );
       yOffset += 10;
-    }
 
-    // Add Big O notation
-    pdf.setFontSize(12);
-    pdf.text(
-      `Time Complexity: ${getBigONotation(currentOp.operation)}`,
-      20,
-      yOffset
-    );
-    yOffset += 10;
+      // Create a temporary container for capturing snapshots
+      const tempContainer = document.createElement("div");
+      tempContainer.style.position = "absolute";
+      tempContainer.style.left = "-9999px";
+      tempContainer.style.top = "-9999px";
+      tempContainer.style.width = "800px";
+      tempContainer.style.height = "600px";
+      tempContainer.style.backgroundColor = "#f8fafc";
+      document.body.appendChild(tempContainer);
 
-    // Capture and add each snapshot
-    for (let i = 0; i < currentOp.memorySnapshots.length; i++) {
-      // Add new page for each snapshot (except the first one which already has the title)
-      if (i > 0) {
-        pdf.addPage();
-        yOffset = 20;
-      }
+      try {
+        // Create a temporary SVG for rendering
+        const tempSvg = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "svg"
+        );
+        tempSvg.setAttribute("width", "800");
+        tempSvg.setAttribute("height", "600");
+        tempContainer.appendChild(tempSvg);
 
-      // Set current snapshot
-      setCurrentSnapshotIndex(i);
+        // Capture and add each snapshot
+        for (let i = 0; i < currentOp.memorySnapshots.length; i++) {
+          // Update progress
+          setExportProgress(
+            Math.round((i / currentOp.memorySnapshots.length) * 100)
+          );
 
-      // Wait for visualization to update
-      await new Promise((resolve) => setTimeout(resolve, 500));
+          // Add new page for each snapshot (except the first one which already has the title)
+          if (i > 0) {
+            pdf.addPage();
+            yOffset = 20;
+          }
 
-      // Capture the visualization
-      const svgElement = svgRef.current;
-      if (svgElement) {
-        // Create a clone of the SVG to avoid modifying the original
-        const svgClone = svgElement.cloneNode(true);
+          // Clear previous content
+          tempSvg.innerHTML = "";
 
-        // Create a temporary container
-        const container = document.createElement("div");
-        container.style.position = "absolute";
-        container.style.left = "-9999px";
-        container.style.top = "-9999px";
-        container.style.width = "800px";
-        container.style.height = "600px";
-        container.style.backgroundColor = "#f8fafc";
-        container.appendChild(svgClone);
-        document.body.appendChild(container);
+          // Create background and content groups
+          const backgroundLayer = d3
+            .select(tempSvg)
+            .append("g")
+            .attr("class", "fixed-background");
+          const contentGroup = d3
+            .select(tempSvg)
+            .append("g")
+            .attr("class", "zoom-container");
 
-        try {
-          // Get the SVG and content group
-          const svg = d3.select(svgClone);
-          const contentGroup = svg.select(".zoom-container");
+          // Add background
+          backgroundLayer
+            .append("rect")
+            .attr("width", 800)
+            .attr("height", 600)
+            .attr("fill", "#f8fafc")
+            .attr("stroke", "#d1d5db");
 
-          // Reset any existing transform
-          contentGroup.attr("transform", null);
+          // Prepare the operation state for rendering
+          const snapshot = currentOp.memorySnapshots[i];
+          const operationState = {
+            ...currentOp,
+            state: {
+              ...currentOp.state,
+              instanceVariables: snapshot.instanceVariables || {},
+              localVariables: snapshot.localVariables || {},
+              addressObjectMap: snapshot.addressObjectMap || {},
+              elements: extractElementsFromSnapshot(
+                snapshot,
+                dataStructure.type
+              ),
+              result: snapshot.getResult,
+              message: snapshot.message,
+            },
+          };
+
+          // Render the snapshot directly
+          const structureType = (dataStructure.type || "").toUpperCase();
+          const impl = (dataStructure.implementation || "").toUpperCase();
+          let combinedType;
+
+          // Special cases that should not combine implementation with type
+          const specialTypes = [
+            "BIG_INTEGER",
+            "WEB_BROWSER",
+            "DEQUE",
+            "FILE_SYSTEM",
+            "GRID",
+          ];
+          if (
+            impl &&
+            impl !== "NULL" &&
+            impl !== "" &&
+            !specialTypes.includes(structureType)
+          ) {
+            combinedType = `${impl}_${structureType}`;
+          } else {
+            combinedType = structureType;
+          }
+
+          // Render the appropriate visualization
+          switch (combinedType) {
+            case "WEB_BROWSER":
+              renderDoublyLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "BIG_INTEGER":
+              renderArrayStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "ARRAY_VECTOR":
+              renderArrayStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "LINKED_LIST_VECTOR":
+              renderLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "ARRAY_STACK":
+              renderArrayStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "LINKED_LIST_STACK":
+              renderLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "TWO_QUEUE_STACK":
+            case "ARRAY_QUEUE":
+              renderArrayStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "LINKED_LIST_QUEUE":
+              renderLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "ARRAY_MAP":
+            case "HASH_MAP":
+            case "TREE_MAP":
+            case "DEQUE":
+              renderDoublyLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "BS_TREE":
+            case "AVL_TREE":
+            case "EXPRESSION_TREE":
+            case "HASH_SET":
+            case "TREE_SET":
+            case "SMALL_INT_SET":
+            case "MOVE_TO_FRONT_SET":
+              renderLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "UNSORTED_VECTOR_PRIORITY_QUEUE":
+            case "SORTED_LINKED_LIST_PRIORITY_QUEUE":
+              renderLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "UNSORTED_DOUBLY_LINKED_LIST_PRIORITY_QUEUE":
+              renderDoublyLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "BINARY_HEAP_PRIORITY_QUEUE":
+              renderArrayStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "FILE_SYSTEM":
+            case "TWO_STACK_EDITOR_BUFFER":
+            case "LINKED_LIST_EDITOR_BUFFER":
+              renderLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "DOUBLY_LINKED_LIST_EDITOR_BUFFER":
+              renderDoublyLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "GRID":
+              renderGridStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            default:
+              renderArrayStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+          }
+
+          // Wait for the visualization to render
+          await new Promise((resolve) => setTimeout(resolve, 500));
 
           // Get the bounds of all elements in the content group
           const bounds = contentGroup.node().getBBox();
@@ -1852,7 +2118,7 @@ function DataStructurePage() {
             `translate(${translateX},${translateY}) scale(${scale})`
           );
 
-          const canvas = await html2canvas(container, {
+          const canvas = await html2canvas(tempContainer, {
             scale: 2,
             useCORS: true,
             logging: false,
@@ -1875,7 +2141,7 @@ function DataStructurePage() {
           yOffset += imgHeight + 10;
 
           // Add result if present
-          const result = currentOp.memorySnapshots[i]?.getResult;
+          const result = snapshot?.getResult;
           if (result !== undefined && result !== null) {
             pdf.setFontSize(12);
             pdf.setFont(undefined, "bold");
@@ -1885,15 +2151,20 @@ function DataStructurePage() {
             pdf.text(String(result), 20, yOffset);
             yOffset += 10;
           }
-        } finally {
-          // Clean up
-          document.body.removeChild(container);
         }
+      } finally {
+        // Clean up
+        document.body.removeChild(tempContainer);
       }
-    }
 
-    // Save the PDF
-    pdf.save(`${currentOp.operation}_snapshots.pdf`);
+      // Save the PDF
+      pdf.save(`${currentOp.operation}_snapshots.pdf`);
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+    } finally {
+      setIsExporting(false);
+      setExportProgress(0);
+    }
   };
 
   return (
@@ -2143,10 +2414,24 @@ function DataStructurePage() {
                   {operations.length > 0 && currentHistoryIndex !== -1 && (
                     <button
                       onClick={exportCurrentOperationToPDF}
-                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                      disabled={isExporting}
+                      className="p-1 rounded hover:bg-gray-200 text-gray-700 relative"
                       title="Export Current Operation to PDF"
                     >
                       <DownloadIcon className="w-4 h-4" />
+                      {isExporting && (
+                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-white p-2 rounded shadow-lg">
+                          <div className="text-xs text-gray-600 mb-1">
+                            Exporting PDF...
+                          </div>
+                          <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-500 transition-all duration-300"
+                              style={{ width: `${exportProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </button>
                   )}
                 </div>
