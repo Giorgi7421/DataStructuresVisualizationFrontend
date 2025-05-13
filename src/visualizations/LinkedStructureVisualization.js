@@ -322,12 +322,27 @@ export const renderLinkedStructureVisualization = (
       style: styles.node,
     });
 
+    // ADD MAIN CHAIN CONNECTIONS HERE
+    const nextNodeAddr = nodeData.nextAddress || nodeData.next;
+    if (nextNodeAddr && nextNodeAddr !== "0x0" && nextNodeAddr !== "null") {
+      // Ensure the target node actually exists in the map before creating a connection
+      // This prevents trying to draw arrows to non-existent or invalid addresses
+      if (addressObjectMap[nextNodeAddr]) {
+        allConnections.push({
+          sourceName: currentAddress, // The current node's address
+          targetAddress: nextNodeAddr, // The next node's address
+          type: "ll_next", // Standard type for main chain next pointers
+        });
+      }
+    }
+    // END OF ADDED MAIN CHAIN CONNECTIONS
+
     currentX += styles.node.width + styles.layout.nodeSpacingX;
     mainChainLeftmostX = Math.min(
       mainChainLeftmostX,
       currentX - (styles.node.width + styles.layout.nodeSpacingX)
     ); // track leftmost edge of the first node
-    currentAddress = nodeData.nextAddress || nodeData.next;
+    currentAddress = nextNodeAddr; // Use the already determined nextNodeAddr for the next iteration
     nodesProcessedCount++;
   }
 
