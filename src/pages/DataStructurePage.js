@@ -72,7 +72,11 @@ const dsOperationArgs = {
   QUEUE: {
     enqueue: { args: ["element"], method: "patch" },
     dequeue: { args: [], method: "patch" },
-    clear: { args: [], method: "patch" },
+    clear: {
+      args: [],
+      method: "patch",
+      implementations: ["ARRAY", "LINKED_LIST"], // Only allow clear for these implementations
+    },
     size: { args: [], method: "get" },
     peek: { args: [], method: "get" },
     isEmpty: { args: [], method: "get" },
@@ -1489,8 +1493,17 @@ function DataStructurePage() {
   const getOperationOptions = () => {
     if (!dataStructure) return [];
     const type = dataStructure.type.toUpperCase();
+    const impl = dataStructure.implementation?.toUpperCase();
     const ops = dsOperationArgs[type] || {};
-    return Object.keys(ops).map((op) => ({ value: op, label: op }));
+    return Object.entries(ops)
+      .filter(([_, op]) => {
+        // If operation has implementation restrictions, check if current implementation is allowed
+        if (op.implementations) {
+          return op.implementations.includes(impl);
+        }
+        return true;
+      })
+      .map(([op]) => ({ value: op, label: op }));
   };
 
   const getOperationArgs = (opValue) => {
