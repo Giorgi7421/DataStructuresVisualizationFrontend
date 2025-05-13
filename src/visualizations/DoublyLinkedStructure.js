@@ -16,7 +16,7 @@ export const renderDoublyLinkedStructureVisualization = (
   memorySnapshot
 ) => {
   console.log(
-    "TOP OF renderWebBrowserVisualization (Aligned with LL Standard). Op:",
+    "TOP OF renderDoublyLinkedStructureVisualization (Applying 5-step layout - Iteration 1). Op:",
     operation,
     "Snap:",
     memorySnapshot
@@ -145,19 +145,225 @@ export const renderDoublyLinkedStructureVisualization = (
   const localVarsBoxWidth = styles.varBox.width;
   const nodeWidth = styles.node.width;
 
-  // --- 1. Render Instance Variables (Top, Center) ---
-  let topLayerBottomY = topLayerY;
-  let instanceVarsBoxInfo = null;
+  // --- 1. INITIAL MAIN CHAIN TRAVERSAL (Populate visited set) ---
+  console.log(
+    "[DLS Step 1] Starting Initial Main Chain Traversal for 'visited' set."
+  );
+  let trueStartAddress =
+    instanceVariables.current ||
+    instanceVariables.currentPage ||
+    instanceVariables.head ||
+    instanceVariables.front ||
+    instanceVariables.start ||
+    instanceVariables.first ||
+    instanceVariables.root;
+
+  if (
+    !trueStartAddress ||
+    trueStartAddress === "0x0" ||
+    trueStartAddress === "null" ||
+    !addressObjectMap[trueStartAddress]
+  ) {
+    console.log(
+      "[DLS Step 1] No primary start (current/head) in instance vars, searching for a node with null/0x0 prev."
+    );
+    const allNodeAddrs = Object.keys(addressObjectMap).filter(
+      (addr) =>
+        addressObjectMap[addr] &&
+        typeof addressObjectMap[addr] === "object" &&
+        !Array.isArray(addressObjectMap[addr])
+    );
+    let potentialStart = null;
+    for (const addr of allNodeAddrs) {
+      const nodeData = addressObjectMap[addr];
+      if (nodeData) {
+        const prev = nodeData.previousAddress || nodeData.prev;
+        if (prev === "0x0" || prev === "null" || !prev) {
+          potentialStart = addr;
+          break;
+        }
+      }
+    }
+    if (potentialStart) trueStartAddress = potentialStart;
+    else if (allNodeAddrs.length > 0) trueStartAddress = allNodeAddrs[0];
+    else trueStartAddress = null;
+  }
+  console.log(
+    `[DLS Step 1] True Start Address for visited set: ${trueStartAddress}`
+  );
+
+  if (trueStartAddress && addressObjectMap[trueStartAddress]) {
+    // Traverse backwards from trueStartAddress for visited set
+    let count = 0;
+    let currentForVisited = trueStartAddress;
+    while (
+      currentForVisited &&
+      currentForVisited !== "0x0" &&
+      currentForVisited !== "null" &&
+      count < MAX_NODES_TO_RENDER
+    ) {
+      if (visited.has(currentForVisited)) break; // Already visited (e.g. if trueStartAddress was part of a loop detected from 'next' traversal)
+      visited.add(currentForVisited);
+      const nodeData = addressObjectMap[currentForVisited];
+      if (!nodeData) break;
+      currentForVisited = nodeData.previousAddress || nodeData.prev;
+      count++;
+    }
+
+    // Traverse forwards from trueStartAddress for visited set
+    count = 0; // Reset count for forward traversal
+    currentForVisited = trueStartAddress; // Start again from the true start for forward pass
+    // The first node (trueStartAddress) is already added by the backward pass if it's the start of backward pass, or will be added here.
+    while (
+      currentForVisited &&
+      currentForVisited !== "0x0" &&
+      currentForVisited !== "null" &&
+      count < MAX_NODES_TO_RENDER
+    ) {
+      visited.add(currentForVisited); // Add to visited (safe if already there)
+      const nodeData = addressObjectMap[currentForVisited];
+      if (!nodeData) break;
+      currentForVisited = nodeData.nextAddress || nodeData.next;
+      count++;
+      if (visited.has(currentForVisited) && count < MAX_NODES_TO_RENDER) {
+        // Break if we hit an already visited node (loop detection)
+        console.log(
+          "[DLS Step 1] Loop detected during forward traversal for visited set, breaking."
+        );
+        break;
+      }
+    }
+  }
+  console.log("[DLS Step 1] Visited set populated:", visited);
+
+  // --- 2. ORPHAN CHAIN ORDERING (Define orderedOrphanAddrs) ---
+  console.log("[DLS Step 2] Starting Orphan Chain Ordering");
+  const orphanAddrs = Object.keys(addressObjectMap).filter(
+    (addr) =>
+      addressObjectMap[addr] &&
+      typeof addressObjectMap[addr] === "object" &&
+      !Array.isArray(addressObjectMap[addr]) &&
+      !visited.has(addr)
+  );
+  const orphanNexts = new Set();
+  orphanAddrs.forEach((addr) => {
+    const node = addressObjectMap[addr];
+    const next = node.nextAddress || node.next;
+    if (next && orphanAddrs.includes(next)) {
+      orphanNexts.add(next);
+    }
+  });
+  const orphanHeads = orphanAddrs.filter((addr) => !orphanNexts.has(addr));
+  let orderedOrphanAddrs = [];
+  orphanHeads.forEach((headAddr) => {
+    let current = headAddr;
+    const chainVisitedThisOrphanRun = new Set();
+    while (
+      current &&
+      !chainVisitedThisOrphanRun.has(current) &&
+      orphanAddrs.includes(current)
+    ) {
+      orderedOrphanAddrs.push(current);
+      chainVisitedThisOrphanRun.add(current);
+      const node = addressObjectMap[current];
+      const next = node.nextAddress || node.next;
+      if (next && orphanAddrs.includes(next)) {
+        current = next;
+      } else {
+        break;
+      }
+    }
+  });
+  console.log("[DLS Step 2] Ordered orphan addresses:", orderedOrphanAddrs);
+
+  // --- 3. GRID SETUP (Define mainChainStartX, mainChainY, etc.) ---
+  console.log("[DLS Step 3] Starting Grid Setup");
+  const gridRows = 4;
+  const baseGridCols = 3;
+  const cellHeight = height / gridRows;
+
+  const orphanNodeCount =
+    orderedOrphanAddrs.length > 0 ? orderedOrphanAddrs.length : 1;
+  const baseNodeWidth = styles.node.width;
+  const baseSpacing = styles.layout.orphanNodeSpacingX;
+  const orphanCellPadding = 20;
+  const calculatedOrphanCellWidth =
+    orphanNodeCount * baseNodeWidth +
+    (orphanNodeCount - 1) * baseSpacing +
+    2 * orphanCellPadding;
+
+  const remainingWidthForOtherCells = Math.max(
+    width - calculatedOrphanCellWidth,
+    baseNodeWidth * (baseGridCols - 1) + baseSpacing * (baseGridCols - 2)
+  );
+  const otherCellWidth =
+    baseGridCols - 1 > 0
+      ? remainingWidthForOtherCells / (baseGridCols - 1)
+      : remainingWidthForOtherCells;
+
+  // Conceptual layout: Orphans (col 0), Instance/Local Vars (col 1), Main Chain (col 2)
+  const cellWidthsArray = [];
+  // Order of cells for colXCoords: Orphan, Other1 (e.g. IV/LV), Other2 (e.g. MainChain)
+  cellWidthsArray[0] = calculatedOrphanCellWidth;
+  cellWidthsArray[1] = otherCellWidth;
+  cellWidthsArray[2] = otherCellWidth;
+  // Ensure the total width does not exceed canvas width, adjust if necessary (basic scaling)
+  let totalCalculatedWidth = cellWidthsArray.reduce((a, b) => a + b, 0);
+  if (totalCalculatedWidth > width) {
+    const scaleFactor = width / totalCalculatedWidth;
+    for (let i = 0; i < cellWidthsArray.length; i++)
+      cellWidthsArray[i] *= scaleFactor;
+  }
+
+  const colXCoords = [0];
+  for (let i = 0; i < cellWidthsArray.length; i++) {
+    colXCoords.push(colXCoords[i] + cellWidthsArray[i]);
+  }
+
+  // Grid cell assignments (adjust X based on desired column for each element)
+  // Orphan Area (e.g. First Column)
+  const orphanCellLeft = colXCoords[0];
+  const orphanGridY = cellHeight * 2 + cellHeight / 2 - styles.node.height / 2;
+
+  // Instance Vars (e.g. Middle Column, Top Row)
+  const instanceVarsX =
+    colXCoords[1] + cellWidthsArray[1] / 2 - styles.varBox.width / 2;
+  const instanceVarsY =
+    cellHeight * 0 +
+    cellHeight / 2 -
+    styles.varBox.headerHeight / 2 -
+    styles.varBox.padding;
+
+  // Main Chain (e.g. Rightmost Column, Middle Row)
+  const mainChainStartX = colXCoords[2] + styles.layout.nodesStartXOffset;
+  const mainChainY = cellHeight * 1 + cellHeight / 2 - styles.node.height / 2;
+
+  // Local Vars (e.g. Middle Column, Bottom Row)
+  const localVarsX =
+    colXCoords[1] + cellWidthsArray[1] / 2 - styles.varBox.width / 2;
+  const localVarsY =
+    cellHeight * 3 +
+    cellHeight / 2 -
+    styles.varBox.headerHeight / 2 -
+    styles.varBox.padding;
+
+  console.log(
+    `[DLS Step 3] Grid Coords: mainX=${mainChainStartX}, mainY=${mainChainY}, orphanY=${orphanGridY}, orphanLeft=${orphanCellLeft}, instX=${instanceVarsX}, instY=${instanceVarsY}, localX=${localVarsX}, localY=${localVarsY}`
+  );
+  console.log(
+    `[DLS Step 3] Cell Widths: Orphan=${cellWidthsArray[0]}, IV/LV Col=${cellWidthsArray[1]}, Main Col=${cellWidthsArray[2]}`
+  );
+
+  // --- EXISTING RENDER Instance Variables (Top, Center) ---
+  // This will use instanceVarsX, instanceVarsY from Step 3
+  let instanceVarsBoxInfo = null; // Keep for potential use in connection drawing or other layout
   if (Object.keys(instanceVariables).length > 0) {
-    const instanceVarsX = width / 2 - instanceVarsBoxWidth / 2;
-    const instanceVarsY =
-      topLayerY + (topSectionHeight - instanceVarsBoxWidth) / 2;
     const instanceVarsResult = renderVariableBox(
       contentGroup,
       "Instance Variables",
       instanceVariables,
-      instanceVarsX,
-      instanceVarsY,
+      instanceVarsX, // Use new grid X
+      instanceVarsY, // Use new grid Y
       styles.varBox,
       "instance",
       isAddress
@@ -166,459 +372,260 @@ export const renderDoublyLinkedStructureVisualization = (
     instanceVarsBoxInfo = {
       x: instanceVarsX,
       y: instanceVarsY,
-      width: instanceVarsBoxWidth,
+      width: styles.varBox.width, // varBox has fixed width
       height: instanceVarsResult.height,
     };
     nodePositions["instance_vars_box"] = instanceVarsBoxInfo;
-    topLayerBottomY = instanceVarsY + instanceVarsResult.height;
-  } else {
-    topLayerBottomY = topLayerY;
-    instanceVarsBoxInfo = {
-      x: width / 2 - instanceVarsBoxWidth / 2,
-      y: topLayerY,
-      width: 0,
-      height: 0,
-    };
   }
+  console.log("[DLS] Instance Variables Rendered (if any).");
 
-  console.log(
-    `[WebBrowserViz Layout Debug] Instance Vars Box X: ${instanceVarsBoxInfo?.x}`
-  );
-
+  // --- COMMENT OUT OLD MAIN CHAIN AND ORPHAN RENDERING LOGIC ---
+  /*
   // --- 2. Render Main Chain (Second Layer, Right Section) ---
-  // Calculate the rightmost position for the main chain
-  const mainChainRightX = width - styles.layout.mainChainRightMargin;
-  let currentX = mainChainRightX;
-
-  let mainHistoryMaxNodeHeight = nodeHeight;
-  const mainHistorySpecs = [];
-  let middleLayerBottomY = mainChainLayerY;
-
-  // Find the start of the chain from instance variables or by finding a node with null prev
-  let startAddress =
-    instanceVariables.head ||
-    instanceVariables.front ||
-    instanceVariables.start ||
-    instanceVariables.first ||
-    instanceVariables.root;
-
-  // If no start address found in instance variables, look for a node with null prev
-  if (!startAddress || !addressObjectMap[startAddress]) {
-    const allNodeAddrs = Object.keys(addressObjectMap).filter(
-      (addr) =>
-        addressObjectMap[addr] &&
-        typeof addressObjectMap[addr] === "object" &&
-        !Array.isArray(addressObjectMap[addr])
-    );
-
-    // Find nodes that are not pointed to by any other node's previousAddress
-    const pointedToAddrs = new Set();
-    allNodeAddrs.forEach((addr) => {
-      const nodeData = addressObjectMap[addr];
-      if (
-        nodeData &&
-        nodeData.previousAddress &&
-        nodeData.previousAddress !== "0x0" &&
-        nodeData.previousAddress !== "null"
-      ) {
-        pointedToAddrs.add(nodeData.previousAddress);
-      }
-    });
-
-    // Nodes that are not pointed to by any other node's previousAddress are potential starts
-    const potentialStarts = allNodeAddrs.filter(
-      (addr) => !pointedToAddrs.has(addr)
-    );
-
-    if (potentialStarts.length > 0) {
-      startAddress = potentialStarts[0];
-    } else if (allNodeAddrs.length > 0) {
-      startAddress = allNodeAddrs[0];
-    }
-  }
-
+  // ... (lots of old main chain rendering logic here) ...
   console.log(`[DoublyLinkedViz Layout] Start Address: ${startAddress}`);
   console.log(`[DoublyLinkedViz Layout] Address Object Map:`, addressObjectMap);
 
   // --- Simplified Rendering: Start from the head of the list ---
   if (startAddress && addressObjectMap[startAddress]) {
-    // First, find the current node's position
-    const startNodeData = addressObjectMap[startAddress];
-    const startNodeFields = {
-      value: startNodeData.value || startNodeData.data || "N/A",
-      prev: startNodeData.previousAddress || startNodeData.prev || "null",
-      next: startNodeData.nextAddress || startNodeData.next || "null",
-    };
-
-    // Place start node at the rightmost position
-    const startNodeX = mainChainRightX;
-    const startNodeY = mainChainLayerY;
-    const startNodeStyle = {
-      ...styles.node,
-      fill: styles.node.currentFill,
-      stroke: styles.node.currentStroke,
-      strokeWidth: 1.5,
-    };
-
-    mainHistorySpecs.push({
-      x: startNodeX,
-      y: startNodeY,
-      address: startAddress,
-      title:
-        startNodeData.title ||
-        truncateAddress(startNodeFields.value) ||
-        truncateAddress(startAddress, 6),
-      fields: startNodeFields,
-      isIsolated: false,
-      style: startNodeStyle,
-    });
-
-    nodePositions[startAddress] = {
-      x: startNodeX,
-      y: startNodeY,
-      width: nodeWidth,
-      height: nodeHeight,
-      fields: startNodeFields,
-    };
-
-    // Render previous nodes to the left
-    let currentPrevAddress = startNodeFields.prev;
-    let currentPrevX = startNodeX - nodeWidth - nodeSpacingX;
-    let nodesProcessedPrev = 0;
-
-    while (
-      currentPrevAddress &&
-      currentPrevAddress !== "0x0" &&
-      currentPrevAddress !== "null" &&
-      !visited.has(currentPrevAddress) &&
-      nodesProcessedPrev < MAX_NODES_TO_RENDER / 2
-    ) {
-      visited.add(currentPrevAddress);
-      const prevNodeData = addressObjectMap[currentPrevAddress];
-      if (!prevNodeData) break;
-
-      const prevNodeFields = {
-        value: prevNodeData.value || prevNodeData.data || "N/A",
-        prev: prevNodeData.previousAddress || prevNodeData.prev || "null",
-        next: prevNodeData.nextAddress || prevNodeData.next || "null",
-      };
-
-      mainHistorySpecs.push({
-        x: currentPrevX,
-        y: startNodeY,
-        address: currentPrevAddress,
-        title:
-          prevNodeData.title ||
-          truncateAddress(prevNodeFields.value) ||
-          truncateAddress(currentPrevAddress, 6),
-        fields: prevNodeFields,
-        isIsolated: false,
-        style: styles.node,
-      });
-
-      nodePositions[currentPrevAddress] = {
-        x: currentPrevX,
-        y: startNodeY,
-        width: nodeWidth,
-        height: nodeHeight,
-        fields: prevNodeFields,
-      };
-
-      // Add connections
-      if (
-        prevNodeFields.next &&
-        prevNodeFields.next !== "0x0" &&
-        prevNodeFields.next !== "null"
-      ) {
-        allConnections.push({
-          sourceName: currentPrevAddress,
-          targetAddress: prevNodeFields.next,
-          type: "ll_next",
-        });
-      }
-      if (
-        prevNodeFields.prev &&
-        prevNodeFields.prev !== "0x0" &&
-        prevNodeFields.prev !== "null"
-      ) {
-        allConnections.push({
-          sourceName: currentPrevAddress,
-          targetAddress: prevNodeFields.prev,
-          type: "ll_prev",
-        });
-      }
-
-      currentPrevAddress = prevNodeFields.prev;
-      currentPrevX -= nodeWidth + nodeSpacingX;
-      nodesProcessedPrev++;
-    }
-
-    // Render next nodes to the right
-    let currentNextAddress = startNodeFields.next;
-    let currentNextX = startNodeX + nodeWidth + nodeSpacingX;
-    let nodesProcessedNext = 0;
-
-    while (
-      currentNextAddress &&
-      currentNextAddress !== "0x0" &&
-      currentNextAddress !== "null" &&
-      !visited.has(currentNextAddress) &&
-      nodesProcessedNext < MAX_NODES_TO_RENDER / 2
-    ) {
-      visited.add(currentNextAddress);
-      const nextNodeData = addressObjectMap[currentNextAddress];
-      if (!nextNodeData) break;
-
-      const nextNodeFields = {
-        value: nextNodeData.value || nextNodeData.data || "N/A",
-        prev: nextNodeData.previousAddress || nextNodeData.prev || "null",
-        next: nextNodeData.nextAddress || nextNodeData.next || "null",
-      };
-
-      mainHistorySpecs.push({
-        x: currentNextX,
-        y: startNodeY,
-        address: currentNextAddress,
-        title:
-          nextNodeData.title ||
-          truncateAddress(nextNodeFields.value) ||
-          truncateAddress(currentNextAddress, 6),
-        fields: nextNodeFields,
-        isIsolated: false,
-        style: styles.node,
-      });
-
-      nodePositions[currentNextAddress] = {
-        x: currentNextX,
-        y: startNodeY,
-        width: nodeWidth,
-        height: nodeHeight,
-        fields: nextNodeFields,
-      };
-
-      // Add connections
-      if (
-        nextNodeFields.next &&
-        nextNodeFields.next !== "0x0" &&
-        nextNodeFields.next !== "null"
-      ) {
-        allConnections.push({
-          sourceName: currentNextAddress,
-          targetAddress: nextNodeFields.next,
-          type: "ll_next",
-        });
-      }
-      if (
-        nextNodeFields.prev &&
-        nextNodeFields.prev !== "0x0" &&
-        nextNodeFields.prev !== "null"
-      ) {
-        allConnections.push({
-          sourceName: currentNextAddress,
-          targetAddress: nextNodeFields.prev,
-          type: "ll_prev",
-        });
-      }
-
-      currentNextAddress = nextNodeFields.next;
-      currentNextX += nodeWidth + nodeSpacingX;
-      nodesProcessedNext++;
-    }
-
-    // Add connections for start node
-    if (
-      startNodeFields.next &&
-      startNodeFields.next !== "0x0" &&
-      startNodeFields.next !== "null"
-    ) {
-      allConnections.push({
-        sourceName: startAddress,
-        targetAddress: startNodeFields.next,
-        type: "ll_next",
-      });
-    }
-    if (
-      startNodeFields.prev &&
-      startNodeFields.prev !== "0x0" &&
-      startNodeFields.prev !== "null"
-    ) {
-      allConnections.push({
-        sourceName: startAddress,
-        targetAddress: startNodeFields.prev,
-        type: "ll_prev",
-      });
-    }
-
-    // Render all collected nodes
-    mainHistorySpecs.forEach((spec) => {
-      try {
-        renderGenericNode(
-          contentGroup,
-          spec,
-          spec.style,
-          nodePositions,
-          isAddress,
-          truncateAddress
-        );
-      } catch (e) {
-        console.error(
-          `[DoublyLinkedViz] Error rendering node (${spec.address}):`,
-          e
-        );
-      }
-    });
+    // ... (old logic for rendering start node, then prev nodes, then next nodes) ...
   } else {
     // Handle case where no valid start node was found
-    console.warn("[DoublyLinkedViz] No valid start node found.");
-    contentGroup
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", mainChainLayerY + 20)
-      .attr("text-anchor", "middle")
-      .text("Could not determine start of list.");
-    middleLayerBottomY = mainChainLayerY + 40;
+    // ...
   }
-
-  const mainChainBottomY = middleLayerBottomY;
 
   // --- 3. Render Orphan Nodes (Third Layer, Left Section) ---
-  const orphanNodeStartX = firstColX;
-  const orphanNodeY = orphanLayerY + (orphanSectionHeight - nodeHeight) / 2; // Center vertically in orphan section
-  let currentOrphanX = orphanNodeStartX;
-  let currentOrphanY = orphanNodeY;
-  let orphanRowHeight = 0;
-  const orphanSpecs = [];
-
-  // Get all nodes that are part of the main chain
-  const mainChainNodes = new Set();
-  if (startAddress && addressObjectMap[startAddress]) {
-    // Add start node
-    mainChainNodes.add(startAddress);
-
-    // Add all previous nodes
-    let currentPrevAddress =
-      addressObjectMap[startAddress].previousAddress ||
-      addressObjectMap[startAddress].prev;
-    while (
-      currentPrevAddress &&
-      currentPrevAddress !== "0x0" &&
-      currentPrevAddress !== "null"
-    ) {
-      mainChainNodes.add(currentPrevAddress);
-      currentPrevAddress =
-        addressObjectMap[currentPrevAddress]?.previousAddress ||
-        addressObjectMap[currentPrevAddress]?.prev;
-    }
-
-    // Add all next nodes
-    let currentNextAddress =
-      addressObjectMap[startAddress].nextAddress ||
-      addressObjectMap[startAddress].next;
-    while (
-      currentNextAddress &&
-      currentNextAddress !== "0x0" &&
-      currentNextAddress !== "null"
-    ) {
-      mainChainNodes.add(currentNextAddress);
-      currentNextAddress =
-        addressObjectMap[currentNextAddress]?.nextAddress ||
-        addressObjectMap[currentNextAddress]?.next;
-    }
-  }
-
-  const allPotentialNodeAddresses = Object.keys(addressObjectMap).filter(
-    (addr) =>
-      addressObjectMap[addr] &&
-      typeof addressObjectMap[addr] === "object" &&
-      !Array.isArray(addressObjectMap[addr]) &&
-      (addressObjectMap[addr].hasOwnProperty("data") ||
-        addressObjectMap[addr].hasOwnProperty("value") ||
-        addressObjectMap[addr].hasOwnProperty("nextAddress") ||
-        addressObjectMap[addr].hasOwnProperty("previousAddress"))
+  // ... (old orphan rendering logic here) ...
+  */
+  console.log(
+    "[DLS] Old Main Chain and Orphan rendering sections are COMMENTED OUT."
   );
 
-  allPotentialNodeAddresses.forEach((addr) => {
-    // Skip if node is part of the main chain
-    if (mainChainNodes.has(addr)) {
-      return;
+  // --- STEP 4: MAIN CHAIN LAYOUT (Populate mainListSpecs) ---
+  console.log("[DLS Step 4] Starting Main Chain Layout.");
+  const mainListSpecs = [];
+  // Use trueStartAddress determined in Step 1 for layout
+  const layoutStartAddress = trueStartAddress;
+
+  if (layoutStartAddress && addressObjectMap[layoutStartAddress]) {
+    let nodesToProcess = [];
+    let tempAddr;
+
+    // Gather nodes to the left (previous)
+    let leftNodes = [];
+    tempAddr = layoutStartAddress;
+    let count = 0;
+    const visitedForLayout = new Set(); // Separate visited set for this layout pass to handle rendering sequence
+
+    // First, process the layoutStartAddress node itself
+    const startNodeDataForLayout = addressObjectMap[layoutStartAddress];
+    if (startNodeDataForLayout) {
+      nodesToProcess.push({
+        addr: layoutStartAddress,
+        data: startNodeDataForLayout,
+        position: "current",
+      });
+      visitedForLayout.add(layoutStartAddress);
+
+      // Gather previous nodes
+      tempAddr =
+        startNodeDataForLayout.previousAddress || startNodeDataForLayout.prev;
+      count = 0;
+      while (
+        tempAddr &&
+        tempAddr !== "0x0" &&
+        tempAddr !== "null" &&
+        !visitedForLayout.has(tempAddr) &&
+        count < MAX_NODES_TO_RENDER / 2
+      ) {
+        const nodeData = addressObjectMap[tempAddr];
+        if (!nodeData) break;
+        leftNodes.unshift({ addr: tempAddr, data: nodeData }); // Add to beginning to maintain order for left rendering
+        visitedForLayout.add(tempAddr);
+        tempAddr = nodeData.previousAddress || nodeData.prev;
+        count++;
+      }
+      nodesToProcess = [...leftNodes, ...nodesToProcess];
+
+      // Gather next nodes
+      tempAddr =
+        startNodeDataForLayout.nextAddress || startNodeDataForLayout.next;
+      count = 0;
+      while (
+        tempAddr &&
+        tempAddr !== "0x0" &&
+        tempAddr !== "null" &&
+        !visitedForLayout.has(tempAddr) &&
+        count < MAX_NODES_TO_RENDER / 2
+      ) {
+        const nodeData = addressObjectMap[tempAddr];
+        if (!nodeData) break;
+        nodesToProcess.push({ addr: tempAddr, data: nodeData });
+        visitedForLayout.add(tempAddr);
+        tempAddr = nodeData.nextAddress || nodeData.next;
+        count++;
+      }
     }
 
-    if (!visited.has(addr)) {
-      visited.add(addr);
-      const nodeData = addressObjectMap[addr];
-      if (!nodeData) return;
+    // Now layout nodesToProcess which are ordered: prevs, current, nexts
+    let currentLayoutX = mainChainStartX; // Start from the left of the main chain area defined by grid
 
-      const orphanNodeFields = {
+    nodesToProcess.forEach((nodeInfo) => {
+      const { addr: currentLayoutAddr, data: nodeData, position } = nodeInfo;
+      const nodeFields = {
         value: nodeData.value || nodeData.data || "N/A",
         prev: nodeData.previousAddress || nodeData.prev || "null",
         next: nodeData.nextAddress || nodeData.next || "null",
       };
+      let nodeSpecificStyle = { ...styles.node };
 
-      const currentOrphanNodeHeight = nodeHeight;
-      orphanRowHeight = Math.max(orphanRowHeight, currentOrphanNodeHeight);
-
-      orphanSpecs.push({
-        x: currentOrphanX,
-        y: currentOrphanY,
-        address: addr,
-        title:
-          nodeData.title ||
-          truncateAddress(orphanNodeFields.value) ||
-          truncateAddress(addr, 6),
-        fields: orphanNodeFields,
-        isIsolated: true,
-        style: {
-          ...styles.node,
-          fill: styles.node.isolatedFill,
-          stroke: styles.node.isolatedStroke,
-          strokeDasharray: "4,4",
-        },
+      mainListSpecs.push({
+        x: currentLayoutX,
+        y: mainChainY,
+        address: currentLayoutAddr,
+        title: currentLayoutAddr, // Always address as per user request
+        fields: nodeFields,
+        isIsolated: false,
+        style: nodeSpecificStyle,
       });
-
-      nodePositions[addr] = {
-        x: currentOrphanX,
-        y: currentOrphanY,
-        width: nodeWidth,
-        height: currentOrphanNodeHeight,
-        fields: orphanNodeFields,
+      nodePositions[currentLayoutAddr] = {
+        x: currentLayoutX,
+        y: mainChainY,
+        width: styles.node.width,
+        height: styles.node.height,
+        fields: nodeFields,
       };
 
-      // Add connections for this orphan node
+      const nextNodeAddr = nodeFields.next;
       if (
-        orphanNodeFields.next &&
-        orphanNodeFields.next !== "0x0" &&
-        orphanNodeFields.next !== "null"
+        nextNodeAddr &&
+        nextNodeAddr !== "0x0" &&
+        nextNodeAddr !== "null" &&
+        addressObjectMap[nextNodeAddr]
       ) {
         allConnections.push({
-          sourceName: addr,
-          targetAddress: orphanNodeFields.next,
+          sourceName: currentLayoutAddr,
+          targetAddress: nextNodeAddr,
           type: "ll_next",
         });
       }
+      const prevNodeAddr = nodeFields.prev;
       if (
-        orphanNodeFields.prev &&
-        orphanNodeFields.prev !== "0x0" &&
-        orphanNodeFields.prev !== "null"
+        prevNodeAddr &&
+        prevNodeAddr !== "0x0" &&
+        prevNodeAddr !== "null" &&
+        addressObjectMap[prevNodeAddr]
       ) {
         allConnections.push({
-          sourceName: addr,
-          targetAddress: orphanNodeFields.prev,
+          sourceName: currentLayoutAddr,
+          targetAddress: prevNodeAddr,
           type: "ll_prev",
         });
       }
+      currentLayoutX += styles.node.width + styles.layout.nodeSpacingX;
+    });
+  }
 
-      // Update position for next orphan + wrapping logic
-      currentOrphanX += nodeWidth + styles.layout.orphanNodeSpacingX;
-      // Wrap if exceeding left section boundary
-      if (
-        currentOrphanX + nodeWidth >
-        leftSectionEnd - styles.layout.nodeSpacingX
-      ) {
-        currentOrphanX = orphanNodeStartX;
-        currentOrphanY += orphanRowHeight + styles.layout.nodeSpacingX;
-        orphanRowHeight = 0;
-      }
+  mainListSpecs.forEach((spec) => {
+    try {
+      renderGenericNode(
+        contentGroup,
+        spec,
+        spec.style,
+        nodePositions,
+        isAddress,
+        truncateAddress
+      );
+    } catch (e) {
+      console.error(
+        `[DLS Step 4] Error rendering MAIN LIST node ${spec.address}:`,
+        e
+      );
     }
+  });
+  console.log(
+    "[DLS Step 4] Main Chain Layout and Rendering - DONE. Specs:",
+    mainListSpecs.length
+  );
+
+  // --- STEP 5: ORPHAN CHAIN LAYOUT (Populate orphanSpecs) ---
+  console.log(
+    "[DLS Step 5] Starting Orphan Chain Layout - Single Line Horizontal."
+  );
+  const orphanSpecs = [];
+  // orphanCellLeft and orphanGridY are defined in Step 3
+  // calculatedOrphanCellWidth (cellWidthsArray[0]) is also from Step 3 and defines the total available width for orphans
+  let currentOrphanX = orphanCellLeft + orphanCellPadding; // Start X for orphan layout
+  const currentOrphanY = orphanGridY; // Orphans will be on a single Y-level
+
+  orderedOrphanAddrs.forEach((addr) => {
+    const nodeData = addressObjectMap[addr];
+    if (!nodeData || typeof nodeData !== "object" || Array.isArray(nodeData)) {
+      console.warn(
+        `[DLS Step 5] Invalid node data for orphan address: ${addr}`
+      );
+      return; // Skip this orphan if data is invalid
+    }
+
+    const orphanNodeFields = {
+      value: nodeData.value || nodeData.data || "N/A",
+      prev: nodeData.previousAddress || nodeData.prev || "null",
+      next: nodeData.nextAddress || nodeData.next || "null",
+    };
+
+    const orphanNodeStyle = {
+      ...styles.node,
+      fill: styles.node.isolatedFill,
+      stroke: styles.node.isolatedStroke,
+      strokeDasharray: "4,4",
+    };
+
+    orphanSpecs.push({
+      x: currentOrphanX,
+      y: currentOrphanY, // All orphans on the same Y level
+      address: addr,
+      title: addr, // Always address as per user request
+      fields: orphanNodeFields,
+      isIsolated: true,
+      style: orphanNodeStyle,
+    });
+    nodePositions[addr] = {
+      x: currentOrphanX,
+      y: currentOrphanY,
+      width: styles.node.width,
+      height: styles.node.height, // Use styles.node.height
+      fields: orphanNodeFields,
+    };
+
+    // Add connections for this orphan node's 'next' and 'prev'
+    const orphanNextAddr = orphanNodeFields.next;
+    if (
+      orphanNextAddr &&
+      orphanNextAddr !== "0x0" &&
+      orphanNextAddr !== "null" &&
+      addressObjectMap[orphanNextAddr]
+    ) {
+      allConnections.push({
+        sourceName: addr,
+        targetAddress: orphanNextAddr,
+        type: "ll_next",
+      });
+    }
+    const orphanPrevAddr = orphanNodeFields.prev;
+    if (
+      orphanPrevAddr &&
+      orphanPrevAddr !== "0x0" &&
+      orphanPrevAddr !== "null" &&
+      addressObjectMap[orphanPrevAddr]
+    ) {
+      allConnections.push({
+        sourceName: addr,
+        targetAddress: orphanPrevAddr,
+        type: "ll_prev",
+      });
+    }
+
+    currentOrphanX += styles.node.width + styles.layout.orphanNodeSpacingX;
   });
 
   // Render orphan nodes
@@ -634,23 +641,25 @@ export const renderDoublyLinkedStructureVisualization = (
       );
     } catch (e) {
       console.error(
-        `[WebBrowserViz] Error rendering ORPHAN node (${spec.address}):`,
+        `[DLS Step 5] Error rendering ORPHAN node ${spec.address}:`,
         e
       );
     }
   });
+  console.log(
+    "[DLS Step 5] Orphan Chain Layout and Rendering - DONE. Specs:",
+    orphanSpecs.length
+  );
 
-  // --- 4. Render Local Variables (Bottom, Center) ---
+  // --- EXISTING RENDER Local Variables (Bottom, Center) ---
+  // This will use localVarsX, localVarsY from Step 3
   if (Object.keys(localVariables).length > 0) {
-    const localVarsX = width / 2 - localVarsBoxWidth / 2; // Center in middle section
-    const localVarsY =
-      localVarsLayerY + (bottomSectionHeight - localVarsBoxWidth) / 2; // Center vertically in bottom section
     const localVarsResult = renderVariableBox(
       contentGroup,
       "Local Variables",
       localVariables,
-      localVarsX,
-      localVarsY,
+      localVarsX, // Use new grid X
+      localVarsY, // Use new grid Y
       styles.varBox,
       "local",
       isAddress
@@ -659,26 +668,33 @@ export const renderDoublyLinkedStructureVisualization = (
     nodePositions["local_vars_box"] = {
       x: localVarsX,
       y: localVarsY,
-      width: localVarsBoxWidth,
+      width: styles.varBox.width,
       height: localVarsResult.height,
     };
   }
+  console.log("[DLS] Local Variables Rendered (if any).");
 
-  // --- 5. Render Connections (Arrow Drawing Logic - Unchanged from previous step) ---
+  // --- EXISTING Render Connections (Arrow Drawing Logic) ---
+  // This logic should largely remain, as it processes 'allConnections'
+  // which will be populated by the new Step 4 and Step 5.
   const connectionsGroup = contentGroup
     .append("g")
     .attr("class", "connections-group");
   allConnections.forEach((conn) => {
+    // ... (Paste existing comprehensive arrow drawing logic here) ...
+    // It should correctly use conn.type ('ll_next', 'll_prev') and
+    // styles.connection properties (colors, markerIds)
+    // Ensure sourcePoint and targetPoint calculations are robust.
+    // --- START OF COPIED ARROW LOGIC ---
     let sourcePoint, targetPoint;
     let path = "";
-    let markerId = styles.connection.llNextMarkerId; // Default to next
-    let color = styles.connection.defaultColor; // Default color
+    let markerId = styles.connection.llNextMarkerId;
+    let color = styles.connection.defaultColor;
     let strokeWidth = styles.connection.strokeWidth;
     const cornerRadius = styles.connection.cornerRadius || 5;
     let pathOrientationHint = "auto";
-    const sNodeStyle = styles.node; // Use base node style for thresholds etc.
+    const sNodeStyle = styles.node;
 
-    // Y_THRESHOLD now based on the standard node height from styles
     const Y_THRESHOLD =
       (sNodeStyle && typeof sNodeStyle.height === "number"
         ? sNodeStyle.height
@@ -686,7 +702,6 @@ export const renderDoublyLinkedStructureVisualization = (
     const HORIZONTAL_OVERSHOOT = 20;
     const INITIAL_HORIZONTAL_SEGMENT_FOR_OVERLAP = 20;
 
-    // 1. Source Data
     let sourceBoundingBoxPosData;
     let specificFieldInitialCoords;
 
@@ -701,19 +716,16 @@ export const renderDoublyLinkedStructureVisualization = (
       sourceBoundingBoxPosData = nodePositions[varBoxType];
       specificFieldInitialCoords = conn.sourceCoords;
       if (!sourceBoundingBoxPosData || !specificFieldInitialCoords) {
-        console.warn(`[WBV Arrow] Missing source VarBox data:`, conn);
+        console.warn(`[DLS Arrow] Missing source VarBox data:`, conn);
         return;
       }
     } else if (conn.sourceName && nodePositions[conn.sourceName]) {
-      // Check if source node exists in positions
       sourceBoundingBoxPosData = nodePositions[conn.sourceName];
-      // Calculate fieldYOffset based on conn.type (prev, next, or default to value/center)
       let fieldYOffset;
-      let fieldNameToUse = "value"; // Default field if not prev/next (e.g. from an orphan pointing via 'value')
+      let fieldNameToUse = "value";
       if (conn.type === "ll_next") fieldNameToUse = "next";
       else if (conn.type === "ll_prev") fieldNameToUse = "prev";
 
-      // Use fields stored in nodePositions if available, otherwise fallback
       const actualFields = sourceBoundingBoxPosData.fields || {
         value: "N/A",
         prev: "null",
@@ -721,17 +733,13 @@ export const renderDoublyLinkedStructureVisualization = (
       };
       const fieldNames = Object.keys(actualFields);
       let fieldIndexToUse = fieldNames.indexOf(fieldNameToUse);
-
       if (fieldIndexToUse === -1) {
-        // Fallback if specific field (next/prev) isn't there
         if (fieldNames.includes("value"))
           fieldIndexToUse = fieldNames.indexOf("value");
-        else if (fieldNames.length > 0)
-          fieldIndexToUse = fieldNames.length - 1; // last available field
-        else fieldIndexToUse = 0; // Absolute fallback to first field index
+        else if (fieldNames.length > 0) fieldIndexToUse = fieldNames.length - 1;
+        else fieldIndexToUse = 0;
       }
 
-      // Use sNodeStyle for field height calculations for consistency
       if (
         sNodeStyle &&
         typeof sNodeStyle.fieldHeight === "number" &&
@@ -745,26 +753,24 @@ export const renderDoublyLinkedStructureVisualization = (
           fieldIndexToUse * (sNodeStyle.fieldHeight + sNodeStyle.fieldSpacing) +
           sNodeStyle.fieldHeight / 2;
       } else {
-        // Fallback if style properties are missing (should not happen with new style object)
         fieldYOffset =
           (sourceBoundingBoxPosData.height || sNodeStyle.height) / 2;
       }
       specificFieldInitialCoords = {
         x:
           sourceBoundingBoxPosData.x +
-          (sourceBoundingBoxPosData.width || sNodeStyle.width) / 2, // Egress X will be adjusted later
+          (sourceBoundingBoxPosData.width || sNodeStyle.width) / 2,
         y: sourceBoundingBoxPosData.y + fieldYOffset,
       };
     } else {
       console.warn(
-        "[WBV Arrow] Connection sourceName not found or missing in nodePositions:",
+        "[DLS Arrow] Connection sourceName not found or invalid:",
         conn.sourceName,
         conn
       );
       return;
     }
 
-    // 2. Target Data
     const targetPosData = nodePositions[conn.targetAddress];
     if (!targetPosData) {
       if (
@@ -788,21 +794,25 @@ export const renderDoublyLinkedStructureVisualization = (
             .attr("y1", egressY)
             .attr("x2", nullEndX)
             .attr("y2", egressY)
-            .attr("stroke", styles.connection.nextColor)
+            .attr(
+              "stroke",
+              conn.type === "ll_prev"
+                ? styles.connection.prevColor
+                : styles.connection.nextColor
+            )
             .attr("stroke-width", strokeWidth)
             .attr("stroke-dasharray", "3,3");
         }
         return;
       }
       console.warn(
-        `[WBV Arrow] Target Node not found for address:`,
+        `[DLS Arrow] Target Node not found for address:`,
         conn.targetAddress,
         conn
       );
       return;
     }
 
-    // 3. Coordinates & Deltas
     const sourceOverallMidX =
       sourceBoundingBoxPosData.x +
       (sourceBoundingBoxPosData.width || sNodeStyle.width) / 2;
@@ -815,7 +825,7 @@ export const renderDoublyLinkedStructureVisualization = (
 
     if (
       (conn.type === "ll_next" || conn.type === "ll_prev") &&
-      !conn.sourceName.includes("vars_box") && // Only for node-to-node, not varbox-to-node
+      !conn.sourceName.includes("vars_box") &&
       sourceBoundingBoxPosData &&
       typeof sourceBoundingBoxPosData.height === "number"
     ) {
@@ -825,7 +835,6 @@ export const renderDoublyLinkedStructureVisualization = (
     const deltaXOverallMid = Math.abs(targetOverallMidX - sourceOverallMidX);
     const deltaYDecisionMid = Math.abs(targetOverallMidY - decisionSourceY);
 
-    // 4. Egress Side & Source Point
     const chosenEgressSide =
       targetOverallMidX < sourceOverallMidX ? "left" : "right";
     sourcePoint = { y: sourceFieldActualY };
@@ -837,7 +846,6 @@ export const renderDoublyLinkedStructureVisualization = (
         (sourceBoundingBoxPosData.width || sNodeStyle.width);
     }
 
-    // 5. Path Style Decision
     if (deltaYDecisionMid <= Y_THRESHOLD) {
       pathOrientationHint = "H-V-H";
       targetPoint = {
@@ -887,28 +895,11 @@ export const renderDoublyLinkedStructureVisualization = (
       }
     }
 
-    // 6. Marker and Color - STANDARDIZED
-    /* Original Logic
-    if (conn.type === "ll_next") {
-        markerId = styles.connection.llNextMarkerId;
-        color = styles.connection.nextColor;
-    } else if (conn.type === "ll_prev") {
-        markerId = styles.connection.llNextMarkerId; // USE NEXT_MARKER_ID FOR PREV
-        color = styles.connection.nextColor;    // USE NEXT_COLOR FOR PREV
-    } else { // instance or local vars
-        markerId = styles.connection.llInstanceVarMarkerId;
-        color = styles.connection.instanceVarColor;
-    }
-    color = color || styles.connection.defaultColor; // Fallback if specific color undefined
-    */
-
-    // New Logic: Differentiate colors and markers based on connection type
     if (
       conn.sourceName &&
       (conn.sourceName.startsWith("instance-") ||
         conn.sourceName.startsWith("local-"))
     ) {
-      // Connection from a variable box
       markerId = styles.connection.llInstanceVarMarkerId;
       color = styles.connection.instanceVarColor;
     } else if (conn.type === "ll_next") {
@@ -918,10 +909,8 @@ export const renderDoublyLinkedStructureVisualization = (
       markerId = styles.connection.llPrevMarkerId;
       color = styles.connection.prevColor;
     }
-    // Ensure color has a fallback if a specific one wasn't assigned (shouldn't happen with above logic)
     color = color || styles.connection.defaultColor;
 
-    // 7. Generate Path Offset
     let initialOffset = 15;
     if (pathOrientationHint === "H-V-H") {
       const xDistForOffset = deltaXOverallMid / 2 - cornerRadius * 2;
@@ -929,7 +918,6 @@ export const renderDoublyLinkedStructureVisualization = (
       initialOffset = Math.max(5, Math.min(30, xDistForOffset, yDistForOffset));
     }
 
-    // 8. Generate Path
     path = generateOrthogonalPath(
       sourcePoint,
       targetPoint,
@@ -939,7 +927,6 @@ export const renderDoublyLinkedStructureVisualization = (
       null
     );
 
-    // 9. Draw Path
     if (path && sourcePoint && targetPoint) {
       connectionsGroup
         .append("path")
@@ -952,7 +939,7 @@ export const renderDoublyLinkedStructureVisualization = (
         .attr("stroke-linecap", "round");
     } else {
       console.warn(
-        "[WebBrowserViz Arrow] Path empty/points missing for connection:",
+        "[DLS Arrow] Path empty/points missing for connection:",
         conn,
         "Source:",
         sourcePoint,
@@ -960,10 +947,12 @@ export const renderDoublyLinkedStructureVisualization = (
         targetPoint
       );
     }
+    // --- END OF COPIED ARROW LOGIC ---
   });
+  console.log("[DLS] Connection Drawing Attempted.");
 
   console.log(
-    "Finished renderWebBrowserVisualization (Aligned & Arrows). Node Positions:",
+    "Finished renderDoublyLinkedStructureVisualization (Iterative Step 1-3). Node Positions:",
     nodePositions,
     "Connections:",
     allConnections
