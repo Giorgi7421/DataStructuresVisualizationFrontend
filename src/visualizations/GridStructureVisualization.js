@@ -16,10 +16,13 @@ export function renderGridStructureVisualization(
   memorySnapshot,
   snapshotIdentifier
 ) {
-  // Use memorySnapshot or operation.state
   const state = memorySnapshot || operation.state || {};
   const instanceVariables = state.instanceVariables || state || {};
   const addressObjectMap = state.addressObjectMap || {};
+
+  // Initialize nodePositions and allConnections
+  const nodePositions = {};
+  const allConnections = [];
 
   // Styles (similar to array visualization)
   const styles = {
@@ -89,21 +92,25 @@ export function renderGridStructureVisualization(
       .attr("fill", styles.connection.color || "#334155");
   }
 
-  // 1. Render 'elems' variable box
+  let addresses = [];
   const elemsAddress = instanceVariables.elems;
+  if (elemsAddress && addressObjectMap[elemsAddress]) {
+    addresses = addressObjectMap[elemsAddress];
+  }
+
+  // 1. Render 'elems' variable box
   const varBoxX = 30;
-  let varBoxY = 30; // temporary for addressesArrayY calculation
+  let varBoxY = 30;
   const addressesArrayX = varBoxX + styles.varBox.width + 60;
-  const addressesArrayY = varBoxY + 10; // align with varBox
-  // Define addressBoxX and addressBoxY so they are in scope for both uses
+  const addressesArrayY = varBoxY + 10;
   const addressBoxX = addressesArrayX;
   const addressBoxY = addressesArrayY - styles.cell.height;
-  // Now align the 'elems' field with the address tag box
   varBoxY =
     addressesArrayY +
     styles.cell.height / 2 -
     styles.varBox.headerHeight -
     styles.varBox.fieldHeight / 2;
+
   const instanceVarBoxResult = renderVariableBox(
     contentGroup,
     "Instance Variables",
@@ -118,13 +125,21 @@ export function renderGridStructureVisualization(
     "instance",
     isAddress
   );
+  // Collect connections from instance variables if any (though elems is handled separately below)
+  if (instanceVarBoxResult && instanceVarBoxResult.connectionPoints) {
+    // Filter out the elems connection if we are drawing it manually, or ensure it's styled distinctly
+    // For now, let's assume renderVariableBox doesn't draw for 'elems' if we handle it manually.
+    // Or, if it does, this new logic will draw ON TOP OF IT or DUPLICATE it for local vars.
+    // We are primarily interested in local var connections here.
+  }
 
-  // Render local variable box below instance variable box if local variables exist
+  // Render local variable box below addresses array
   const localVariables = state.localVariables || {};
   if (Object.keys(localVariables).length > 0) {
-    const localVarsX = varBoxX;
-    const localVarsY = varBoxY + instanceVarBoxResult.height + 20; // 20px spacing
-    renderVariableBox(
+    const addressesArrayHeight = addresses.length * styles.cell.height;
+    const localVarsX = addressesArrayX;
+    const localVarsY = addressesArrayY + addressesArrayHeight + 40;
+    const localVarsResult = renderVariableBox(
       contentGroup,
       "Local Variables",
       localVariables,
@@ -134,44 +149,71 @@ export function renderGridStructureVisualization(
       "local",
       isAddress
     );
+    if (localVarsResult && localVarsResult.connectionPoints) {
+      allConnections.push(...localVarsResult.connectionPoints);
+    }
   }
 
-  // 2. Render the addresses array as a vertical array (like array visualization, but vertical)
-  let addresses = [];
-  if (elemsAddress && addressObjectMap[elemsAddress]) {
-    addresses = addressObjectMap[elemsAddress];
-  }
-  const cellSpacingY = 0;
+  // Arrow from 'elems' field in Instance Variables to the start of addresses array (main elems pointer)
+  if (elemsAddress && instanceVarBoxResult.connectionPoints) {
+    const elemsConnectionPoint = instanceVarBoxResult.connectionPoints.find(
+      (p) => p.sourceName.endsWith("-elems")
+    );
+    if (elemsConnectionPoint && elemsConnectionPoint.sourceCoords) {
+      const startX = elemsConnectionPoint.sourceCoords.x;
+      const startY = elemsConnectionPoint.sourceCoords.y;
 
-  // Draw arrow from 'elems' to addresses array (horizontal)
-  if (elemsAddress) {
-    // Calculate the y-position of the 'elems' field in the instance variable box
-    const instanceVars = {
-      elems: elemsAddress,
-      rows: instanceVariables.rows,
-      columns: instanceVariables.columns,
-    };
-    const instanceVarKeys = Object.keys(instanceVars);
-    const fieldIndex = instanceVarKeys.indexOf("elems");
-    const startX = varBoxX + styles.varBox.width;
-    const startY =
-      varBoxY +
-      styles.varBox.headerHeight +
-      styles.varBox.padding +
-      fieldIndex * (styles.varBox.fieldHeight + styles.varBox.fieldSpacing) +
-      styles.varBox.fieldHeight / 2;
-    const endX = addressBoxX;
-    const endY = addressBoxY + styles.cell.height / 2;
-    contentGroup
-      .append("path")
-      .attr("d", `M ${startX} ${startY} L ${endX} ${endY}`)
-      .attr("fill", "none")
-      .attr("stroke", styles.connection.color)
-      .attr("stroke-width", styles.connection.strokeWidth)
-      .attr("marker-end", "url(#array-arrow)");
+      // Target the middle of the left side of the addressBox above the vertical addresses array
+      const endTargetX = addressBoxX; // Target left edge
+      const endTargetY = addressBoxY + styles.cell.height / 2; // Target vertical middle
+
+      const path = generateOrthogonalPath(
+        { x: startX, y: startY },
+        { x: endTargetX, y: endTargetY },
+        styles.connection.cornerRadius,
+        "H-V-H",
+        15,
+        null
+      );
+      contentGroup
+        .append("path")
+        .attr("d", path)
+        .attr("fill", "none")
+        .attr("stroke", styles.connection.color)
+        .attr("stroke-width", styles.connection.strokeWidth)
+        .attr("marker-end", `url(#${styles.connection.markerId})`);
+    } else {
+      // Fallback logic (can be kept or removed if the above is reliable)
+      const instanceVars = {
+        elems: elemsAddress,
+        rows: instanceVariables.rows,
+        columns: instanceVariables.columns,
+      };
+      const instanceVarKeys = Object.keys(instanceVars);
+      const fieldIndex = instanceVarKeys.indexOf("elems");
+      if (fieldIndex !== -1) {
+        const startXfb = varBoxX + styles.varBox.width;
+        const startYfb =
+          varBoxY +
+          styles.varBox.headerHeight +
+          styles.varBox.padding +
+          fieldIndex *
+            (styles.varBox.fieldHeight + styles.varBox.fieldSpacing) +
+          styles.varBox.fieldHeight / 2;
+        // Fallback still targets old way, consider updating if this path is taken often
+        const endXfb = addressBoxX;
+        const endYfb = addressBoxY + styles.cell.height / 2;
+        contentGroup
+          .append("path")
+          .attr("d", `M ${startXfb} ${startYfb} L ${endXfb} ${endYfb}`)
+          .attr("fill", "none")
+          .attr("stroke", styles.connection.color)
+          .attr("stroke-width", styles.connection.strokeWidth)
+          .attr("marker-end", `url(#${styles.connection.markerId})`);
+      }
+    }
   }
 
-  // Render addresses array as vertical array
   const addressCellWidth = 140;
   addresses.forEach((rowAddress, idx) => {
     const cellX = addressesArrayX;
@@ -216,8 +258,16 @@ export function renderGridStructureVisualization(
       .style("font-size", styles.cell.fontSize)
       .text(truncateAddress(String(rowAddress), 10));
 
+    // Store position of this row's address box
+    nodePositions[rowAddress] = {
+      x: cellX,
+      y: cellY,
+      width: addressCellWidth,
+      height: styles.cell.height,
+    };
+
     // Offset row arrays and address boxes to the right of the addresses array
-    const gap = 40;
+    const gap = 120;
     const rowAddressBoxWidth = 100;
     const rowAddressBoxX = addressesArrayX + addressCellWidth + gap;
     const rowStartX = rowAddressBoxX + rowAddressBoxWidth;
@@ -340,9 +390,17 @@ export function renderGridStructureVisualization(
         .style("font-size", styles.cell.fontSize)
         .text(truncateAddress(String(cellValue), 10));
     });
+
+    // Store position of the ACTUAL ROW TAG (rowAddressBox)
+    nodePositions[rowAddress] = {
+      x: rowAddressBoxX,
+      y: rowStartY,
+      width: rowAddressBoxWidth,
+      height: styles.cell.height,
+    };
   });
 
-  // Add address box above the addresses array (like in array visualization)
+  // Add address box above the addresses array (for elemsAddress)
   if (addresses.length > 0 && elemsAddress) {
     const addressBoxX = addressesArrayX;
     const addressBoxY = addressesArrayY - styles.cell.height; // flush with addresses array
@@ -392,4 +450,69 @@ export function renderGridStructureVisualization(
       .attr("stroke", styles.connection.color)
       .attr("stroke-width", styles.connection.strokeWidth);
   }
+
+  // --- ARROW DRAWING LOGIC (NEW SECTION) ---
+  const connectionsGroup = contentGroup
+    .append("g")
+    .attr("class", "connections-from-local-vars");
+  allConnections.forEach((conn) => {
+    if (!conn.sourceCoords || !conn.targetAddress) {
+      console.warn("[GridViz] Connection missing source/target info:", conn);
+      return;
+    }
+
+    const sourcePoint = conn.sourceCoords;
+    const targetData = nodePositions[conn.targetAddress]; // Target is a row's address box
+
+    if (!targetData) {
+      console.warn(
+        `[GridViz] Target for connection not found in nodePositions: ${conn.targetAddress}`
+      );
+      return;
+    }
+
+    // Determine targetPoint on the edge of the targetData bounding box
+    const targetPoint = {
+      x:
+        sourcePoint.x < targetData.x + targetData.width / 2
+          ? targetData.x
+          : targetData.x + targetData.width,
+      y: targetData.y + targetData.height / 2,
+    };
+
+    const markerId = styles.connection.markerId; // "array-arrow"
+    const color = styles.connection.color;
+    const strokeWidth = styles.connection.strokeWidth;
+    const cornerRadius = styles.connection.cornerRadius;
+
+    const deltaXOverallMid = Math.abs(targetPoint.x - sourcePoint.x);
+    const deltaYOverallMid = Math.abs(targetPoint.y - sourcePoint.y);
+
+    let initialOffset;
+    const xDistForOffset = deltaXOverallMid / 2 - cornerRadius * 2;
+    const yDistForOffset = deltaYOverallMid * 0.4;
+    initialOffset = Math.max(5, Math.min(30, xDistForOffset, yDistForOffset));
+    if (isNaN(initialOffset) || initialOffset < 5) initialOffset = 15; // Fallback
+
+    const path = generateOrthogonalPath(
+      sourcePoint,
+      targetPoint,
+      cornerRadius,
+      "H-V-H", // Force H-V-H path style
+      initialOffset,
+      null
+    );
+
+    if (path) {
+      connectionsGroup
+        .append("path")
+        .attr("d", path)
+        .attr("fill", "none")
+        .attr("stroke", color)
+        .attr("stroke-width", strokeWidth)
+        .attr("marker-end", markerId ? `url(#${markerId})` : null);
+    } else {
+      console.warn("[GridViz] Could not generate path for connection:", conn);
+    }
+  });
 }
