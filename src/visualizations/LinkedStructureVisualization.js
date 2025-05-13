@@ -29,6 +29,9 @@ export const renderLinkedStructureVisualization = (
   const instanceVariables = state.instanceVariables || {};
   const addressObjectMap = state.addressObjectMap || {};
 
+  // Move visited to the top so it is available for orphan ordering
+  const visited = new Set();
+
   // Define styles, adjusting node styles for renderGenericNode
   const styles = {
     varBox: {
@@ -102,56 +105,16 @@ export const renderLinkedStructureVisualization = (
   const nodePositions = {};
   const allConnections = [];
 
-  const firstColX = 30;
-  const varBoxTopMargin = 30;
-
-  let instanceVarsBoxHeight = 0;
-  let localVarsBoxHeight = 0;
-  const instanceVarsBoxWidth = styles.varBox.width || 180;
-  const localVarsBoxWidth = styles.varBox.width || 180;
-  const layerSpacingY = styles.layout.layerSpacingY || 120;
-  let nodeStartX = firstColX;
-
-  let topLayerBottomY = varBoxTopMargin;
-  if (Object.keys(instanceVariables).length > 0) {
-    const instanceVarsX = width / 2 - instanceVarsBoxWidth / 2;
-    const instanceVarsY = varBoxTopMargin;
-    const instanceVarsResult = renderVariableBox(
-      contentGroup,
-      "Instance Variables",
-      instanceVariables,
-      instanceVarsX,
-      instanceVarsY,
-      styles.varBox,
-      "instance",
-      isAddress
-    );
-    allConnections.push(...instanceVarsResult.connectionPoints);
-    instanceVarsBoxHeight = instanceVarsResult.height;
-    nodePositions["instance_vars_box"] = {
-      x: instanceVarsX,
-      y: instanceVarsY,
-      width: instanceVarsBoxWidth,
-      height: instanceVarsBoxHeight,
-    };
-    topLayerBottomY = instanceVarsY + instanceVarsBoxHeight;
-    nodeStartX = firstColX;
-  } else {
-    topLayerBottomY = 0;
-  }
-
-  const middleLayerY =
-    topLayerBottomY > 0 ? topLayerBottomY + layerSpacingY : varBoxTopMargin;
-
-  const mainListSpecs = [];
-  const orphanSpecs = [];
-  const visited = new Set();
+  // Declare main chain variables ONCE at the top
+  let startAddress;
+  let currentAddress;
+  let nodesProcessedCount;
   const MAX_NODES_TO_RENDER = 50;
+  let mainChainLeftmostX;
+  let currentX;
 
-  const mainListStartX = width / 2 + 30;
-  let currentX = mainListStartX;
-
-  let startAddress =
+  // --- 1. INITIAL MAIN CHAIN TRAVERSAL (Populate visited set) ---
+  startAddress =
     instanceVariables.start ||
     instanceVariables.head ||
     instanceVariables.front;
@@ -185,42 +148,145 @@ export const renderLinkedStructureVisualization = (
     if (potentialStarts.length > 0) {
       startAddress = potentialStarts[0];
     } else if (allNodeAddrs.length > 0) {
-      startAddress = allNodeAddrs[0];
+      startAddress = allNodeAddrs[0]; // Fallback to first node if no clear start
     }
   }
 
-  let currentAddress = startAddress;
-  let nodesProcessedCount = 0;
-  let middleLayerMaxNodeHeight = styles.node.height; // Use defined default
-  currentX = mainListStartX;
+  let tempCurrentAddress = startAddress;
+  let nodesVisitedCount = 0;
+  while (
+    tempCurrentAddress &&
+    tempCurrentAddress !== "0x0" &&
+    tempCurrentAddress !== "null" &&
+    !visited.has(tempCurrentAddress) &&
+    nodesVisitedCount < MAX_NODES_TO_RENDER
+  ) {
+    visited.add(tempCurrentAddress);
+    const nodeData = addressObjectMap[tempCurrentAddress];
+    if (!nodeData || typeof nodeData !== "object" || Array.isArray(nodeData)) {
+      break; // Invalid node data
+    }
+    tempCurrentAddress = nodeData.nextAddress || nodeData.next;
+    nodesVisitedCount++;
+  }
 
-  // Calculate layer positions
-  const topLayerY = varBoxTopMargin;
-  const mainChainLayerY =
-    topLayerY +
-    (instanceVarsBoxHeight > 0
-      ? instanceVarsBoxHeight + styles.layout.layerSpacingY
-      : 0);
-  const orphanLayerY = mainChainLayerY + styles.layout.layerSpacingY;
-  const localVarsLayerY = orphanLayerY + styles.layout.layerSpacingY;
+  // --- 2. ORPHAN CHAIN ORDERING (Define orderedOrphanAddrs) ---
+  const orphanAddrs = Object.keys(addressObjectMap).filter(
+    (addr) =>
+      addressObjectMap[addr] &&
+      typeof addressObjectMap[addr] === "object" &&
+      !Array.isArray(addressObjectMap[addr]) &&
+      !visited.has(addr) // Use the populated visited set
+  );
+  const orphanNexts = new Set();
+  orphanAddrs.forEach((addr) => {
+    const node = addressObjectMap[addr];
+    const next = node.nextAddress || node.next;
+    if (next && orphanAddrs.includes(next)) {
+      orphanNexts.add(next);
+    }
+  });
+  const orphanHeads = orphanAddrs.filter((addr) => !orphanNexts.has(addr));
+  let orderedOrphanAddrs = [];
+  orphanHeads.forEach((headAddr) => {
+    let current = headAddr;
+    const chainVisitedThisOrphanRun = new Set(); // Avoid cycles within a single orphan chain run
+    while (
+      current &&
+      !chainVisitedThisOrphanRun.has(current) &&
+      orphanAddrs.includes(current)
+    ) {
+      orderedOrphanAddrs.push(current);
+      chainVisitedThisOrphanRun.add(current);
+      const node = addressObjectMap[current];
+      const next = node.nextAddress || node.next;
+      if (next && orphanAddrs.includes(next)) {
+        current = next;
+      } else {
+        break;
+      }
+    }
+  });
 
-  // Track the leftmost position of the main chain
-  let mainChainLeftmostX = mainListStartX;
+  // --- 3. GRID SETUP (Define mainChainStartX, mainChainY, etc.) ---
+  // --- GRID LAYOUT CONSTANTS ---
+  const gridRows = 4;
+  const gridCols = 3; // This might be adjusted by dynamic width logic later
+  const cellWidth = width / gridCols;
+  const cellHeight = height / gridRows;
+
+  // --- DYNAMIC GRID LAYOUT FOR ORPHAN CHAIN ---
+  const orphanNodeCount =
+    orderedOrphanAddrs.length > 0 ? orderedOrphanAddrs.length : 1;
+  const baseNodeWidth = styles.node.width;
+  const baseSpacing = styles.layout.orphanNodeSpacingX;
+  const orphanCellPadding = 20;
+  const calculatedOrphanCellWidth = // Renamed to avoid conflict if gridCols is changed
+    orphanNodeCount * baseNodeWidth +
+    (orphanNodeCount - 1) * baseSpacing +
+    2 * orphanCellPadding;
+
+  const actualGridCols = 3; // Assuming a fixed 3-column conceptual layout for now
+  const remainingWidth = Math.max(width - calculatedOrphanCellWidth, 1);
+  // If only 1 column remains for other cells, it takes all remaining width.
+  // If more than 1 column remains (e.g. gridCols = 3, 1 for orphans, 2 for others), divide fairly.
+  const otherCellWidth =
+    actualGridCols > 1 ? remainingWidth / (actualGridCols - 1) : remainingWidth;
+
+  const cellWidths = [
+    calculatedOrphanCellWidth,
+    otherCellWidth,
+    otherCellWidth,
+  ]; // Adjust if actualGridCols changes
+  // Ensure this array matches actualGridCols if it's dynamic
+  if (actualGridCols === 2) cellWidths.splice(2, 1);
+  if (actualGridCols === 1) cellWidths.splice(1, 2);
+
+  const colX = [0];
+  for (let i = 0; i < cellWidths.length; i++) {
+    colX.push(colX[i] + cellWidths[i]);
+  }
+
+  // Cell assignments (conceptual, might need review if actualGridCols changes)
+  // Instance Variables: (0,1) -> e.g. colX[1] based, if it exists
+  const instanceVarsX =
+    (colX[1] || 0) + (cellWidths[1] || width) / 2 - styles.varBox.width / 2;
+  const instanceVarsY =
+    cellHeight * 0 + cellHeight / 2 - styles.varBox.headerHeight;
+  // Main Chain: (1,2) -> e.g. colX[2] based
+  const mainChainY = cellHeight * 1 + cellHeight / 2 - styles.node.height / 2;
+  const mainChainStartX = (colX[2] || colX[1] || 0) + 20; // Fallback if fewer columns
+  // Orphan Chain: (2,0) -> e.g. colX[0] based
+  const orphanCellLeft = colX[0];
+  const orphanCellTop = cellHeight * 2;
+  const orphanCellHeight = cellHeight;
+  // Local Variables: (3,1) -> e.g. colX[1] based
+  const localVarsX =
+    (colX[1] || 0) + (cellWidths[1] || width) / 2 - styles.varBox.width / 2;
+  const localVarsY =
+    cellHeight * 3 + cellHeight / 2 - styles.varBox.headerHeight;
+
+  // --- 4. MAIN CHAIN LAYOUT (Populate mainListSpecs) ---
+  const mainListSpecs = [];
+  currentAddress = startAddress; // Re-initialize for this pass
+  nodesProcessedCount = 0; // Re-initialize
+  mainChainLeftmostX = mainChainStartX; // Initialize with start X
+  currentX = mainChainStartX; // Initialize currentX for layout
 
   while (
     currentAddress &&
     currentAddress !== "0x0" &&
     currentAddress !== "null" &&
-    !visited.has(currentAddress) &&
+    // No need to check visited.has() here if we are strictly following the main chain from startAddress
+    // and assuming it's acyclic for layout purposes, or relying on MAX_NODES_TO_RENDER.
+    // If main chain could have nodes also in orphan list due to complex structures, ensure `visited` logic is robust.
     nodesProcessedCount < MAX_NODES_TO_RENDER
   ) {
-    visited.add(currentAddress);
+    // If this node was ALREADY processed by orphan logic AND ALSO part of main chain path (complex cases),
+    // it would be in `visited`. The first pass (populating `visited`) is key for orphan detection.
+    // This second pass is for LAYING OUT the main chain identified.
     const nodeData = addressObjectMap[currentAddress];
-
     if (!nodeData || typeof nodeData !== "object" || Array.isArray(nodeData)) {
-      console.warn(
-        `LinkedListVectorViz: Invalid node data for address ${currentAddress}.` // Renamed Log
-      );
       break;
     }
 
@@ -232,7 +298,6 @@ export const renderLinkedStructureVisualization = (
     } else {
       nodeFields.value = "N/A";
     }
-
     if (nodeData.nextAddress !== undefined) {
       nodeFields.next = nodeData.nextAddress;
     } else if (nodeData.next !== undefined) {
@@ -240,7 +305,6 @@ export const renderLinkedStructureVisualization = (
     } else {
       nodeFields.next = "null";
     }
-
     if (nodeData.previousAddress !== undefined) {
       nodeFields.prev = nodeData.previousAddress;
     } else if (nodeData.prev !== undefined) {
@@ -249,36 +313,22 @@ export const renderLinkedStructureVisualization = (
 
     mainListSpecs.push({
       x: currentX,
-      y: middleLayerY,
+      y: mainChainY,
       address: currentAddress,
       title:
         nodeData.title || nodeData.url || truncateAddress(currentAddress, 6),
       fields: nodeFields,
-      isIsolated: false,
+      isIsolated: false, // Main chain nodes are not isolated by definition here
       style: styles.node,
     });
 
-    middleLayerMaxNodeHeight = Math.max(
-      middleLayerMaxNodeHeight,
-      styles.node.height
-    );
-
-    if (
-      nodeData.nextAddress &&
-      nodeData.nextAddress !== "0x0" &&
-      nodeData.nextAddress !== "null"
-    ) {
-      allConnections.push({
-        sourceName: currentAddress,
-        targetAddress: nodeData.nextAddress,
-        type: "ll_next",
-      });
-    }
-
     currentX += styles.node.width + styles.layout.nodeSpacingX;
-    currentAddress = nodeData.nextAddress;
+    mainChainLeftmostX = Math.min(
+      mainChainLeftmostX,
+      currentX - (styles.node.width + styles.layout.nodeSpacingX)
+    ); // track leftmost edge of the first node
+    currentAddress = nodeData.nextAddress || nodeData.next;
     nodesProcessedCount++;
-    mainChainLeftmostX = Math.min(mainChainLeftmostX, currentX);
   }
 
   if (nodesProcessedCount === MAX_NODES_TO_RENDER) {
@@ -304,92 +354,62 @@ export const renderLinkedStructureVisualization = (
     }
   });
 
-  // Modify orphan nodes rendering to use the new layer and position
-  const orphanNodeStartX = firstColX;
-  const orphanNodeY = orphanLayerY;
-  let currentOrphanX = orphanNodeStartX;
-  let currentOrphanY = orphanNodeY;
-  let orphanRowHeight = 0;
-
-  const allPotentialNodeAddresses = Object.keys(addressObjectMap).filter(
-    (addr) =>
-      addressObjectMap[addr] &&
-      typeof addressObjectMap[addr] === "object" &&
-      !Array.isArray(addressObjectMap[addr]) &&
-      (addressObjectMap[addr].hasOwnProperty("data") ||
-        addressObjectMap[addr].hasOwnProperty("value") ||
-        addressObjectMap[addr].hasOwnProperty("nextAddress"))
-  );
-
-  allPotentialNodeAddresses.forEach((addr) => {
-    if (!visited.has(addr)) {
-      const nodeData = addressObjectMap[addr];
-      if (!nodeData) return;
-
-      const orphanNodeFields = {};
-      if (nodeData.data !== undefined) {
-        orphanNodeFields.value = nodeData.data;
-      } else if (nodeData.value !== undefined) {
-        orphanNodeFields.value = nodeData.value;
-      } else {
-        orphanNodeFields.value = "N/A";
-      }
-
-      if (nodeData.nextAddress !== undefined) {
-        orphanNodeFields.next = nodeData.nextAddress;
-      } else if (nodeData.next !== undefined) {
-        orphanNodeFields.next = nodeData.next;
-      } else {
-        orphanNodeFields.next = "null";
-      }
-
-      if (nodeData.previousAddress !== undefined) {
-        orphanNodeFields.prev = nodeData.previousAddress;
-      } else if (nodeData.prev !== undefined) {
-        orphanNodeFields.prev = nodeData.prev;
-      } // Note: prev field rendering might need specific handling if required
-
-      const nodeHeight = (styles.node && styles.node.height) || 100;
-      orphanRowHeight = Math.max(orphanRowHeight, nodeHeight);
-
-      orphanSpecs.push({
-        x: currentOrphanX,
-        y: currentOrphanY,
-        address: addr,
-        title: nodeData.title || nodeData.url || truncateAddress(addr, 6),
-        fields: orphanNodeFields,
-        isIsolated: true,
-        style: styles.node,
+  // --- 5. ORPHAN CHAIN LAYOUT ---
+  let orphanStartXGrid = orphanCellLeft + orphanCellPadding;
+  const orphanYGrid =
+    orphanCellTop + (orphanCellHeight - styles.node.height) / 2;
+  let orphanXGrid = orphanStartXGrid;
+  const orphanSpecs = [];
+  const orphanAddrToSpec = {};
+  orderedOrphanAddrs.forEach((addr, idx) => {
+    const nodeData = addressObjectMap[addr];
+    const orphanNodeFields = {};
+    if (nodeData.data !== undefined) {
+      orphanNodeFields.value = nodeData.data;
+    } else if (nodeData.value !== undefined) {
+      orphanNodeFields.value = nodeData.value;
+    } else {
+      orphanNodeFields.value = "N/A";
+    }
+    if (nodeData.nextAddress !== undefined) {
+      orphanNodeFields.next = nodeData.nextAddress;
+    } else if (nodeData.next !== undefined) {
+      orphanNodeFields.next = nodeData.next;
+    } else {
+      orphanNodeFields.next = "null";
+    }
+    if (nodeData.previousAddress !== undefined) {
+      orphanNodeFields.prev = nodeData.previousAddress;
+    } else if (nodeData.prev !== undefined) {
+      orphanNodeFields.prev = nodeData.prev;
+    }
+    const spec = {
+      x: orphanXGrid,
+      y: orphanYGrid,
+      address: addr,
+      title: nodeData.title || nodeData.url || truncateAddress(addr, 6),
+      fields: orphanNodeFields,
+      isIsolated: true,
+      style: { ...styles.node, width: baseNodeWidth },
+    };
+    orphanSpecs.push(spec);
+    orphanAddrToSpec[addr] = spec;
+    orphanXGrid += baseNodeWidth + baseSpacing;
+    visited.add(addr);
+  });
+  // Draw next-pointer arrows for orphans
+  orphanSpecs.forEach((spec) => {
+    const nodeData = addressObjectMap[spec.address];
+    const nextAddr = nodeData.nextAddress || nodeData.next;
+    if (nextAddr && orphanAddrToSpec[nextAddr]) {
+      allConnections.push({
+        sourceName: spec.address,
+        targetAddress: nextAddr,
+        type: "ll_next_orphan",
       });
-      visited.add(addr);
-
-      // Update connection logic for orphan nodes
-      if (
-        nodeData.nextAddress &&
-        nodeData.nextAddress !== "0x0" &&
-        nodeData.nextAddress !== "null"
-      ) {
-        allConnections.push({
-          sourceName: addr,
-          targetAddress: nodeData.nextAddress,
-          type: "ll_next_orphan",
-        });
-      }
-
-      // Wrap orphan nodes if they would overlap with main chain
-      currentOrphanX +=
-        (styles.node.width || 180) + styles.layout.orphanNodeSpacingX;
-      if (
-        currentOrphanX + (styles.node.width || 180) >
-        mainChainLeftmostX - styles.layout.nodeSpacingX
-      ) {
-        currentOrphanX = orphanNodeStartX;
-        currentOrphanY += orphanRowHeight + styles.layout.nodeSpacingX;
-        orphanRowHeight = 0;
-      }
     }
   });
-
+  // Render all orphanSpecs
   orphanSpecs.forEach((spec) => {
     try {
       renderGenericNode(
@@ -409,20 +429,32 @@ export const renderLinkedStructureVisualization = (
     }
   });
 
-  // Calculate bottom Y based on the maximum height reached in the middle layer
-  // (Consider both main list and potentially multiple rows of orphans)
-  const middleLayerMaxHeightReached = Math.max(
-    middleLayerMaxNodeHeight,
-    currentOrphanY + orphanRowHeight - middleLayerY
-  ); // Check max Y reached by orphans
-  const middleLayerBottomY = middleLayerY + middleLayerMaxHeightReached;
+  // --- INSTANCE VARIABLES BOX ---
+  let instanceVarsBoxHeight = 0;
+  if (Object.keys(instanceVariables).length > 0) {
+    const instanceVarsResult = renderVariableBox(
+      contentGroup,
+      "Instance Variables",
+      instanceVariables,
+      instanceVarsX,
+      instanceVarsY,
+      styles.varBox,
+      "instance",
+      isAddress
+    );
+    allConnections.push(...instanceVarsResult.connectionPoints);
+    instanceVarsBoxHeight = instanceVarsResult.height;
+    nodePositions["instance_vars_box"] = {
+      x: instanceVarsX,
+      y: instanceVarsY,
+      width: styles.varBox.width,
+      height: instanceVarsBoxHeight,
+    };
+  }
 
-  const bottomLayerStartY = middleLayerBottomY + layerSpacingY;
-
-  // Update local variables rendering to use the new layer position
+  // --- LOCAL VARIABLES BOX ---
+  let localVarsBoxHeight = 0;
   if (Object.keys(localVariables).length > 0) {
-    const localVarsX = width / 2 - localVarsBoxWidth / 2;
-    const localVarsY = localVarsLayerY;
     const localVarsResult = renderVariableBox(
       contentGroup,
       "Local Variables",
@@ -438,7 +470,7 @@ export const renderLinkedStructureVisualization = (
     nodePositions["local_vars_box"] = {
       x: localVarsX,
       y: localVarsY,
-      width: localVarsBoxWidth,
+      width: styles.varBox.width,
       height: localVarsBoxHeight,
     };
   }
