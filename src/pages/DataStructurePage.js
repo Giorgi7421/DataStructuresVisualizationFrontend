@@ -32,6 +32,7 @@ import { renderArrayStructureVisualization } from "../visualizations/ArrayStruct
 import { renderLinkedStructureVisualization } from "../visualizations/LinkedStructureVisualization";
 import { renderDoublyLinkedStructureVisualization } from "../visualizations/DoublyLinkedStructure";
 import { renderGridStructureVisualization } from "../visualizations/GridStructureVisualization";
+import { renderTwoStackEditorBufferVisualization } from "../visualizations/TwoStackEditorBufferVisualization"; // Added import
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -82,42 +83,12 @@ const dsOperationArgs = {
     isEmpty: { args: [], method: "get" },
   },
   EDITOR_BUFFER: {
-    moveCursorToStart: {
-      ARRAY: "O(n)",
-      TWO_STACK: "O(n)",
-      LINKED_LIST: "O(n)",
-      DOUBLY_LINKED_LIST: "O(n)",
-    },
-    moveCursorToEnd: {
-      ARRAY: "O(n)",
-      TWO_STACK: "O(n)",
-      LINKED_LIST: "O(n)",
-      DOUBLY_LINKED_LIST: "O(n)",
-    },
-    moveCursorForward: {
-      ARRAY: "O(n)",
-      TWO_STACK: "O(n)",
-      LINKED_LIST: "O(n)",
-      DOUBLY_LINKED_LIST: "O(n)",
-    },
-    moveCursorBackward: {
-      ARRAY: "O(n)",
-      TWO_STACK: "O(n)",
-      LINKED_LIST: "O(n)",
-      DOUBLY_LINKED_LIST: "O(n)",
-    },
-    insertCharacter: {
-      ARRAY: "O(n)",
-      TWO_STACK: "O(n)",
-      LINKED_LIST: "O(n)",
-      DOUBLY_LINKED_LIST: "O(n)",
-    },
-    deleteCharacter: {
-      ARRAY: "O(n)",
-      TWO_STACK: "O(n)",
-      LINKED_LIST: "O(n)",
-      DOUBLY_LINKED_LIST: "O(n)",
-    },
+    moveCursorToStart: { args: [], method: "patch" },
+    moveCursorToEnd: { args: [], method: "patch" },
+    moveCursorForward: { args: [], method: "patch" },
+    moveCursorBackward: { args: [], method: "patch" },
+    insertCharacter: { args: ["element"], method: "patch" },
+    deleteCharacter: { args: ["element"], method: "patch" },
   },
   DEQUE: {
     pushFront: { args: ["element"], method: "patch" },
@@ -1008,6 +979,15 @@ function DataStructurePage() {
               );
               break;
             case "TWO_QUEUE_STACK":
+              renderArrayStructureVisualization(
+                tempGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "ARRAY_QUEUE":
               renderArrayStructureVisualization(
                 tempGroup,
@@ -1058,6 +1038,15 @@ function DataStructurePage() {
               );
               break;
             case "UNSORTED_VECTOR_PRIORITY_QUEUE":
+              renderArrayStructureVisualization(
+                tempGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "SORTED_LINKED_LIST_PRIORITY_QUEUE":
               renderLinkedStructureVisualization(
                 tempGroup,
@@ -1089,7 +1078,6 @@ function DataStructurePage() {
               );
               break;
             case "FILE_SYSTEM":
-            case "TWO_STACK_EDITOR_BUFFER":
             case "LINKED_LIST_EDITOR_BUFFER":
               renderLinkedStructureVisualization(
                 tempGroup,
@@ -1112,6 +1100,16 @@ function DataStructurePage() {
               break;
             case "GRID":
               renderGridStructureVisualization(
+                tempGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
+            case "TWO_STACK_EDITOR_BUFFER": // Added case
+              renderTwoStackEditorBufferVisualization(
                 tempGroup,
                 width,
                 height,
@@ -1551,12 +1549,12 @@ function DataStructurePage() {
     const args = getOperationArgs(opValue);
     const value = operationValues[opValue];
     if (args.length > 0) {
-      if (
-        !value ||
-        (Array.isArray(value)
-          ? value.some((v) => !v || v.trim() === "")
-          : value.trim() === "")
-      ) {
+      const allArgsProvided = Array.isArray(value)
+        ? value.length === args.length &&
+          value.every((v) => v && String(v).trim() !== "")
+        : value && String(value).trim() !== "";
+      if (!allArgsProvided) {
+        setError("Please provide all required arguments for the operation.");
         return;
       }
     }
@@ -1567,11 +1565,14 @@ function DataStructurePage() {
       setPendingOperation(true);
 
       const type = dataStructure.type.toUpperCase();
-      const impl = dataStructure.implementation;
+      const currentImpl = dataStructure.implementation; // User-selected implementation
       const dsName = dataStructure.name;
-      // Convert opValue to kebab-case for API call
       const opName = camelToKebab(opValue);
-      const argVals = Array.isArray(value) ? value : value ? [value] : [];
+      const argVals = Array.isArray(value)
+        ? value
+        : value
+        ? [String(value)]
+        : []; // Ensure argVals are strings
 
       const controllerMap = {
         VECTOR: "vector",
@@ -1586,51 +1587,84 @@ function DataStructurePage() {
         WEB_BROWSER: "web-browser",
       };
       const controller = controllerMap[type];
-      let endpoint = "";
       let method = "patch";
-      // Use kebab-case opName for getOps check
-      const getOps = [
-        "size",
-        "is-empty",
-        "get",
-        "peek",
-        "contains",
-        "num-rows",
-        "num-columns",
-        "in-bounds",
-        "get-front",
-        "get-back",
-        "search",
-        "is-greater-than",
-      ];
-      if (getOps.includes(opName)) method = "get";
 
+      const operationDetails = dsOperationArgs[type]?.[opValue];
+      if (operationDetails?.method) {
+        method = operationDetails.method.toLowerCase();
+      } else {
+        const getOps = [
+          "size",
+          "is-empty",
+          "get",
+          "peek",
+          "contains",
+          "num-rows",
+          "num-columns",
+          "in-bounds",
+          "get-front",
+          "get-back",
+          "search",
+          "is-greater-than",
+        ];
+        if (getOps.includes(opName)) {
+          method = "get";
+        }
+      }
+
+      let endpoint = "";
+      // Types that HAVE selectable implementations (and currentImpl should be defined)
       if (
         ["VECTOR", "TREE", "STACK", "SET", "QUEUE", "EDITOR_BUFFER"].includes(
           type
         )
       ) {
-        endpoint = `/${controller}/${opName}/${
-          impl ? impl + "/" : ""
-        }${dsName}`;
-        if (args.length > 0) {
-          endpoint += "/" + argVals.map(encodeURIComponent).join("/");
+        if (!currentImpl || currentImpl.toUpperCase() === "NULL") {
+          setError(
+            `Error: Implementation not specified for ${type} ${dsName}.`
+          );
+          setProcessingOperation(false);
+          setLoading(false);
+          setPendingOperation(false);
+          return;
         }
-      } else if (
-        ["DEQUE", "BIG_INTEGER", "GRID", "WEB_BROWSER"].includes(type)
-      ) {
-        endpoint = `/${controller}/${opName}/${dsName}`;
-        if (args.length > 0) {
-          endpoint += "/" + argVals.map(encodeURIComponent).join("/");
-        }
+        endpoint = `/${controller}/${opName}/${currentImpl}/${dsName}`;
       }
+      // Types that DO NOT have selectable implementations (currentImpl might be null/undefined or not relevant for URL)
+      else if (["DEQUE", "BIG_INTEGER", "GRID", "WEB_BROWSER"].includes(type)) {
+        endpoint = `/${controller}/${opName}/${dsName}`;
+      }
+      // Fallback or error for unhandled types
+      else {
+        setError(
+          `Error: Unhandled data structure type "${type}" for API endpoint construction.`
+        );
+        setProcessingOperation(false);
+        setLoading(false);
+        setPendingOperation(false);
+        return;
+      }
+
+      if (
+        args.length > 0 &&
+        argVals.length > 0 &&
+        argVals.every((val) => val && String(val).trim() !== "")
+      ) {
+        endpoint +=
+          "/" + argVals.map((v) => encodeURIComponent(String(v))).join("/");
+      }
+
+      console.log(`Constructed Endpoint: ${method.toUpperCase()} ${endpoint}`);
 
       const api = require("../services/api").default;
       let response;
       if (method === "get") {
         response = await api.get(endpoint);
       } else {
-        response = await api.patch(endpoint);
+        // For PATCH/POST etc., if there are arguments but they are NOT part of the URL path by design for an op,
+        // they might need to be sent in the body. Current dsOperationArgs don't specify this.
+        // Assuming for now all args defined in dsOperationArgs are path params if present.
+        response = await api.patch(endpoint); // Or api.post(endpoint, bodyData) if needed
       }
 
       const newOperations = await fetchDataStructure();
@@ -2179,7 +2213,6 @@ function DataStructurePage() {
               );
               break;
             case "FILE_SYSTEM":
-            case "TWO_STACK_EDITOR_BUFFER":
             case "LINKED_LIST_EDITOR_BUFFER":
               renderLinkedStructureVisualization(
                 contentGroup,
@@ -2207,6 +2240,16 @@ function DataStructurePage() {
                 600,
                 operationState,
                 snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "TWO_STACK_EDITOR_BUFFER": // Added case for PDF export
+              renderTwoStackEditorBufferVisualization(
+                contentGroup,
+                800, // Fixed width for PDF rendering
+                600, // Fixed height for PDF rendering
+                operationState, // Use the prepared operationState for this snapshot
+                snapshot, // Pass the specific snapshot
                 `export_snapshot_${i}`
               );
               break;

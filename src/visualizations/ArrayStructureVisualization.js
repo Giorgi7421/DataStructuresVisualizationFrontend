@@ -142,7 +142,8 @@ export const renderArrayStructureVisualization = (
     instanceVariables
   );
   const arrayVarKey = Object.keys(instanceVariables).find(
-    (key) => key === "array" || key === "data" || key === "digits"
+    (key) =>
+      key === "array" || key === "data" || key === "digits" || key === "vector"
   );
   console.log(
     `[${snapshotIdentifier || "ArrayViz"}] Found array variable key:`,
