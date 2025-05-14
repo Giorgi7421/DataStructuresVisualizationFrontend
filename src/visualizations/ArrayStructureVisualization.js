@@ -143,7 +143,12 @@ export const renderArrayStructureVisualization = (
   );
   const arrayVarKey = Object.keys(instanceVariables).find(
     (key) =>
-      key === "array" || key === "data" || key === "digits" || key === "vector"
+      key === "array" ||
+      key === "data" ||
+      key === "digits" ||
+      key === "vector" ||
+      key === "first" ||
+      key === "second"
   );
   console.log(
     `[${snapshotIdentifier || "ArrayViz"}] Found array variable key:`,
@@ -533,8 +538,7 @@ export const renderArrayStructureVisualization = (
     // Draw connection from a variable (instance or local) to an intermediate box
     if (sourcePoint && targetIntermediateBoxPos) {
       const isInstanceToArray =
-        conn.sourceName?.startsWith("instance-") &&
-        conn.targetAddress === arrayDataAddress;
+        conn.sourceName?.startsWith("instance-") && targetIntermediateBoxPos; // MODIFIED: Check for any valid target box
       const isLocalToArray =
         conn.sourceName?.startsWith("local-") && targetIntermediateBoxPos; // General case for local pointing to any array
 
