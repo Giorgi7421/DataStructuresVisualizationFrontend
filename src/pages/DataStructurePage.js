@@ -2529,12 +2529,12 @@ function DataStructurePage() {
                             >
                               <div className="font-semibold text-blue-700">
                                 {op.operation}
-                                {op.parameters &&
-                                Object.keys(op.parameters).length > 0
-                                  ? `(${Object.values(op.parameters).join(
-                                      ", "
-                                    )})`
-                                  : ""}
+                                {`(${
+                                  op.parameters &&
+                                  Object.keys(op.parameters).length > 0
+                                    ? Object.values(op.parameters).join(", ")
+                                    : ""
+                                })`}
                                 {op.state &&
                                   op.state.result !== undefined &&
                                   op.state.result !== null && (
