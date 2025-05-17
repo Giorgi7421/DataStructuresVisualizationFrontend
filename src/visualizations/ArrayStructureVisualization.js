@@ -42,6 +42,14 @@ export const renderArrayStructureVisualization = (
   const instanceVariables = state.instanceVariables || {};
   const addressObjectMap = state.addressObjectMap || {};
 
+  console.log(
+    `[ArrayStructureViz Debug - ${snapshotIdentifier}] Received for rendering:`,
+    {
+      instanceVariables: JSON.parse(JSON.stringify(instanceVariables)),
+      addressObjectMap: JSON.parse(JSON.stringify(addressObjectMap)),
+    }
+  );
+
   // Define styles for array visualization
   const styles = {
     varBox: {
@@ -360,6 +368,10 @@ export const renderArrayStructureVisualization = (
   // --- Render Other Arrays from addressObjectMap ---
   let otherArraysStartX;
   let otherArraysStartY;
+  console.log(
+    `[ArrayStructureViz Debug - ${snapshotIdentifier}] Determined arrayDataAddress for main array:`,
+    arrayDataAddress
+  );
 
   if (localVarsBoxPosition) {
     otherArraysStartX =
@@ -377,9 +389,16 @@ export const renderArrayStructureVisualization = (
   let currentOtherArrayY = otherArraysStartY;
 
   Object.entries(addressObjectMap).forEach(([address, data]) => {
+    console.log(
+      `[ArrayStructureViz Debug - ${snapshotIdentifier}] Checking addressObjectMap entry: Address = ${address}, IsArray = ${Array.isArray(
+        data
+      )}, IsNotMain = ${address !== arrayDataAddress}`
+    );
     if (Array.isArray(data) && address !== arrayDataAddress) {
+      console.log(
+        `[ArrayStructureViz Debug - ${snapshotIdentifier}] Rendering 'other' array at address: ${address}`
+      );
       const subsequentArrayData = data;
-      if (subsequentArrayData.length === 0) return;
 
       const subIntermediateBoxWidth = 80;
       const subIntermediateBoxHeight = styles.arrayCell.height;
