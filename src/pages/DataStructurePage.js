@@ -277,12 +277,12 @@ const bigONotations = {
       BINARY_HEAP_PRIORITY: "O(1)",
     },
     peek: {
-      ARRAY: "O(n)",
-      LINKED_LIST: "O(n)",
+      ARRAY: "O(1)",
+      LINKED_LIST: "O(1)",
       UNSORTED_VECTOR_PRIORITY: "O(n)",
-      SORTED_LINKED_LIST_PRIORITY: "O(n)",
+      SORTED_LINKED_LIST_PRIORITY: "O(1)",
       UNSORTED_DOUBLY_LINKED_LIST_PRIORITY: "O(n)",
-      BINARY_HEAP_PRIORITY: "O(n)",
+      BINARY_HEAP_PRIORITY: "O(1)",
     },
     isEmpty: {
       ARRAY: "O(1)",
