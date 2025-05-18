@@ -418,11 +418,17 @@ export const renderLinkedStructureVisualization = (
   orphanSpecs.forEach((spec) => {
     const nodeData = addressObjectMap[spec.address];
     const nextAddr = nodeData.nextAddress || nodeData.next;
-    if (nextAddr && orphanAddrToSpec[nextAddr]) {
+    // Check if nextAddr is a valid node in the overall map, not just another orphan
+    if (
+      nextAddr &&
+      nextAddr !== "0x0" &&
+      nextAddr !== "null" &&
+      addressObjectMap[nextAddr]
+    ) {
       allConnections.push({
         sourceName: spec.address,
         targetAddress: nextAddr,
-        type: "ll_next_orphan",
+        type: "ll_next", // Use the standard 'll_next' type for styling consistency
       });
     }
   });
