@@ -117,7 +117,9 @@ export const renderLinkedStructureVisualization = (
   startAddress =
     instanceVariables.start ||
     instanceVariables.head ||
-    instanceVariables.front;
+    instanceVariables.front ||
+    instanceVariables.stack ||
+    instanceVariables.array;
   if (
     !startAddress ||
     startAddress === "0x0" ||
