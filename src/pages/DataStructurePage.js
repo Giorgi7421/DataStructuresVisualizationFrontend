@@ -88,7 +88,7 @@ const dsOperationArgs = {
     moveCursorForward: { args: [], method: "patch" },
     moveCursorBackward: { args: [], method: "patch" },
     insertCharacter: { args: ["element"], method: "patch" },
-    deleteCharacter: { args: ["element"], method: "patch" },
+    deleteCharacter: { args: [], method: "patch" },
   },
   DEQUE: {
     pushFront: { args: ["element"], method: "patch" },
