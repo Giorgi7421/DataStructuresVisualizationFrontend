@@ -473,7 +473,7 @@ export const renderDoublyLinkedStructureVisualization = (
     nodesToProcess.forEach((nodeInfo) => {
       const { addr: currentLayoutAddr, data: nodeData, position } = nodeInfo;
       const nodeFields = {
-        value: nodeData.value || nodeData.data || "N/A",
+        value: nodeData.value || nodeData.data || "null",
         prev: nodeData.previousAddress || nodeData.prev || "null",
         next: nodeData.nextAddress || nodeData.next || "null",
       };
@@ -568,7 +568,7 @@ export const renderDoublyLinkedStructureVisualization = (
     }
 
     const orphanNodeFields = {
-      value: nodeData.value || nodeData.data || "N/A",
+      value: nodeData.value || nodeData.data || "null",
       prev: nodeData.previousAddress || nodeData.prev || "null",
       next: nodeData.nextAddress || nodeData.next || "null",
     };
@@ -727,7 +727,7 @@ export const renderDoublyLinkedStructureVisualization = (
       else if (conn.type === "ll_prev") fieldNameToUse = "prev";
 
       const actualFields = sourceBoundingBoxPosData.fields || {
-        value: "N/A",
+        value: "null",
         prev: "null",
         next: "null",
       };

@@ -298,7 +298,7 @@ export const renderLinkedStructureVisualization = (
     } else if (nodeData.value !== undefined) {
       nodeFields.value = nodeData.value;
     } else {
-      nodeFields.value = "N/A";
+      nodeFields.value = "null";
     }
     if (nodeData.nextAddress !== undefined) {
       nodeFields.next = nodeData.nextAddress;
@@ -386,7 +386,7 @@ export const renderLinkedStructureVisualization = (
     } else if (nodeData.value !== undefined) {
       orphanNodeFields.value = nodeData.value;
     } else {
-      orphanNodeFields.value = "N/A";
+      orphanNodeFields.value = "null";
     }
     if (nodeData.nextAddress !== undefined) {
       orphanNodeFields.next = nodeData.nextAddress;
