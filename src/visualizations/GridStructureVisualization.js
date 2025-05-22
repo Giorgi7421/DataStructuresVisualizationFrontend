@@ -114,11 +114,7 @@ export function renderGridStructureVisualization(
   const instanceVarBoxResult = renderVariableBox(
     contentGroup,
     "Instance Variables",
-    {
-      elems: elemsAddress,
-      rows: instanceVariables.rows,
-      columns: instanceVariables.columns,
-    },
+    instanceVariables,
     varBoxX,
     varBoxY,
     styles.varBox,
@@ -184,14 +180,9 @@ export function renderGridStructureVisualization(
         .attr("marker-end", `url(#${styles.connection.markerId})`);
     } else {
       // Fallback logic (can be kept or removed if the above is reliable)
-      const instanceVars = {
-        elems: elemsAddress,
-        rows: instanceVariables.rows,
-        columns: instanceVariables.columns,
-      };
-      const instanceVarKeys = Object.keys(instanceVars);
+      const instanceVarKeys = Object.keys(instanceVariables);
       const fieldIndex = instanceVarKeys.indexOf("elems");
-      if (fieldIndex !== -1) {
+      if (fieldIndex !== -1 && Object.prototype.hasOwnProperty.call(instanceVariables, 'elems')) {
         const startXfb = varBoxX + styles.varBox.width;
         const startYfb =
           varBoxY +
