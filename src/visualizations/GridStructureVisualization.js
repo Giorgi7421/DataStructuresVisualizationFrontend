@@ -6,8 +6,6 @@ import {
   generateOrthogonalPath,
 } from "../utils/visualizationUtils";
 
-import { defaultVisualizationStyles } from "../utils/visualizationUtils";
-
 export function renderGridStructureVisualization(
   contentGroup,
   width,
@@ -23,6 +21,41 @@ export function renderGridStructureVisualization(
   // Initialize nodePositions and allConnections
   const nodePositions = {};
   const allConnections = [];
+
+  // --- Determine the primary 'addresses' array and its address ('elemsAddress') ---
+  let elemsAddress = null; // This will be the address of the identified master array
+  let addresses = [];    // This will be the content of the identified master array
+
+  // Priority 1: Check if instanceVariables.elems points to a valid array
+  if (
+    instanceVariables.elems &&
+    typeof instanceVariables.elems === 'string' &&
+    isAddress(instanceVariables.elems) &&
+    Object.prototype.hasOwnProperty.call(addressObjectMap, instanceVariables.elems) &&
+    Array.isArray(addressObjectMap[instanceVariables.elems])
+  ) {
+    elemsAddress = instanceVariables.elems;
+    addresses = addressObjectMap[elemsAddress];
+    console.log(`[GridViz] Using master array from instanceVariables.elems: ${elemsAddress}`);
+  } else {
+    // Priority 2: If not found via elems, check if there's exactly one array in addressObjectMap
+    const mapKeys = Object.keys(addressObjectMap);
+    const arrayEntries = mapKeys.filter(key =>
+        Object.prototype.hasOwnProperty.call(addressObjectMap, key) &&
+        Array.isArray(addressObjectMap[key])
+    );
+
+    if (arrayEntries.length === 1) {
+      elemsAddress = arrayEntries[0];
+      addresses = addressObjectMap[elemsAddress];
+      console.log(`[GridViz] Identified the only array in addressObjectMap as master: ${elemsAddress}`);
+    } else if (arrayEntries.length > 1) {
+      console.log("[GridViz] Multiple arrays in addressObjectMap and none specified by instanceVariables.elems. Cannot uniquely identify master array.");
+    } else {
+      console.log("[GridViz] No array found via instanceVariables.elems and no arrays in addressObjectMap.");
+    }
+  }
+  // --- End of new logic to find addresses array ---
 
   // Styles (similar to array visualization)
   const styles = {
@@ -90,12 +123,6 @@ export function renderGridStructureVisualization(
       .append("path")
       .attr("d", "M 0 0 L 10 5 L 0 10 z")
       .attr("fill", styles.connection.color || "#334155");
-  }
-
-  let addresses = [];
-  const elemsAddress = instanceVariables.elems;
-  if (elemsAddress && addressObjectMap[elemsAddress]) {
-    addresses = addressObjectMap[elemsAddress];
   }
 
   // 1. Render 'elems' variable box
