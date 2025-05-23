@@ -2351,462 +2351,457 @@ function DataStructurePage() {
       {/* Add the export modal */}
       <ExportModal />
 
-      {loading ? (
-        <div className="flex justify-center items-center h-full">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-        </div>
-      ) : (
-        <div className="flex flex-col h-full overflow-hidden">
-          {/* Header - minimal height */}
-          <div className="flex items-center px-4 py-1 bg-white shadow-sm flex-shrink-0">
-            <button
-              onClick={() => navigate("/home")}
-              className="flex items-center text-blue-500 hover:text-blue-700"
-            >
-              <ArrowLeftIcon className="w-4 h-4 mr-1" />
-              Back
-            </button>
-            {dataStructure && (
-              <h1 className="text-lg font-bold ml-3 truncate">
-                {dataStructure.name}{" "}
-                <span className="text-gray-500 text-sm">
-                  ({dataStructure.type}
-                  {dataStructure.implementation &&
-                    ` - ${dataStructure.implementation}`}
-                  )
-                </span>
-              </h1>
-            )}
-          </div>
-
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-1 text-xs flex-shrink-0">
-              {error}
-            </div>
+      {/* This div below becomes the top-level content after removing the ternary */}
+      <div className="flex flex-col h-full overflow-hidden">
+        {/* Header - minimal height */}
+        <div className="flex items-center px-4 py-1 bg-white shadow-sm flex-shrink-0">
+          <button
+            onClick={() => navigate("/home")}
+            className="flex items-center text-blue-500 hover:text-blue-700"
+          >
+            <ArrowLeftIcon className="w-4 h-4 mr-1" />
+            Back
+          </button>
+          {dataStructure && (
+            <h1 className="text-lg font-bold ml-3 truncate">
+              {dataStructure.name}{" "}
+              <span className="text-gray-500 text-sm">
+                ({dataStructure.type}
+                {dataStructure.implementation &&
+                  ` - ${dataStructure.implementation}`}
+                )
+              </span>
+            </h1>
           )}
+        </div>
 
-          {/* Main content area with reduced padding */}
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2 p-2 overflow-hidden">
-            {/* Operation panel */}
-            <div className="bg-white rounded shadow-md p-2 flex flex-col h-full overflow-hidden">
-              <h2 className="text-md font-bold mb-2 flex-shrink-0">
-                Operations
-              </h2>
-              <div className="flex flex-col h-full">
-                {/* Operation Form - Takes up half the space */}
-                <div className="h-1/2 overflow-y-auto no-scrollbar">
-                  <form
-                    onSubmit={(e) => handleOperationSubmit(e, operation)}
-                    className="flex flex-col divide-y divide-gray-200"
-                  >
-                    {getOperationOptions().map((op) => (
-                      <div
-                        key={op.value}
-                        className="flex items-center justify-between py-0.5 h-7"
-                      >
-                        <div className="flex items-center">
-                          <span className="text-gray-700 text-xs font-semibold whitespace-nowrap">
-                            {op.label}(
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-1 text-xs flex-shrink-0">
+            {error}
+          </div>
+        )}
+
+        {/* Main content area with reduced padding */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2 p-2 overflow-hidden">
+          {/* Operation panel */}
+          <div className="bg-white rounded shadow-md p-2 flex flex-col h-full overflow-hidden">
+            <h2 className="text-md font-bold mb-2 flex-shrink-0">Operations</h2>
+            <div className="flex flex-col h-full">
+              {/* Operation Form - Takes up half the space */}
+              <div className="h-1/2 overflow-y-auto no-scrollbar">
+                <form
+                  onSubmit={(e) => handleOperationSubmit(e, operation)}
+                  className="flex flex-col divide-y divide-gray-200"
+                >
+                  {getOperationOptions().map((op) => (
+                    <div
+                      key={op.value}
+                      className="flex items-center justify-between py-0.5 h-7"
+                    >
+                      <div className="flex items-center">
+                        <span className="text-gray-700 text-xs font-semibold whitespace-nowrap">
+                          {op.label}(
+                        </span>
+                        {getOperationArgs(op.value).length === 0 && (
+                          <span className="text-gray-700 text-xs font-semibold">
+                            )
                           </span>
-                          {getOperationArgs(op.value).length === 0 && (
-                            <span className="text-gray-700 text-xs font-semibold">
-                              )
+                        )}
+                        {getOperationArgs(op.value).map((arg, idx, arr) => (
+                          <span key={arg} className="flex items-center">
+                            <span
+                              className={`text-gray-700 text-xs font-semibold${
+                                idx === 0 ? "" : " ml-1"
+                              }`}
+                            >
+                              {arg}:&nbsp;
                             </span>
-                          )}
-                          {getOperationArgs(op.value).map((arg, idx, arr) => (
-                            <span key={arg} className="flex items-center">
-                              <span
-                                className={`text-gray-700 text-xs font-semibold${
-                                  idx === 0 ? "" : " ml-1"
-                                }`}
-                              >
-                                {arg}:&nbsp;
-                              </span>
-                              <input
-                                id={`operation-${op.value}-${arg}`}
-                                type="text"
-                                value={
-                                  Array.isArray(operationValues[op.value])
-                                    ? operationValues[op.value][idx] || ""
-                                    : getOperationArgs(op.value).length > 1
-                                    ? ""
-                                    : operationValues[op.value] || ""
-                                }
-                                onChange={(e) => {
-                                  setOperationValues((prev) => {
-                                    if (getOperationArgs(op.value).length > 1) {
-                                      const newVals = Array.isArray(
-                                        prev[op.value]
-                                      )
-                                        ? [...prev[op.value]]
-                                        : [];
-                                      newVals[idx] = e.target.value;
-                                      return { ...prev, [op.value]: newVals };
-                                    } else {
-                                      return {
-                                        ...prev,
-                                        [op.value]: e.target.value,
-                                      };
-                                    }
-                                  });
-                                }}
-                                className={`${
-                                  getOperationArgs(op.value).length === 3
-                                    ? "w-12"
-                                    : "w-16"
-                                } px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6`}
-                              />
-                              {idx < arr.length - 1 && (
-                                <span className="text-gray-700 text-xs font-semibold ml-1">
-                                  ,
-                                </span>
-                              )}
-                              {idx === arr.length - 1 && (
-                                <span className="text-gray-700 text-xs font-semibold">
-                                  )
-                                </span>
-                              )}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="flex items-center">
-                          <span className="text-xs text-black font-mono font-bold">
-                            {getBigONotation(op.value)}
-                          </span>
-                          <button
-                            type="submit"
-                            onClick={(e) => handleOperationSubmit(e, op.value)}
-                            disabled={
-                              getOperationArgs(op.value).length > 0 &&
-                              (!operationValues[op.value] ||
-                                (Array.isArray(operationValues[op.value])
-                                  ? operationValues[op.value].some(
-                                      (v) => !v || v.trim() === ""
+                            <input
+                              id={`operation-${op.value}-${arg}`}
+                              type="text"
+                              value={
+                                Array.isArray(operationValues[op.value])
+                                  ? operationValues[op.value][idx] || ""
+                                  : getOperationArgs(op.value).length > 1
+                                  ? ""
+                                  : operationValues[op.value] || ""
+                              }
+                              onChange={(e) => {
+                                setOperationValues((prev) => {
+                                  if (getOperationArgs(op.value).length > 1) {
+                                    const newVals = Array.isArray(
+                                      prev[op.value]
                                     )
-                                  : operationValues[op.value]?.trim() === ""))
-                            }
-                            className="bg-blue-500 text-white py-0.5 px-3 rounded text-xs font-semibold hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-300 disabled:text-gray-500 h-6 whitespace-nowrap"
-                          >
-                            {processingOperation ? "Processing..." : "Perform"}
-                          </button>
-                        </div>
+                                      ? [...prev[op.value]]
+                                      : [];
+                                    newVals[idx] = e.target.value;
+                                    return { ...prev, [op.value]: newVals };
+                                  } else {
+                                    return {
+                                      ...prev,
+                                      [op.value]: e.target.value,
+                                    };
+                                  }
+                                });
+                              }}
+                              className={`${
+                                getOperationArgs(op.value).length === 3
+                                  ? "w-12"
+                                  : "w-16"
+                              } px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-6`}
+                            />
+                            {idx < arr.length - 1 && (
+                              <span className="text-gray-700 text-xs font-semibold ml-1">
+                                ,
+                              </span>
+                            )}
+                            {idx === arr.length - 1 && (
+                              <span className="text-gray-700 text-xs font-semibold">
+                                )
+                              </span>
+                            )}
+                          </span>
+                        ))}
                       </div>
-                    ))}
-                  </form>
-                </div>
+                      <div className="flex items-center">
+                        <span className="text-xs text-black font-mono font-bold">
+                          {getBigONotation(op.value)}
+                        </span>
+                        <button
+                          type="submit"
+                          onClick={(e) => handleOperationSubmit(e, op.value)}
+                          disabled={
+                            getOperationArgs(op.value).length > 0 &&
+                            (!operationValues[op.value] ||
+                              (Array.isArray(operationValues[op.value])
+                                ? operationValues[op.value].some(
+                                    (v) => !v || v.trim() === ""
+                                  )
+                                : operationValues[op.value]?.trim() === ""))
+                          }
+                          className="bg-blue-500 text-white py-0.5 px-3 rounded text-xs font-semibold hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-300 disabled:text-gray-500 h-6 whitespace-nowrap"
+                        >
+                          {processingOperation ? "Processing..." : "Perform"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </form>
+              </div>
 
-                {/* Operation History List - Takes up the other half */}
+              {/* Operation History List - Takes up the other half */}
+              <div
+                className="h-1/2 overflow-y-auto"
+                style={{
+                  scrollbarWidth: "thin",
+                  scrollbarColor: "#94a3b8 #f1f5f9",
+                }}
+              >
+                <h3 className="font-bold mb-1 text-xs">Operation History</h3>
                 <div
-                  className="h-1/2 overflow-y-auto"
+                  className="bg-gray-100 p-2 rounded h-[calc(100%-24px)] overflow-y-auto"
                   style={{
                     scrollbarWidth: "thin",
                     scrollbarColor: "#94a3b8 #f1f5f9",
                   }}
                 >
-                  <h3 className="font-bold mb-1 text-xs">Operation History</h3>
-                  <div
-                    className="bg-gray-100 p-2 rounded h-[calc(100%-24px)] overflow-y-auto"
-                    style={{
-                      scrollbarWidth: "thin",
-                      scrollbarColor: "#94a3b8 #f1f5f9",
-                    }}
-                  >
-                    {operations.length > 0 ? (
-                      <ul className="divide-y divide-gray-200">
-                        {[...operations].reverse().map((op, index) => {
-                          // Calculate the original index since we reversed the array
-                          const originalIndex = operations.length - 1 - index;
-                          return (
-                            <div
-                              key={originalIndex}
-                              className={`w-full text-left py-2 px-1 text-xs ${
-                                originalIndex === currentHistoryIndex
-                                  ? "bg-blue-100 font-bold"
-                                  : "hover:bg-blue-50"
-                              }`}
-                              onClick={() => selectOperation(originalIndex)}
-                              style={{ cursor: "pointer" }}
-                            >
-                              <div className="font-semibold text-blue-700">
-                                {op.operation}
-                                {`(${
-                                  op.parameters &&
-                                  Object.keys(op.parameters).length > 0
-                                    ? Object.values(op.parameters).join(", ")
-                                    : ""
-                                })`}
-                                {op.state &&
-                                  op.state.result !== undefined &&
-                                  op.state.result !== null && (
-                                    <span className="text-black">
-                                      {" "}
-                                      Result: {String(op.state.result)}
-                                    </span>
-                                  )}
-                              </div>
-                              {op.state && op.state.message && (
-                                <div className="mt-1 text-gray-600">
-                                  {op.state.message}
-                                </div>
-                              )}
+                  {operations.length > 0 ? (
+                    <ul className="divide-y divide-gray-200">
+                      {[...operations].reverse().map((op, index) => {
+                        // Calculate the original index since we reversed the array
+                        const originalIndex = operations.length - 1 - index;
+                        return (
+                          <div
+                            key={originalIndex}
+                            className={`w-full text-left py-2 px-1 text-xs ${
+                              originalIndex === currentHistoryIndex
+                                ? "bg-blue-100 font-bold"
+                                : "hover:bg-blue-50"
+                            }`}
+                            onClick={() => selectOperation(originalIndex)}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <div className="font-semibold text-blue-700">
+                              {op.operation}
+                              {`(${
+                                op.parameters &&
+                                Object.keys(op.parameters).length > 0
+                                  ? Object.values(op.parameters).join(", ")
+                                  : ""
+                              })`}
+                              {op.state &&
+                                op.state.result !== undefined &&
+                                op.state.result !== null && (
+                                  <span className="text-black">
+                                    {" "}
+                                    Result: {String(op.state.result)}
+                                  </span>
+                                )}
                             </div>
-                          );
-                        })}
-                      </ul>
-                    ) : (
-                      <p className="text-gray-500 text-xs py-2">
-                        No operations performed yet.
-                      </p>
+                            {op.state && op.state.message && (
+                              <div className="mt-1 text-gray-600">
+                                {op.state.message}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 text-xs py-2">
+                      No operations performed yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Visualization area */}
+          <div className="md:col-span-3 bg-white rounded shadow-md p-2 flex flex-col h-full overflow-hidden">
+            <div className="flex justify-between items-center mb-2 flex-shrink-0">
+              <h2 className="text-md font-bold">Visualization</h2>
+              {/* Zoom Controls */}
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-1">
+                  <div className="text-xs mr-2 text-gray-600">
+                    Zoom: {(zoomLevel * 100).toFixed(0)}%
+                  </div>
+                  <button
+                    onClick={zoomIn}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                    title="Zoom In"
+                  >
+                    <ZoomInIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={zoomOut}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                    title="Zoom Out"
+                  >
+                    <ZoomOutIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={resetZoom}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                    title="Reset Zoom"
+                  >
+                    <RefreshCwIcon className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {isExporting && (
+                  <div className="flex items-center space-x-2">
+                    <div className="text-xs text-gray-600">
+                      Exporting PDF...
+                    </div>
+                    <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 transition-all duration-300"
+                        style={{ width: `${exportProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {operations.length > 0 && currentHistoryIndex !== -1 && (
+                  <button
+                    onClick={exportCurrentOperationToPDF}
+                    disabled={isExporting}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-700"
+                    title="Export Current Operation to PDF"
+                  >
+                    <DownloadIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div
+              className="flex-1 overflow-hidden relative"
+              style={{ minHeight: "500px" }}
+              ref={visualizationContainerRef}
+            >
+              <svg
+                ref={svgRef}
+                className="w-full h-full"
+                style={{ minHeight: "500px" }}
+              ></svg>
+              {/* Add this loading overlay */}
+              {loading && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex justify-center items-center z-10">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                </div>
+              )}
+            </div>
+
+            {/* Result display - only show for current snapshot if it has a result */}
+            {operations.length > 0 &&
+              operations[currentHistoryIndex]?.memorySnapshots?.[
+                currentSnapshotIndex
+              ]?.getResult !== undefined &&
+              operations[currentHistoryIndex]?.memorySnapshots?.[
+                currentSnapshotIndex
+              ]?.getResult !== null && (
+                <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200 flex-shrink-0">
+                  <div className="text-sm font-semibold text-gray-700">
+                    Result:
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {String(
+                      operations[currentHistoryIndex].memorySnapshots[
+                        currentSnapshotIndex
+                      ].getResult
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Visualization area */}
-            <div className="md:col-span-3 bg-white rounded shadow-md p-2 flex flex-col h-full overflow-hidden">
-              <div className="flex justify-between items-center mb-2 flex-shrink-0">
-                <h2 className="text-md font-bold">Visualization</h2>
-                {/* Zoom Controls */}
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-1">
-                    <div className="text-xs mr-2 text-gray-600">
-                      Zoom: {(zoomLevel * 100).toFixed(0)}%
-                    </div>
-                    <button
-                      onClick={zoomIn}
-                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
-                      title="Zoom In"
-                    >
-                      <ZoomInIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={zoomOut}
-                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
-                      title="Zoom Out"
-                    >
-                      <ZoomOutIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={resetZoom}
-                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
-                      title="Reset Zoom"
-                    >
-                      <RefreshCwIcon className="w-4 h-4" />
-                    </button>
+            {/* Playback controls with reduced vertical space */}
+            {operations.length > 0 &&
+              operations[currentHistoryIndex]?.memorySnapshots?.length > 1 && (
+                <div className="flex justify-between items-center mt-2 flex-shrink-0">
+                  <div className="text-gray-600 text-xs">
+                    Snapshot {currentSnapshotIndex + 1}/
+                    {operations[currentHistoryIndex].memorySnapshots.length} of
+                    "
+                    {operations[currentHistoryIndex].operationName ||
+                      operations[currentHistoryIndex].operation}
+                    "
                   </div>
 
-                  {isExporting && (
-                    <div className="flex items-center space-x-2">
-                      <div className="text-xs text-gray-600">
-                        Exporting PDF...
-                      </div>
-                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-500 transition-all duration-300"
-                          style={{ width: `${exportProgress}%` }}
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={goToFirst}
+                      disabled={
+                        !snapshotMode ||
+                        !operations[currentHistoryIndex]?.memorySnapshots
+                          ?.length ||
+                        currentSnapshotIndex === 0
+                      }
+                      className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                      title="First Snapshot"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
                         />
-                      </div>
-                    </div>
-                  )}
-
-                  {operations.length > 0 && currentHistoryIndex !== -1 && (
-                    <button
-                      onClick={exportCurrentOperationToPDF}
-                      disabled={isExporting}
-                      className="p-1 rounded hover:bg-gray-200 text-gray-700"
-                      title="Export Current Operation to PDF"
-                    >
-                      <DownloadIcon className="w-4 h-4" />
+                      </svg>
                     </button>
-                  )}
-                </div>
-              </div>
 
-              <div
-                className="flex-1 overflow-hidden relative"
-                style={{ minHeight: "500px" }}
-                ref={visualizationContainerRef}
-              >
-                <svg
-                  ref={svgRef}
-                  className="w-full h-full"
-                  style={{ minHeight: "500px" }}
-                ></svg>
-              </div>
+                    <button
+                      onClick={goToPrevious}
+                      disabled={
+                        !snapshotMode ||
+                        !operations[currentHistoryIndex]?.memorySnapshots
+                          ?.length ||
+                        currentSnapshotIndex === 0
+                      }
+                      className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                      title="Previous Snapshot"
+                    >
+                      <ChevronLeftIcon className="w-4 h-4" />
+                    </button>
 
-              {/* Result display - only show for current snapshot if it has a result */}
-              {operations.length > 0 &&
-                operations[currentHistoryIndex]?.memorySnapshots?.[
-                  currentSnapshotIndex
-                ]?.getResult !== undefined &&
-                operations[currentHistoryIndex]?.memorySnapshots?.[
-                  currentSnapshotIndex
-                ]?.getResult !== null && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200 flex-shrink-0">
-                    <div className="text-sm font-semibold text-gray-700">
-                      Result:
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {String(
-                        operations[currentHistoryIndex].memorySnapshots[
-                          currentSnapshotIndex
-                        ].getResult
+                    <button
+                      onClick={toggleAutoPlay}
+                      disabled={
+                        !operations[currentHistoryIndex]?.memorySnapshots
+                          ?.length ||
+                        operations[currentHistoryIndex]?.memorySnapshots
+                          ?.length <= 1
+                      }
+                      className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                      title={autoPlay ? "Pause" : "Play"}
+                    >
+                      {autoPlay ? (
+                        <PauseIcon className="w-4 h-4" />
+                      ) : (
+                        <PlayIcon className="w-4 h-4" />
                       )}
-                    </div>
-                  </div>
-                )}
+                    </button>
 
-              {/* Playback controls with reduced vertical space */}
-              {operations.length > 0 &&
-                operations[currentHistoryIndex]?.memorySnapshots?.length >
-                  1 && (
-                  <div className="flex justify-between items-center mt-2 flex-shrink-0">
-                    <div className="text-gray-600 text-xs">
-                      Snapshot {currentSnapshotIndex + 1}/
-                      {operations[currentHistoryIndex].memorySnapshots.length}{" "}
-                      of "
-                      {operations[currentHistoryIndex].operationName ||
-                        operations[currentHistoryIndex].operation}
-                      "
-                    </div>
-
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={goToFirst}
-                        disabled={
-                          !snapshotMode ||
-                          !operations[currentHistoryIndex]?.memorySnapshots
-                            ?.length ||
-                          currentSnapshotIndex === 0
-                        }
-                        className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
-                        title="First Snapshot"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-                          />
-                        </svg>
-                      </button>
-
-                      <button
-                        onClick={goToPrevious}
-                        disabled={
-                          !snapshotMode ||
-                          !operations[currentHistoryIndex]?.memorySnapshots
-                            ?.length ||
-                          currentSnapshotIndex === 0
-                        }
-                        className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
-                        title="Previous Snapshot"
-                      >
-                        <ChevronLeftIcon className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={toggleAutoPlay}
-                        disabled={
-                          !operations[currentHistoryIndex]?.memorySnapshots
-                            ?.length ||
+                    <button
+                      onClick={goToNext}
+                      disabled={
+                        !snapshotMode ||
+                        !operations[currentHistoryIndex]?.memorySnapshots
+                          ?.length ||
+                        currentSnapshotIndex >=
                           operations[currentHistoryIndex]?.memorySnapshots
-                            ?.length <= 1
-                        }
-                        className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
-                        title={autoPlay ? "Pause" : "Play"}
-                      >
-                        {autoPlay ? (
-                          <PauseIcon className="w-4 h-4" />
-                        ) : (
-                          <PlayIcon className="w-4 h-4" />
-                        )}
-                      </button>
+                            ?.length -
+                            1
+                      }
+                      className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                      title="Next Snapshot"
+                    >
+                      <ChevronRightIcon className="w-4 h-4" />
+                    </button>
 
-                      <button
-                        onClick={goToNext}
-                        disabled={
-                          !snapshotMode ||
-                          !operations[currentHistoryIndex]?.memorySnapshots
-                            ?.length ||
-                          currentSnapshotIndex >=
-                            operations[currentHistoryIndex]?.memorySnapshots
-                              ?.length -
-                              1
-                        }
-                        className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
-                        title="Next Snapshot"
+                    <button
+                      onClick={goToLast}
+                      disabled={
+                        !snapshotMode ||
+                        !operations[currentHistoryIndex]?.memorySnapshots
+                          ?.length ||
+                        currentSnapshotIndex >=
+                          operations[currentHistoryIndex]?.memorySnapshots
+                            ?.length -
+                            1
+                      }
+                      className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                      title="Last Snapshot"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        <ChevronRightIcon className="w-4 h-4" />
-                      </button>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                  </div>
 
-                      <button
-                        onClick={goToLast}
-                        disabled={
-                          !snapshotMode ||
-                          !operations[currentHistoryIndex]?.memorySnapshots
-                            ?.length ||
-                          currentSnapshotIndex >=
-                            operations[currentHistoryIndex]?.memorySnapshots
-                              ?.length -
-                              1
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center">
+                      <label htmlFor="playback-speed" className="mr-1 text-xs">
+                        Speed:
+                      </label>
+                      <select
+                        id="playback-speed"
+                        value={autoPlaySpeed}
+                        onChange={(e) =>
+                          setAutoPlaySpeed(Number(e.target.value))
                         }
-                        className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50"
-                        title="Last Snapshot"
+                        className="border border-gray-300 rounded px-1 py-0 text-xs"
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13 5l7 7-7 7M5 5l7 7-7 7"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <div className="flex items-center">
-                        <label
-                          htmlFor="playback-speed"
-                          className="mr-1 text-xs"
-                        >
-                          Speed:
-                        </label>
-                        <select
-                          id="playback-speed"
-                          value={autoPlaySpeed}
-                          onChange={(e) =>
-                            setAutoPlaySpeed(Number(e.target.value))
-                          }
-                          className="border border-gray-300 rounded px-1 py-0 text-xs"
-                        >
-                          {playbackSpeedOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                        {playbackSpeedOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                )}
-            </div>
+                </div>
+              )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
