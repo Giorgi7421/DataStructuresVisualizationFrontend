@@ -226,19 +226,19 @@ const bigONotations = {
       TREE: "O(n)",
       HASH: "O(n)",
       SMALL_INT: "O(n)",
-      MOVE_TO_FRONT: "O(n)",
+      MOVE_TO_FRONT: "O(1)",
     },
     size: {
       TREE: "O(n)",
       HASH: "O(n)",
       SMALL_INT: "O(n)",
-      MOVE_TO_FRONT: "O(n)",
+      MOVE_TO_FRONT: "O(1)",
     },
     isEmpty: {
       TREE: "O(n)",
       HASH: "O(n)",
       SMALL_INT: "O(n)",
-      MOVE_TO_FRONT: "O(n)",
+      MOVE_TO_FRONT: "O(1)",
     },
     contains: {
       TREE: "O(n)",
