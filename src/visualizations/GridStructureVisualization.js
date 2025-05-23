@@ -18,44 +18,76 @@ export function renderGridStructureVisualization(
   const instanceVariables = state.instanceVariables || state || {};
   const addressObjectMap = state.addressObjectMap || {};
 
-  // Initialize nodePositions and allConnections
-  const nodePositions = {};
-  const allConnections = [];
-
   // --- Determine the primary 'addresses' array and its address ('elemsAddress') ---
-  let elemsAddress = null; // This will be the address of the identified master array
-  let addresses = [];    // This will be the content of the identified master array
-
-  // Priority 1: Check if instanceVariables.elems points to a valid array
+  let elemsAddress = null;
+  let addresses = [];
   if (
     instanceVariables.elems &&
-    typeof instanceVariables.elems === 'string' &&
+    typeof instanceVariables.elems === "string" &&
     isAddress(instanceVariables.elems) &&
-    Object.prototype.hasOwnProperty.call(addressObjectMap, instanceVariables.elems) &&
+    Object.prototype.hasOwnProperty.call(
+      addressObjectMap,
+      instanceVariables.elems
+    ) &&
     Array.isArray(addressObjectMap[instanceVariables.elems])
   ) {
     elemsAddress = instanceVariables.elems;
     addresses = addressObjectMap[elemsAddress];
-    console.log(`[GridViz] Using master array from instanceVariables.elems: ${elemsAddress}`);
   } else {
-    // Priority 2: If not found via elems, check if there's exactly one array in addressObjectMap
     const mapKeys = Object.keys(addressObjectMap);
-    const arrayEntries = mapKeys.filter(key =>
+    const arrayEntries = mapKeys.filter(
+      (key) =>
         Object.prototype.hasOwnProperty.call(addressObjectMap, key) &&
         Array.isArray(addressObjectMap[key])
     );
-
     if (arrayEntries.length === 1) {
       elemsAddress = arrayEntries[0];
       addresses = addressObjectMap[elemsAddress];
-      console.log(`[GridViz] Identified the only array in addressObjectMap as master: ${elemsAddress}`);
-    } else if (arrayEntries.length > 1) {
-      console.log("[GridViz] Multiple arrays in addressObjectMap and none specified by instanceVariables.elems. Cannot uniquely identify master array.");
-    } else {
-      console.log("[GridViz] No array found via instanceVariables.elems and no arrays in addressObjectMap.");
     }
   }
-  // --- End of new logic to find addresses array ---
+  // --- End of logic to find addresses array ---
+
+  // --- Identify unreferenced row arrays and calculate their required height ---
+  const stylesForCalc = { cell: { height: 40 }, padding: 5 }; // Minimal styles for height calc before full styles obj
+  const unreferencedRowSpacing = 5;
+  const unreferencedSectionBottomMargin = 15;
+  let unreferencedRowsBlockHeight = 0;
+  let unreferencedRowAddrs = [];
+
+  if (addressObjectMap) {
+    // Ensure addressObjectMap is available
+    const allPotentialRowArrayAddrs = Object.keys(addressObjectMap).filter(
+      (key) => key !== elemsAddress && Array.isArray(addressObjectMap[key])
+    );
+    const referencedSet = new Set(
+      addresses.filter(
+        (addr) => addr && typeof addr === "string" && isAddress(addr)
+      )
+    );
+    unreferencedRowAddrs = allPotentialRowArrayAddrs
+      .filter((addr) => !referencedSet.has(addr))
+      .sort();
+
+    if (unreferencedRowAddrs.length > 0) {
+      unreferencedRowsBlockHeight =
+        unreferencedRowAddrs.length *
+          (stylesForCalc.cell.height + unreferencedRowSpacing) -
+        unreferencedRowSpacing + // No spacing after the last one
+        unreferencedSectionBottomMargin;
+      console.log(
+        "[GridViz] Unreferenced rows identified:",
+        unreferencedRowAddrs,
+        "Block height:",
+        unreferencedRowsBlockHeight
+      );
+    } else {
+      console.log("[GridViz] No unreferenced rows identified.");
+    }
+  }
+  // --- End of unreferenced rows calculation ---
+
+  const nodePositions = {};
+  const allConnections = [];
 
   // Styles (similar to array visualization)
   const styles = {
@@ -125,18 +157,114 @@ export function renderGridStructureVisualization(
       .attr("fill", styles.connection.color || "#334155");
   }
 
-  // 1. Render 'elems' variable box
+  // --- Adjust main grid starting positions based on unreferenced rows height ---
+  const topMargin = 30; // The absolute top margin of the canvas
   const varBoxX = 30;
-  let varBoxY = 30;
+  let mainGridStartY = topMargin + unreferencedRowsBlockHeight;
+
   const addressesArrayX = varBoxX + styles.varBox.width + 60;
-  const addressesArrayY = varBoxY + 10;
+  const addressesArrayY = mainGridStartY + 10; // This is for the vertical array
   const addressBoxX = addressesArrayX;
   const addressBoxY = addressesArrayY - styles.cell.height;
-  varBoxY =
+
+  let varBoxY = // Calculate varBoxY relative to the (now shifted) addressesArrayY
     addressesArrayY +
     styles.cell.height / 2 -
     styles.varBox.headerHeight -
     styles.varBox.fieldHeight / 2;
+
+  // --- START: Render unreferenced rows at the top ---
+  if (unreferencedRowAddrs.length > 0) {
+    let currentUnreferencedY = topMargin;
+    const unreferencedRowAddressBoxX = addressesArrayX + 140 + 120; // Align with main grid's horizontal rows X
+    const unreferencedRowDataStartX = unreferencedRowAddressBoxX + 100;
+
+    unreferencedRowAddrs.forEach((unrefAddr) => {
+      const rowAddressBoxWidth = 100;
+      // Address Box for the unreferenced row
+      contentGroup
+        .append("rect")
+        .attr("x", unreferencedRowAddressBoxX)
+        .attr("y", currentUnreferencedY)
+        .attr("width", rowAddressBoxWidth)
+        .attr("height", styles.cell.height)
+        .attr("fill", styles.cell.fill)
+        .attr("stroke", styles.cell.stroke)
+        .attr("stroke-width", 1)
+        .attr("rx", 3);
+      contentGroup
+        .append("text")
+        .attr("x", unreferencedRowAddressBoxX + rowAddressBoxWidth / 2)
+        .attr("y", currentUnreferencedY + styles.cell.height / 2)
+        .attr("dy", ".35em")
+        .attr("text-anchor", "middle")
+        .attr("font-size", styles.cell.fontSize)
+        .attr("font-weight", "bold")
+        .attr("fill", styles.varBox.addressValueFill)
+        .text(truncateAddress(String(unrefAddr), 10));
+
+      // Data cells for the unreferenced row
+      const rowData = addressObjectMap[unrefAddr] || [];
+      if (rowData.length > 0) {
+        // Arrow from address box to first cell of unreferenced row
+        contentGroup
+          .append("path")
+          .attr(
+            "d",
+            `M ${unreferencedRowAddressBoxX + rowAddressBoxWidth} ${
+              currentUnreferencedY + styles.cell.height / 2
+            } L ${unreferencedRowDataStartX} ${
+              currentUnreferencedY + styles.cell.height / 2
+            }`
+          )
+          .attr("fill", "none")
+          .attr("stroke", styles.connection.color)
+          .attr("stroke-width", styles.connection.strokeWidth)
+          .attr("marker-end", "url(#array-arrow)");
+      }
+      rowData.forEach((cellValue, colIdx) => {
+        const cellX2 = unreferencedRowDataStartX + colIdx * styles.cell.width;
+        const cellGroup2 = contentGroup
+          .append("g")
+          .attr("transform", `translate(${cellX2}, ${currentUnreferencedY})`);
+        cellGroup2
+          .append("rect")
+          .attr("width", styles.cell.width)
+          .attr("height", styles.cell.height)
+          .attr("fill", styles.cell.fill)
+          .attr("stroke", styles.cell.stroke)
+          .attr("stroke-width", 1);
+        cellGroup2
+          .append("line")
+          .attr("x1", 0)
+          .attr("y1", 18)
+          .attr("x2", styles.cell.width)
+          .attr("y2", 18)
+          .attr("stroke", styles.cell.stroke)
+          .attr("stroke-width", 0.5);
+        cellGroup2
+          .append("text")
+          .attr("x", styles.cell.width / 2)
+          .attr("y", 9)
+          .attr("dy", ".35em")
+          .attr("text-anchor", "middle")
+          .attr("fill", "#64748b")
+          .style("font-size", "10px")
+          .text(colIdx);
+        cellGroup2
+          .append("text")
+          .attr("x", styles.cell.width / 2)
+          .attr("y", 18 + (styles.cell.height - 18) / 2)
+          .attr("dy", ".35em")
+          .attr("text-anchor", "middle")
+          .attr("fill", styles.cell.textFill)
+          .style("font-size", styles.cell.fontSize)
+          .text(truncateAddress(String(cellValue), 10));
+      });
+      currentUnreferencedY += styles.cell.height + 5; // Move Y for next unreferenced row (5 is unreferencedRowSpacing)
+    });
+  }
+  // --- END: Render unreferenced rows at the top ---
 
   const instanceVarBoxResult = renderVariableBox(
     contentGroup,
@@ -209,7 +337,10 @@ export function renderGridStructureVisualization(
       // Fallback logic (can be kept or removed if the above is reliable)
       const instanceVarKeys = Object.keys(instanceVariables);
       const fieldIndex = instanceVarKeys.indexOf("elems");
-      if (fieldIndex !== -1 && Object.prototype.hasOwnProperty.call(instanceVariables, 'elems')) {
+      if (
+        fieldIndex !== -1 &&
+        Object.prototype.hasOwnProperty.call(instanceVariables, "elems")
+      ) {
         const startXfb = varBoxX + styles.varBox.width;
         const startYfb =
           varBoxY +
