@@ -643,6 +643,14 @@ function calculateTreeLayout(
   const levelHeight = adaptiveVerticalSpacing; // Use adaptive vertical spacing
   const minHorizontalSpacing = adaptiveHorizontalSpacing; // Use adaptive horizontal spacing
 
+  // Calculate the actual tree depth to determine spacing
+  const treeDepth = getTreeDepth(rootNode);
+  const baseSpacingAtBottom = 50; // Start with 50px at deepest level
+
+  console.log(
+    `[BSTree] Tree depth: ${treeDepth}, base spacing at bottom: ${baseSpacingAtBottom}`
+  );
+
   // First pass: assign levels and calculate subtree widths
   function assignLevelsAndWidths(node, level = 0) {
     if (!node) return 0;
@@ -669,7 +677,7 @@ function calculateTreeLayout(
     return node.subtreeWidth;
   }
 
-  // Second pass: assign x positions with simple level-based layout
+  // Second pass: assign x positions with bottom-up spacing calculation
   function assignPositions(node, centerX = 0) {
     if (!node) return;
 
@@ -688,7 +696,7 @@ function calculateTreeLayout(
       `[BSTree] Positioning node ${node.address} at (${node.x}, ${node.y}), level ${node.level}`
     );
 
-    // Position children with simple horizontal spreading
+    // Position children with bottom-up spacing calculation
     if (node.children) {
       const leftChild = node.children[0];
       const rightChild = node.children[1];
@@ -699,12 +707,15 @@ function calculateTreeLayout(
         } children check: left=${!!leftChild}, right=${!!rightChild}`
       );
 
-      // Level-based horizontal spacing that DECREASES as we go deeper
-      // Deeper levels need less space since they have fewer descendants
-      const baseSpacing = 800;
-      const horizontalSpread = baseSpacing / Math.pow(2, node.level); // Decreasing spacing by level
+      // Bottom-up horizontal spacing: start with 100px at deepest level, double as we go up
+      // For a node at level L in a tree of depth D: spacing = baseSpacing * 2^(D - 1 - L)
+      const levelsFromBottom = treeDepth - 1 - node.level;
+      const horizontalSpread =
+        baseSpacingAtBottom * Math.pow(2, levelsFromBottom);
 
-      console.log(`[BSTree] Using horizontal spread: ${horizontalSpread}`);
+      console.log(
+        `[BSTree] Level ${node.level}, levels from bottom: ${levelsFromBottom}, horizontal spread: ${horizontalSpread}`
+      );
 
       if (leftChild) {
         // Position left child to the left of parent

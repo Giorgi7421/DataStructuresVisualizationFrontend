@@ -714,8 +714,8 @@ function DataStructurePage() {
         .zoom()
         .scaleExtent([0.1, 5]) // Min/max zoom levels
         .translateExtent([
-          [-width * 3, -height * 3],
-          [width * 3, height * 3],
+          [-width * 10, -height * 10],
+          [width * 10, height * 10],
         ]) // Extra generous panning area
         .on("zoom", (event) => {
           // Apply the transform directly to the content group
