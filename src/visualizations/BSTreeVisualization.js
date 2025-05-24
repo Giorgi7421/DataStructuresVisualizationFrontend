@@ -1009,7 +1009,7 @@ function renderTreeConnections(
           const targetRightEdgeX = childPos.x + actualNodeWidth;
 
           // Go LEFT until we're within target bounds, then extend a bit more left
-          const horizontalExtension = 30; // Extension beyond bounds
+          const horizontalExtension = 15; // Reduced extension beyond bounds
           let extendedX;
 
           if (sourceX > targetRightEdgeX) {
@@ -1063,7 +1063,7 @@ function renderTreeConnections(
           const targetRightEdgeX = childPos.x + actualNodeWidth;
 
           // Go RIGHT until we're within target bounds, then extend a bit more right
-          const horizontalExtension = 30; // Extension beyond bounds
+          const horizontalExtension = 15; // Reduced extension beyond bounds
           let extendedX;
 
           if (sourceX < targetLeftEdgeX) {
