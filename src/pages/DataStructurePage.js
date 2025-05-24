@@ -1300,7 +1300,10 @@ function DataStructurePage() {
     if (!svgRef.current) return;
 
     const resizeObserver = new ResizeObserver(() => {
-      renderVisualization();
+      // Only re-render if dataStructure is available
+      if (dataStructure) {
+        renderVisualization();
+      }
     });
 
     resizeObserver.observe(svgRef.current.parentElement);
@@ -1308,7 +1311,7 @@ function DataStructurePage() {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [renderVisualization]);
+  }, [renderVisualization, dataStructure]);
 
   // Find and modify the useEffect that resets snapshot index when operation changes
   useEffect(() => {
