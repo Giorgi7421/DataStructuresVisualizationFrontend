@@ -4,6 +4,7 @@ import {
   renderGenericNode,
   isAddress,
   truncateAddress,
+  generateOrthogonalPath,
 } from "../utils/visualizationUtils";
 
 export function renderBSTreeVisualization(
@@ -541,17 +542,16 @@ export function renderBSTreeVisualization(
           targetY,
         });
 
-        allConnections.push({
-          source: {
-            x: sourceX,
-            y: sourceY,
-          },
-          target: {
-            x: targetX,
-            y: targetY - nodeHeight / 2, // Connect to top of node
-          },
-          style: "curved",
-        });
+        // Create H-V orthogonal path: horizontal to target center X, then vertical down
+        const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
+
+        contentGroup
+          .append("path")
+          .attr("d", pathData)
+          .attr("fill", "none")
+          .attr("stroke", styles.connection.color)
+          .attr("stroke-width", styles.connection.strokeWidth)
+          .attr("marker-end", "url(#arrowhead)");
       } else {
         console.warn("[BSTree] Invalid coordinates for root connection:", {
           sourceX,
@@ -1126,17 +1126,6 @@ function renderTreeConnections(
     const leftSideX = parentNodeTopLeftX; // Actual left edge of node box
     const rightSideX = parentNodeTopLeftX + actualNodeWidth; // Actual right edge using rendered width
 
-    console.log(`[BSTree] Arrow coordinates for node ${node.address}:`, {
-      parentNodeTopLeftX,
-      storedWidth: nodeWidth,
-      actualNodeWidth,
-      stylesNodeWidth: styles.node.width,
-      leftSideX,
-      rightSideX,
-      leftFieldY,
-      rightFieldY,
-    });
-
     // Draw connections to children
     if (node.children) {
       // Left child connection - arrow from LEFT side of parent
@@ -1155,14 +1144,12 @@ function renderTreeConnections(
 
           const sourceX = leftSideX; // Left side for left child
           const sourceY = leftFieldY;
-          const targetX = childTopLeftX + childNodeWidth / 2;
+          const targetX = childTopLeftX + styles.node.width / 2; // Use actual rendered width for center
           const targetY = childTopLeftY; // Top edge of address header
 
-          // Simple upward curve
-          const controlX = (sourceX + targetX) / 2;
-          const controlY = Math.min(sourceY, targetY) - 50;
+          // Create H-V orthogonal path: horizontal to target center X, then vertical down
+          const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
 
-          const pathData = `M ${sourceX} ${sourceY} Q ${controlX} ${controlY} ${targetX} ${targetY}`;
           contentGroup
             .append("path")
             .attr("d", pathData)
@@ -1194,27 +1181,12 @@ function renderTreeConnections(
 
           const sourceX = rightSideX; // Right side for right child
           const sourceY = rightFieldY;
-          const targetX = childTopLeftX + childNodeWidth / 2;
+          const targetX = childTopLeftX + styles.node.width / 2; // Use actual rendered width for center
           const targetY = childTopLeftY; // Top edge of address header
 
-          console.log(
-            `[BSTree] RIGHT arrow from ${node.address} to ${rightChild.address}:`,
-            {
-              sourceX,
-              sourceY,
-              targetX,
-              targetY,
-              parentNodeTopLeftX,
-              parentNodeWidth: nodeWidth,
-              rightSideX,
-            }
-          );
+          // Create H-V orthogonal path: horizontal to target center X, then vertical down
+          const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
 
-          // Simple upward curve
-          const controlX = (sourceX + targetX) / 2;
-          const controlY = Math.min(sourceY, targetY) - 50;
-
-          const pathData = `M ${sourceX} ${sourceY} Q ${controlX} ${controlY} ${targetX} ${targetY}`;
           contentGroup
             .append("path")
             .attr("d", pathData)
