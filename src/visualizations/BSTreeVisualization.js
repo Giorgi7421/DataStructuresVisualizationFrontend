@@ -683,8 +683,10 @@ function calculateTreeLayout(
         } children check: left=${!!leftChild}, right=${!!rightChild}`
       );
 
-      // Simple direct horizontal spacing - like DoublyLinkedStructure
-      const horizontalSpread = 300; // Fixed 300px spacing
+      // Level-based horizontal spacing that DECREASES as we go deeper
+      // Deeper levels need less space since they have fewer descendants
+      const baseSpacing = 800;
+      const horizontalSpread = baseSpacing / Math.pow(2, node.level); // Decreasing spacing by level
 
       console.log(`[BSTree] Using horizontal spread: ${horizontalSpread}`);
 
