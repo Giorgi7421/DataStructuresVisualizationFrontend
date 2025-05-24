@@ -59,13 +59,13 @@ export function renderBSTreeVisualization(
 
   // Adaptive node width: smaller for deeper trees
   const adaptiveNodeWidth = Math.max(
-    Math.min(availableWidth / (maxNodes * 1.5), 250), // Increased max width from 180 to 250
-    140 // Increased minimum readable size from 100 to 140
+    Math.min(availableWidth / (maxNodes * 3.0), 180), // Increased max width to 180 like DoublyLinkedStructure
+    120 // Increased minimum size to 120 for better text fit
   );
 
-  // Adaptive spacing based on node size
-  const adaptiveHorizontalSpacing = adaptiveNodeWidth * 1.8;
-  const adaptiveVerticalSpacing = Math.max(150, adaptiveNodeWidth * 2);
+  // Adaptive spacing based on node size - much more generous
+  const adaptiveHorizontalSpacing = adaptiveNodeWidth * 3.0; // Increased multiplier
+  const adaptiveVerticalSpacing = Math.max(200, adaptiveNodeWidth * 2.5); // Increased multiplier
 
   console.log("[BSTree] Adaptive sizing:", {
     treeDepth,
@@ -99,10 +99,10 @@ export function renderBSTreeVisualization(
     },
     node: {
       width: adaptiveNodeWidth, // Use adaptive width instead of fixed 80
-      headerHeight: 30, // Increased from 25 to 30
-      fieldHeight: 25, // Increased from 20 to 25
-      fieldSpacing: 3, // Increased from 2 to 3
-      padding: 12, // Increased from 8 to 12
+      headerHeight: 25, // Reduced to match DoublyLinkedStructure
+      fieldHeight: 25, // Reduced to match DoublyLinkedStructure
+      fieldSpacing: 5, // Keep at 5 like DoublyLinkedStructure
+      padding: 10, // Reduced to match DoublyLinkedStructure
       fill: "#ffffff",
       stroke: "#94a3b8",
       titleFill: "#f8fafc",
@@ -113,8 +113,8 @@ export function renderBSTreeVisualization(
       addressTextFill: "#0ea5e9",
       fieldRectFill: "white",
       fieldRectStroke: "#e2e8f0",
-      fontSize: "11px", // Increased from 10px to 11px
-      titleFontSize: "13px", // Increased from 12px to 13px
+      fontSize: "12px", // Use same as DoublyLinkedStructure
+      titleFontSize: "13px", // Keep same
     },
     connection: {
       strokeWidth: 2,
@@ -374,50 +374,10 @@ export function renderBSTreeVisualization(
       );
       console.log(`[BSTree] Using adaptive node width: ${styles.node.width}`);
 
-      // Ensure we have valid dimensions to prevent division by zero
-      const validTreeWidth = Math.max(treeWidth, 1);
-      const validTreeHeight = Math.max(
-        treeBounds.maxY -
-          treeBounds.minY +
-          2 * (styles.node.headerHeight + styles.node.fieldHeight * 3),
-        1
-      );
-      const validAreaWidth = Math.max(treeAreaWidth, 1);
-      const validAreaHeight = Math.max(treeAreaHeight, 1);
-
-      const scale = Math.min(
-        validAreaWidth / validTreeWidth,
-        validAreaHeight / validTreeHeight,
-        1
-      );
-
-      // Position the tree so the root node appears at the fixed center between variable boxes
-      const offsetX = centerBetweenBoxes; // Fixed position for root node
-      const offsetY =
-        treeAreaY +
-        (validAreaHeight - validTreeHeight * scale) / 2 -
-        treeBounds.minY * scale;
-
-      // Validate all calculated values
-      if (isNaN(scale) || isNaN(offsetX) || isNaN(offsetY)) {
-        console.error("[BSTree] Invalid calculated values:", {
-          scale,
-          offsetX,
-          offsetY,
-          treeAreaX,
-          treeAreaY,
-          validAreaWidth,
-          validAreaHeight,
-          validTreeWidth,
-          validTreeHeight,
-          treeBounds,
-        });
-        throw new Error("Invalid positioning calculations");
-      }
-
-      console.log(
-        `[BSTree] Rendering with scale: ${scale}, offset: (${offsetX}, ${offsetY})`
-      );
+      // Bypass complex scaling - use direct positioning like DoublyLinkedStructure
+      const scale = 1; // No scaling
+      const offsetX = centerBetweenBoxes; // Simple horizontal center
+      const offsetY = treeAreaY; // Simple vertical position
 
       // Render tree nodes and connections
       renderTreeNodes(
@@ -484,34 +444,11 @@ export function renderBSTreeVisualization(
 
     if (rootNode && rootConnectionPoint && rootConnectionPoint.sourceCoords) {
       console.log("[BSTree] Drawing root connection...");
-      const treeBounds = getTreeBounds(treeLayout);
 
-      // Use the same positioning logic as main tree rendering
-      const validTreeWidth = Math.max(
-        treeBounds.maxX - treeBounds.minX + 2 * styles.node.width,
-        1
-      );
-      const validTreeHeight = Math.max(
-        treeBounds.maxY -
-          treeBounds.minY +
-          2 * (styles.node.headerHeight + styles.node.fieldHeight * 3),
-        1
-      );
-      const validAreaWidth = Math.max(treeAreaWidth, 1);
-      const validAreaHeight = Math.max(treeAreaHeight, 1);
-
-      const scale = Math.min(
-        validAreaWidth / validTreeWidth,
-        validAreaHeight / validTreeHeight,
-        1
-      );
-
-      // Position the root node at the fixed center between variable boxes
-      const offsetX = centerBetweenBoxes; // Fixed position for root node
-      const offsetY =
-        treeAreaY +
-        (validAreaHeight - validTreeHeight * scale) / 2 -
-        treeBounds.minY * scale;
+      // Use direct positioning - same as main tree rendering
+      const scale = 1; // No scaling
+      const offsetX = centerBetweenBoxes; // Simple horizontal center
+      const offsetY = treeAreaY; // Simple vertical position
 
       const sourceX = rootConnectionPoint.sourceCoords.x;
       const sourceY = rootConnectionPoint.sourceCoords.y;
@@ -520,22 +457,14 @@ export function renderBSTreeVisualization(
       // Calculate the target Y to connect to the top edge of the root node header
       // Root node center Y coordinate
       const rootNodeCenterY = offsetY + rootNode.y * scale;
-      // Root node height (scaled)
-      const scaledNodeHeight =
-        (styles.node.headerHeight +
-          styles.node.fieldHeight * 3 +
-          styles.node.fieldSpacing * 2 +
-          styles.node.padding * 2) *
-        scale;
-      // Target Y should be at the top edge of the node (root node center - half height)
-      const targetY = rootNodeCenterY - scaledNodeHeight / 2;
-
+      // Root node height (no scaling)
       const nodeHeight =
-        (styles.node.headerHeight +
-          styles.node.fieldHeight * 3 +
-          styles.node.fieldSpacing * 2 +
-          styles.node.padding * 2) *
-        scale;
+        styles.node.headerHeight +
+        styles.node.fieldHeight * 3 +
+        styles.node.fieldSpacing * 2 +
+        styles.node.padding * 2;
+      // Target Y should be at the top edge of the node (root node center - half height)
+      const targetY = rootNodeCenterY - nodeHeight / 2;
 
       // Validate all coordinates before creating the connection
       if (
@@ -724,7 +653,7 @@ function calculateTreeLayout(
     return node.subtreeWidth;
   }
 
-  // Second pass: assign x positions with corner-based diagonal layout
+  // Second pass: assign x positions with simple level-based layout
   function assignPositions(node, centerX = 0) {
     if (!node) return;
 
@@ -734,29 +663,16 @@ function calculateTreeLayout(
       centerX = 0;
     }
 
+    // Simple direct positioning without complex scaling - like DoublyLinkedStructure
+    const levelSpacing = 200; // Fixed 200px between levels
     node.x = centerX;
-    node.y = node.level * levelHeight;
-
-    // Validate calculated coordinates
-    if (isNaN(node.x) || isNaN(node.y)) {
-      console.error("[BSTree] Calculated NaN coordinates in layout:", {
-        node: node.address,
-        level: node.level,
-        levelHeight,
-        centerX,
-        calculatedX: node.x,
-        calculatedY: node.y,
-      });
-      // Set safe defaults
-      node.x = 0;
-      node.y = (node.level || 0) * levelHeight;
-    }
+    node.y = node.level * levelSpacing;
 
     console.log(
-      `[BSTree] Positioning node ${node.address} at (${node.x}, ${node.y})`
+      `[BSTree] Positioning node ${node.address} at (${node.x}, ${node.y}), level ${node.level}`
     );
 
-    // Position children based on parent box corners with diagonal offsets
+    // Position children with simple horizontal spreading
     if (node.children) {
       const leftChild = node.children[0];
       const rightChild = node.children[1];
@@ -767,90 +683,31 @@ function calculateTreeLayout(
         } children check: left=${!!leftChild}, right=${!!rightChild}`
       );
 
-      // Calculate parent node dimensions (these will be used for corner calculations)
-      const parentNodeWidth = nodeWidth; // Use the passed nodeWidth parameter
-      const parentNodeHeight =
-        styles.node.headerHeight +
-        styles.node.fieldHeight * 3 +
-        styles.node.fieldSpacing * 2 +
-        styles.node.padding * 2;
+      // Simple direct horizontal spacing - like DoublyLinkedStructure
+      const horizontalSpread = 300; // Fixed 300px spacing
 
-      // Diagonal offsets - horizontal distance larger than vertical
-      const horizontalOffset = Math.max(350, nodeWidth * 4.5); // Dramatically increased horizontal spacing
-      const verticalOffset = Math.max(200, nodeWidth * 3.0); // Increased vertical spacing to ensure children are below parents
-
-      console.log(
-        `[BSTree] Spacing calculations: horizontalOffset=${horizontalOffset}, verticalOffset=${verticalOffset}, nodeWidth=${nodeWidth}, parentNodeHeight=${parentNodeHeight}`
-      );
+      console.log(`[BSTree] Using horizontal spread: ${horizontalSpread}`);
 
       if (leftChild) {
-        // Position left child relative to bottom-left corner of parent
-        // Parent bottom-left corner: (centerX - parentNodeWidth/2, centerY + parentNodeHeight/2)
-        const parentBottomLeftX = centerX - parentNodeWidth / 2;
-        const parentBottomY = node.y + parentNodeHeight / 2; // Parent's bottom edge
-
-        // Child position: move left and down from parent bottom-left
-        const childCenterX =
-          parentBottomLeftX - horizontalOffset + nodeWidth / 2;
-
-        // Position child so its TOP edge (including header) is verticalOffset below parent's BOTTOM edge
-        const childTopY = parentBottomY + verticalOffset + 50; // Added extra 50px buffer to ensure clear separation
-        const childCenterY = childTopY + parentNodeHeight / 2; // Child center = child top + half of total height
-
-        console.log(`[BSTree] Left child positioning:`);
-        console.log(`  - Parent center Y: ${node.y}`);
-        console.log(`  - Parent bottom Y: ${parentBottomY}`);
-        console.log(`  - Child top Y: ${childTopY}`);
-        console.log(`  - Child center Y: ${childCenterY}`);
+        // Position left child to the left of parent
+        const childCenterX = centerX - horizontalSpread;
         console.log(
-          `  - Gap between parent bottom and child top: ${
-            childTopY - parentBottomY
+          `[BSTree] Left child will be at X: ${childCenterX}, Y will be: ${
+            leftChild.level * levelSpacing
           }`
         );
-        console.log(
-          `  - Total Y distance from parent center to child center: ${
-            childCenterY - node.y
-          }`
-        );
-
         assignPositions(leftChild, childCenterX);
-        // Override the y position since we calculated it specifically
-        leftChild.y = childCenterY;
       }
 
       if (rightChild) {
-        // Position right child relative to bottom-right corner of parent
-        // Parent bottom-right corner: (centerX + parentNodeWidth/2, centerY + parentNodeHeight/2)
-        const parentBottomRightX = centerX + parentNodeWidth / 2;
-        const parentBottomY = node.y + parentNodeHeight / 2; // Parent's bottom edge
-
-        // Child position: move right and down from parent bottom-right
-        const childCenterX =
-          parentBottomRightX + horizontalOffset - nodeWidth / 2;
-
-        // Position child so its TOP edge (including header) is verticalOffset below parent's BOTTOM edge
-        const childTopY = parentBottomY + verticalOffset + 50; // Added extra 50px buffer to ensure clear separation
-        const childCenterY = childTopY + parentNodeHeight / 2; // Child center = child top + half of total height
-
-        console.log(`[BSTree] Right child positioning:`);
-        console.log(`  - Parent center Y: ${node.y}`);
-        console.log(`  - Parent bottom Y: ${parentBottomY}`);
-        console.log(`  - Child top Y: ${childTopY}`);
-        console.log(`  - Child center Y: ${childCenterY}`);
+        // Position right child to the right of parent
+        const childCenterX = centerX + horizontalSpread;
         console.log(
-          `  - Gap between parent bottom and child top: ${
-            childTopY - parentBottomY
+          `[BSTree] Right child will be at X: ${childCenterX}, Y will be: ${
+            rightChild.level * levelSpacing
           }`
         );
-        console.log(
-          `  - Total Y distance from parent center to child center: ${
-            childCenterY - node.y
-          }`
-        );
-
         assignPositions(rightChild, childCenterX);
-        // Override the y position since we calculated it specifically
-        rightChild.y = childCenterY;
       }
 
       if (!leftChild && !rightChild) {
@@ -1024,8 +881,6 @@ function renderTreeNodes(
       y: y - nodeHeight / 2, // Top-left y
       width: nodeWidth,
       height: nodeHeight,
-      // Store field info if needed by connection logic, though direct calc in renderTreeConnections is also fine
-      // fields: { value: node.value, left: node.left, right: node.right }
     };
 
     // Recursively render children
@@ -1094,22 +949,6 @@ function renderTreeConnections(
     const parentX = parentPos.x; // This is already scaled top-left X
     const parentY = parentPos.y; // This is already scaled top-left Y
 
-    // Note: nodeWidth and nodeHeight are the SCALED dimensions of the parent node here.
-    // If nodePositions stores unscaled width/height, they need to be scaled here.
-    // Assuming nodePositions stores SCALED width/height as per renderTreeNodes modification.
-    const nodeWidth = parentPos.width;
-    const nodeHeight = parentPos.height;
-
-    // Calculate field positions within the node (relative to parent's top-left)
-    const scaledHeaderHeight = styles.node.headerHeight * scale;
-    const scaledFieldHeight = styles.node.fieldHeight * scale;
-    const scaledFieldSpacing = styles.node.fieldSpacing * scale;
-    const scaledPadding = styles.node.padding * scale;
-
-    // Parent's coordinates and dimensions from nodePositions (already scaled and positioned)
-    const parentNodeTopLeftX = parentX;
-    const parentNodeTopLeftY = parentY;
-
     // Use the actual rendered node width from styles, not the stored scaled width
     const actualNodeWidth = styles.node.width;
 
@@ -1121,7 +960,7 @@ function renderTreeConnections(
 
     // Calculate Y-coordinate for center of "left" field (field index 1, after "value")
     const leftFieldY =
-      parentNodeTopLeftY +
+      parentPos.y +
       headerHeight +
       padding +
       1 * (fieldHeight + fieldSpacing) +
@@ -1129,15 +968,15 @@ function renderTreeConnections(
 
     // Calculate Y-coordinate for center of "right" field (field index 2, after "value" and "left")
     const rightFieldY =
-      parentNodeTopLeftY +
+      parentPos.y +
       headerHeight +
       padding +
       2 * (fieldHeight + fieldSpacing) +
       fieldHeight / 2;
 
     // X-coordinates for left and right sides of node using actual rendered width
-    const leftSideX = parentNodeTopLeftX; // Actual left edge of node box
-    const rightSideX = parentNodeTopLeftX + actualNodeWidth; // Actual right edge using rendered width
+    const leftSideX = parentPos.x; // Actual left edge of node box
+    const rightSideX = parentPos.x + actualNodeWidth; // Actual right edge using rendered width
 
     // Draw connections to children
     if (node.children) {
@@ -1150,15 +989,10 @@ function renderTreeConnections(
           typeof childPos.x === "number" &&
           typeof childPos.y === "number"
         ) {
-          const childTopLeftX = childPos.x;
-          const childTopLeftY = childPos.y;
-          const childNodeWidth = childPos.width;
-          const childHeaderHeight = styles.node.headerHeight;
-
           const sourceX = leftSideX; // Left side for left child
           const sourceY = leftFieldY;
-          const targetX = childTopLeftX + styles.node.width / 2; // Use actual rendered width for center
-          const targetY = childTopLeftY; // Top edge of address header
+          const targetX = childPos.x + styles.node.width / 2; // Use actual rendered width for center
+          const targetY = childPos.y; // Top edge of address header
 
           // Create H-V orthogonal path: horizontal to target center X, then vertical down
           const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
@@ -1187,15 +1021,10 @@ function renderTreeConnections(
           typeof childPos.x === "number" &&
           typeof childPos.y === "number"
         ) {
-          const childTopLeftX = childPos.x;
-          const childTopLeftY = childPos.y;
-          const childNodeWidth = childPos.width;
-          const childHeaderHeight = styles.node.headerHeight;
-
           const sourceX = rightSideX; // Right side for right child
           const sourceY = rightFieldY;
-          const targetX = childTopLeftX + styles.node.width / 2; // Use actual rendered width for center
-          const targetY = childTopLeftY; // Top edge of address header
+          const targetX = childPos.x + styles.node.width / 2; // Use actual rendered width for center
+          const targetY = childPos.y; // Top edge of address header
 
           // Create H-V orthogonal path: horizontal to target center X, then vertical down
           const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
