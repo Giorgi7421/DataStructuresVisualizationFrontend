@@ -33,6 +33,7 @@ import { renderLinkedStructureVisualization } from "../visualizations/LinkedStru
 import { renderDoublyLinkedStructureVisualization } from "../visualizations/DoublyLinkedStructure";
 import { renderGridStructureVisualization } from "../visualizations/GridStructureVisualization";
 import { renderTwoStackEditorBufferVisualization } from "../visualizations/TwoStackEditorBufferVisualization"; // Added import
+import { renderBSTreeVisualization } from "../visualizations/BSTreeVisualization"; // Added import
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -1022,6 +1023,15 @@ function DataStructurePage() {
               );
               break;
             case "BS_TREE":
+              renderBSTreeVisualization(
+                tempGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "AVL_TREE":
             case "EXPRESSION_TREE":
             case "HASH_SET":
@@ -2166,6 +2176,15 @@ function DataStructurePage() {
               );
               break;
             case "BS_TREE":
+              renderBSTreeVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
             case "AVL_TREE":
             case "EXPRESSION_TREE":
             case "HASH_SET":
@@ -2182,6 +2201,15 @@ function DataStructurePage() {
               );
               break;
             case "UNSORTED_VECTOR_PRIORITY_QUEUE":
+              renderArrayStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
             case "SORTED_LINKED_LIST_PRIORITY_QUEUE":
               renderLinkedStructureVisualization(
                 contentGroup,
