@@ -516,7 +516,20 @@ export function renderBSTreeVisualization(
       const sourceX = rootConnectionPoint.sourceCoords.x;
       const sourceY = rootConnectionPoint.sourceCoords.y;
       const targetX = offsetX + rootNode.x * scale;
-      const targetY = offsetY + rootNode.y * scale;
+
+      // Calculate the target Y to connect to the top edge of the root node header
+      // Root node center Y coordinate
+      const rootNodeCenterY = offsetY + rootNode.y * scale;
+      // Root node height (scaled)
+      const scaledNodeHeight =
+        (styles.node.headerHeight +
+          styles.node.fieldHeight * 3 +
+          styles.node.fieldSpacing * 2 +
+          styles.node.padding * 2) *
+        scale;
+      // Target Y should be at the top edge of the node (root node center - half height)
+      const targetY = rootNodeCenterY - scaledNodeHeight / 2;
+
       const nodeHeight =
         (styles.node.headerHeight +
           styles.node.fieldHeight * 3 +
@@ -764,7 +777,7 @@ function calculateTreeLayout(
 
       // Diagonal offsets - horizontal distance larger than vertical
       const horizontalOffset = Math.max(350, nodeWidth * 4.5); // Dramatically increased horizontal spacing
-      const verticalOffset = Math.max(150, nodeWidth * 2.0); // Significantly increased vertical spacing
+      const verticalOffset = Math.max(200, nodeWidth * 3.0); // Increased vertical spacing to ensure children are below parents
 
       console.log(
         `[BSTree] Spacing calculations: horizontalOffset=${horizontalOffset}, verticalOffset=${verticalOffset}, nodeWidth=${nodeWidth}, parentNodeHeight=${parentNodeHeight}`
@@ -781,7 +794,7 @@ function calculateTreeLayout(
           parentBottomLeftX - horizontalOffset + nodeWidth / 2;
 
         // Position child so its TOP edge (including header) is verticalOffset below parent's BOTTOM edge
-        const childTopY = parentBottomY + verticalOffset; // Child's top edge (top of header)
+        const childTopY = parentBottomY + verticalOffset + 50; // Added extra 50px buffer to ensure clear separation
         const childCenterY = childTopY + parentNodeHeight / 2; // Child center = child top + half of total height
 
         console.log(`[BSTree] Left child positioning:`);
@@ -816,7 +829,7 @@ function calculateTreeLayout(
           parentBottomRightX + horizontalOffset - nodeWidth / 2;
 
         // Position child so its TOP edge (including header) is verticalOffset below parent's BOTTOM edge
-        const childTopY = parentBottomY + verticalOffset; // Child's top edge (top of header)
+        const childTopY = parentBottomY + verticalOffset + 50; // Added extra 50px buffer to ensure clear separation
         const childCenterY = childTopY + parentNodeHeight / 2; // Child center = child top + half of total height
 
         console.log(`[BSTree] Right child positioning:`);
