@@ -161,9 +161,9 @@ export function renderBSTreeVisualization(
     }
   }
 
-  // Position calculations - place variable boxes above the tree
-  const varBoxY = 30;
-  const varBoxSpacing = 20;
+  // Position calculations - place variable boxes side by side with tree below
+  const varBoxY = 20; // Both boxes at the same Y level
+  const varBoxSpacing = 40; // Horizontal spacing between the two boxes
   const instanceVarBoxX = 30;
   const localVarBoxX = instanceVarBoxX + styles.varBox.width + varBoxSpacing;
 
@@ -301,17 +301,21 @@ export function renderBSTreeVisualization(
     );
   }
 
-  // Calculate tree area position - centered below both variable boxes
+  // Calculate tree area position - below both variable boxes with increased spacing
   const treeAreaY =
     varBoxY +
     Math.max(
       instanceVarBoxResult?.height || 80,
       localVarBoxResult?.height || 80
     ) +
-    40;
-  const treeAreaX = instanceVarBoxX; // Start from left edge of instance variables
-  const treeAreaWidth = localVarBoxX + styles.varBox.width - instanceVarBoxX; // Span across both boxes
+    80; // Increased spacing to 80px
+  const treeAreaX = 50; // Start earlier to give more room for the tree
+  const treeAreaWidth = width - treeAreaX - 50; // Give the tree plenty of width
   const treeAreaHeight = height - treeAreaY - 30;
+
+  // Calculate where we want the root node to appear (center between the two variable boxes)
+  const centerBetweenBoxes =
+    (instanceVarBoxX + localVarBoxX + styles.varBox.width) / 2;
 
   if (treeLayout) {
     console.log("[BSTree] Tree layout exists, proceeding with rendering");
@@ -348,10 +352,8 @@ export function renderBSTreeVisualization(
         1
       );
 
-      const offsetX =
-        treeAreaX +
-        (validAreaWidth - validTreeWidth * scale) / 2 -
-        treeBounds.minX * scale;
+      // Position the tree so the root node appears at the fixed center between variable boxes
+      const offsetX = centerBetweenBoxes; // Fixed position for root node
       const offsetY =
         treeAreaY +
         (validAreaHeight - validTreeHeight * scale) / 2 -
@@ -451,26 +453,30 @@ export function renderBSTreeVisualization(
     if (rootNode && rootConnectionPoint && rootConnectionPoint.sourceCoords) {
       console.log("[BSTree] Drawing root connection...");
       const treeBounds = getTreeBounds(treeLayout);
-      const scale = Math.min(
-        treeAreaWidth /
-          (treeBounds.maxX - treeBounds.minX + 2 * styles.node.radius),
-        treeAreaHeight /
-          (treeBounds.maxY - treeBounds.minY + 2 * styles.node.radius),
+
+      // Use the same positioning logic as main tree rendering
+      const validTreeWidth = Math.max(
+        treeBounds.maxX - treeBounds.minX + 2 * styles.node.width,
         1
       );
-      const offsetX =
-        treeAreaX +
-        (treeAreaWidth -
-          (treeBounds.maxX - treeBounds.minX + 2 * styles.node.radius) *
-            scale) /
-          2 -
-        treeBounds.minX * scale;
+      const validTreeHeight = Math.max(
+        treeBounds.maxY - treeBounds.minY + 2 * styles.node.headerHeight,
+        1
+      );
+      const validAreaWidth = Math.max(treeAreaWidth, 1);
+      const validAreaHeight = Math.max(treeAreaHeight, 1);
+
+      const scale = Math.min(
+        validAreaWidth / validTreeWidth,
+        validAreaHeight / validTreeHeight,
+        1
+      );
+
+      // Position the root node at the fixed center between variable boxes
+      const offsetX = centerBetweenBoxes; // Fixed position for root node
       const offsetY =
         treeAreaY +
-        (treeAreaHeight -
-          (treeBounds.maxY - treeBounds.minY + 2 * styles.node.radius) *
-            scale) /
-          2 -
+        (validAreaHeight - validTreeHeight * scale) / 2 -
         treeBounds.minY * scale;
 
       const sourceX = rootConnectionPoint.sourceCoords.x;
