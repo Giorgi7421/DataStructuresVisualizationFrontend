@@ -20,6 +20,22 @@ export function renderBSTreeVisualization(
     memorySnapshot,
   });
 
+  // Define arrowheads for connections
+  const arrowheadSize = 8;
+  contentGroup
+    .append("defs")
+    .append("marker")
+    .attr("id", "arrowhead")
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 8)
+    .attr("refY", 0)
+    .attr("orient", "auto")
+    .attr("markerWidth", arrowheadSize)
+    .attr("markerHeight", arrowheadSize)
+    .append("path")
+    .attr("d", "M0,-5L10,0L0,5")
+    .attr("fill", "#334155");
+
   const state = memorySnapshot || operation.state || {};
   const instanceVariables = state.instanceVariables || {};
   const localVariables = state.localVariables || {};
