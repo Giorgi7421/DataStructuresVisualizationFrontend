@@ -980,9 +980,18 @@ function renderTreeConnections(
     const leftSideX = parentPos.x; // Actual left edge of node box
     const rightSideX = parentPos.x + actualNodeWidth; // Actual right edge using rendered width
 
+    console.log(`[BSTree] Connection coords for node ${node.address}:`, {
+      parentPos,
+      actualNodeWidth,
+      leftSideX,
+      rightSideX,
+      leftFieldY,
+      rightFieldY,
+    });
+
     // Draw connections to children
     if (node.children) {
-      // Left child connection - arrow from LEFT side of parent
+      // Left child connection - arrow from LEFT side of parent going LEFT
       if (node.children[0]) {
         const leftChild = node.children[0];
         const childPos = nodePositions[leftChild.address];
@@ -991,13 +1000,35 @@ function renderTreeConnections(
           typeof childPos.x === "number" &&
           typeof childPos.y === "number"
         ) {
-          const sourceX = leftSideX; // Left side for left child
+          const sourceX = leftSideX; // Always start from left edge of parent
           const sourceY = leftFieldY;
-          const targetX = childPos.x + styles.node.width / 2; // Use actual rendered width for center
-          const targetY = childPos.y; // Top edge of address header
+          const targetY = childPos.y;
 
-          // Create H-V orthogonal path: horizontal to target center X, then vertical down
-          const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
+          // Calculate target node bounds to detect when we're "within" them
+          const targetLeftEdgeX = childPos.x;
+          const targetRightEdgeX = childPos.x + actualNodeWidth;
+
+          // Go LEFT until we're within target bounds, then extend a bit more left
+          const horizontalExtension = 30; // Extension beyond bounds
+          let extendedX;
+
+          if (sourceX > targetRightEdgeX) {
+            // Source is to the right of target, go left to right edge then extend
+            extendedX = targetRightEdgeX - horizontalExtension;
+          } else if (sourceX < targetLeftEdgeX) {
+            // Source is to the left of target, just extend from left edge
+            extendedX = targetLeftEdgeX - horizontalExtension;
+          } else {
+            // Source is already within bounds, extend left from source
+            extendedX = sourceX - horizontalExtension;
+          }
+
+          console.log(
+            `[BSTree] Left child arrow: source(${sourceX}, ${sourceY}) -> left to (${extendedX}, ${targetY}), target bounds: ${targetLeftEdgeX}-${targetRightEdgeX}`
+          );
+
+          // Simple H-V path: horizontal left, then vertical down
+          const pathData = `M ${sourceX} ${sourceY} L ${extendedX} ${sourceY} L ${extendedX} ${targetY}`;
 
           contentGroup
             .append("path")
@@ -1014,7 +1045,7 @@ function renderTreeConnections(
         }
       }
 
-      // Right child connection - arrow from RIGHT side of parent
+      // Right child connection - arrow from RIGHT side of parent going RIGHT
       if (node.children[1]) {
         const rightChild = node.children[1];
         const childPos = nodePositions[rightChild.address];
@@ -1023,13 +1054,35 @@ function renderTreeConnections(
           typeof childPos.x === "number" &&
           typeof childPos.y === "number"
         ) {
-          const sourceX = rightSideX; // Right side for right child
+          const sourceX = rightSideX; // Always start from right edge of parent
           const sourceY = rightFieldY;
-          const targetX = childPos.x + styles.node.width / 2; // Use actual rendered width for center
-          const targetY = childPos.y; // Top edge of address header
+          const targetY = childPos.y;
 
-          // Create H-V orthogonal path: horizontal to target center X, then vertical down
-          const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
+          // Calculate target node bounds to detect when we're "within" them
+          const targetLeftEdgeX = childPos.x;
+          const targetRightEdgeX = childPos.x + actualNodeWidth;
+
+          // Go RIGHT until we're within target bounds, then extend a bit more right
+          const horizontalExtension = 30; // Extension beyond bounds
+          let extendedX;
+
+          if (sourceX < targetLeftEdgeX) {
+            // Source is to the left of target, go right to left edge then extend
+            extendedX = targetLeftEdgeX + horizontalExtension;
+          } else if (sourceX > targetRightEdgeX) {
+            // Source is to the right of target, just extend from right edge
+            extendedX = targetRightEdgeX + horizontalExtension;
+          } else {
+            // Source is already within bounds, extend right from source
+            extendedX = sourceX + horizontalExtension;
+          }
+
+          console.log(
+            `[BSTree] Right child arrow: source(${sourceX}, ${sourceY}) -> right to (${extendedX}, ${targetY}), target bounds: ${targetLeftEdgeX}-${targetRightEdgeX}`
+          );
+
+          // Simple H-V path: horizontal right, then vertical down
+          const pathData = `M ${sourceX} ${sourceY} L ${extendedX} ${sourceY} L ${extendedX} ${targetY}`;
 
           contentGroup
             .append("path")
