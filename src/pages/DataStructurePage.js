@@ -34,6 +34,7 @@ import { renderDoublyLinkedStructureVisualization } from "../visualizations/Doub
 import { renderGridStructureVisualization } from "../visualizations/GridStructureVisualization";
 import { renderTwoStackEditorBufferVisualization } from "../visualizations/TwoStackEditorBufferVisualization"; // Added import
 import { renderTreeVisualization } from "../visualizations/TreeVisualization"; // Added import
+import { renderHashStructureVisualization } from "../visualizations/HashStructureVisualization"; // Added import
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -1010,10 +1011,19 @@ function DataStructurePage() {
               );
               break;
             case "ARRAY_MAP":
-            case "HASH_MAP":
             case "TREE_MAP":
             case "DEQUE":
               renderDoublyLinkedStructureVisualization(
+                tempGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
+            case "HASH_MAP":
+              renderHashStructureVisualization(
                 tempGroup,
                 width,
                 height,
@@ -1034,11 +1044,20 @@ function DataStructurePage() {
               break;
             case "AVL_TREE":
             case "EXPRESSION_TREE":
-            case "HASH_SET":
             case "TREE_SET":
             case "SMALL_INT_SET":
             case "MOVE_TO_FRONT_SET":
               renderLinkedStructureVisualization(
+                tempGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
+            case "HASH_SET":
+              renderHashStructureVisualization(
                 tempGroup,
                 width,
                 height,
@@ -2166,10 +2185,19 @@ function DataStructurePage() {
               );
               break;
             case "ARRAY_MAP":
-            case "HASH_MAP":
             case "TREE_MAP":
             case "DEQUE":
               renderDoublyLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "HASH_MAP":
+              renderHashStructureVisualization(
                 contentGroup,
                 800,
                 600,
@@ -2190,11 +2218,20 @@ function DataStructurePage() {
               break;
             case "AVL_TREE":
             case "EXPRESSION_TREE":
-            case "HASH_SET":
             case "TREE_SET":
             case "SMALL_INT_SET":
             case "MOVE_TO_FRONT_SET":
               renderLinkedStructureVisualization(
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
+              );
+              break;
+            case "HASH_SET":
+              renderHashStructureVisualization(
                 contentGroup,
                 800,
                 600,
