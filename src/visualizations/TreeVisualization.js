@@ -450,7 +450,21 @@ export function renderTreeVisualization(
     // Empty tree - no message displayed, just blank visualization area
   }
 
-  // Render variable pointer arrows to node address tags
+  // Render orphan nodes above the variable boxes, centered between them
+  const orphanStartY = varBoxY - 150; // Position above the variable boxes
+  const orphanStartX =
+    centerBetweenBoxes - (orphanNodes.length * (styles.node.width + 50)) / 2; // Center horizontally
+
+  const orphanNodesArea = renderOrphanNodes(
+    contentGroup,
+    orphanNodes,
+    orphanStartX,
+    orphanStartY,
+    styles,
+    nodePositions
+  );
+
+  // Render variable pointer arrows to node address tags (after orphan nodes are positioned)
   const allConnectionPoints = [...(localVarBoxResult?.connectionPoints || [])];
 
   const centerX = centerBetweenBoxes; // Use the actual center between variable boxes
@@ -548,66 +562,6 @@ export function renderTreeVisualization(
     }
   }
 
-  // Draw connections from variables to orphan nodes
-  if (orphanNodes && orphanNodes.length > 0) {
-    console.log("[BSTree] Checking for connections to orphan nodes...");
-
-    // Check both instance and local variable connection points
-    const allConnectionPoints = [
-      ...(localVarBoxResult?.connectionPoints || []),
-    ];
-
-    allConnectionPoints.forEach((connectionPoint) => {
-      if (connectionPoint && connectionPoint.targetAddress) {
-        // Find if this connection point targets an orphan node
-        const targetOrphan = orphanNodes.find(
-          (orphan) => orphan.address === connectionPoint.targetAddress
-        );
-
-        if (targetOrphan && connectionPoint.sourceCoords) {
-          console.log(
-            `[BSTree] Drawing connection to orphan node ${targetOrphan.address}`
-          );
-
-          const sourceX = connectionPoint.sourceCoords.x;
-          const sourceY = connectionPoint.sourceCoords.y;
-          const targetX = targetOrphan.x;
-          const targetY =
-            targetOrphan.y -
-            (styles.node.headerHeight +
-              styles.node.fieldHeight * 3 +
-              styles.node.fieldSpacing * 2 +
-              styles.node.padding * 2) /
-              2;
-
-          // Validate coordinates
-          if (
-            typeof sourceX === "number" &&
-            typeof sourceY === "number" &&
-            typeof targetX === "number" &&
-            typeof targetY === "number" &&
-            !isNaN(sourceX) &&
-            !isNaN(sourceY) &&
-            !isNaN(targetX) &&
-            !isNaN(targetY)
-          ) {
-            // Create H-V orthogonal path to orphan node
-            const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
-
-            contentGroup
-              .append("path")
-              .attr("d", pathData)
-              .attr("fill", "none")
-              .attr("stroke", "#ef4444") // Red color for orphan connections
-              .attr("stroke-width", styles.connection.strokeWidth)
-              .attr("marker-end", "url(#arrowhead)")
-              .attr("stroke-dasharray", "5,5"); // Dashed line to indicate orphan connection
-          }
-        }
-      }
-    });
-  }
-
   // Draw all connections
   console.log("[BSTree] About to draw connections:", allConnections.length);
   allConnections.forEach((conn, index) => {
@@ -626,20 +580,6 @@ export function renderTreeVisualization(
       console.warn(`[BSTree] Skipping invalid connection ${index}:`, conn);
     }
   });
-
-  // Render orphan nodes above the variable boxes, centered between them
-  const orphanStartY = varBoxY - 150; // Position above the variable boxes
-  const orphanStartX =
-    centerBetweenBoxes - (orphanNodes.length * (styles.node.width + 50)) / 2; // Center horizontally
-
-  const orphanNodesArea = renderOrphanNodes(
-    contentGroup,
-    orphanNodes,
-    orphanStartX,
-    orphanStartY,
-    styles,
-    nodePositions
-  );
 
   return { nodePositions, connections: allConnections, orphanNodesArea };
 }
@@ -1541,7 +1481,7 @@ function renderOrphanNodes(
   };
 }
 
-// Helper function to render variable pointer arrows to node address tags
+// Helper function to render variable pointer arrows
 function renderVariablePointerArrows(
   contentGroup,
   allConnectionPoints,
