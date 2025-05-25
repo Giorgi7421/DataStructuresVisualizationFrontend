@@ -450,6 +450,18 @@ export function renderTreeVisualization(
     // Empty tree - no message displayed, just blank visualization area
   }
 
+  // Render variable pointer arrows to node address tags
+  const allConnectionPoints = [...(localVarBoxResult?.connectionPoints || [])];
+
+  const centerX = centerBetweenBoxes; // Use the actual center between variable boxes
+  renderVariablePointerArrows(
+    contentGroup,
+    allConnectionPoints,
+    nodePositions,
+    styles,
+    centerX
+  );
+
   // Draw connections from instance variables to tree root
   if (rootAddress && treeLayout) {
     console.log("[BSTree] Attempting to draw root connection...");
@@ -542,7 +554,6 @@ export function renderTreeVisualization(
 
     // Check both instance and local variable connection points
     const allConnectionPoints = [
-      ...(instanceVarBoxResult?.connectionPoints || []),
       ...(localVarBoxResult?.connectionPoints || []),
     ];
 
@@ -1528,4 +1539,77 @@ function renderOrphanNodes(
     width: orphanNodes.length * nodeSpacing,
     height: maxHeight, // No longer need extra height for label
   };
+}
+
+// Helper function to render variable pointer arrows to node address tags
+function renderVariablePointerArrows(
+  contentGroup,
+  allConnectionPoints,
+  nodePositions,
+  styles,
+  centerX
+) {
+  console.log("[BSTree] Rendering variable pointer arrows...");
+
+  allConnectionPoints.forEach((connectionPoint) => {
+    if (
+      !connectionPoint ||
+      !connectionPoint.targetAddress ||
+      !connectionPoint.varName
+    ) {
+      return;
+    }
+
+    const targetNodePos = nodePositions[connectionPoint.targetAddress];
+    if (!targetNodePos) {
+      console.warn(
+        `[BSTree] Target node position not found for ${connectionPoint.targetAddress}`
+      );
+      return;
+    }
+
+    // Calculate position of the address tag (header area of the node)
+    const headerCenterX = targetNodePos.x + targetNodePos.width / 2;
+    const headerCenterY = targetNodePos.y + styles.node.headerHeight / 2;
+
+    // Arrow positioning - always from right side to right edge
+    const arrowLength = 40;
+    const arrowY = headerCenterY; // Keep arrow at header center height
+
+    // Always start from right side and connect to right edge
+    const arrowStartX = targetNodePos.x + targetNodePos.width + arrowLength; // Start 40px to the right of node
+    const arrowEndX = targetNodePos.x + targetNodePos.width; // Stop at right edge of node
+
+    const arrowStartY = arrowY;
+    const arrowEndY = arrowY;
+
+    // Draw the arrow line
+    contentGroup
+      .append("line")
+      .attr("x1", arrowStartX)
+      .attr("y1", arrowStartY)
+      .attr("x2", arrowEndX)
+      .attr("y2", arrowEndY)
+      .attr("stroke", "#2563eb") // Blue color for variable pointers
+      .attr("stroke-width", 2)
+      .attr("marker-end", "url(#arrowhead)");
+
+    // Add variable name text above the arrow
+    const textX = arrowStartX;
+    const textY = arrowStartY - 8; // Position above the arrow start
+
+    contentGroup
+      .append("text")
+      .attr("x", textX)
+      .attr("y", textY)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "11px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#2563eb")
+      .text(connectionPoint.varName);
+
+    console.log(
+      `[BSTree] Added pointer arrow for ${connectionPoint.varName} -> ${connectionPoint.targetAddress}`
+    );
+  });
 }
