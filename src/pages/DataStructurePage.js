@@ -33,7 +33,7 @@ import { renderLinkedStructureVisualization } from "../visualizations/LinkedStru
 import { renderDoublyLinkedStructureVisualization } from "../visualizations/DoublyLinkedStructure";
 import { renderGridStructureVisualization } from "../visualizations/GridStructureVisualization";
 import { renderTwoStackEditorBufferVisualization } from "../visualizations/TwoStackEditorBufferVisualization"; // Added import
-import { renderBSTreeVisualization } from "../visualizations/BSTreeVisualization"; // Added import
+import { renderTreeVisualization } from "../visualizations/TreeVisualization"; // Added import
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -1023,7 +1023,7 @@ function DataStructurePage() {
               );
               break;
             case "BS_TREE":
-              renderBSTreeVisualization(
+              renderTreeVisualization(
                 tempGroup,
                 width,
                 height,
@@ -2179,7 +2179,7 @@ function DataStructurePage() {
               );
               break;
             case "BS_TREE":
-              renderBSTreeVisualization(
+              renderTreeVisualization(
                 contentGroup,
                 800,
                 600,

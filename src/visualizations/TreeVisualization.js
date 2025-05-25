@@ -7,7 +7,7 @@ import {
   generateOrthogonalPath,
 } from "../utils/visualizationUtils";
 
-export function renderBSTreeVisualization(
+export function renderTreeVisualization(
   contentGroup,
   width,
   height,
@@ -67,6 +67,13 @@ export function renderBSTreeVisualization(
 
   const treeData = parseTreeStructure(rootAddress, addressObjectMap);
   console.log("[BSTree] Parsed tree data:", treeData);
+
+  // Find orphan nodes (nodes not connected to the main tree)
+  const orphanNodes = findOrphanNodes(rootAddress, addressObjectMap);
+  console.log(
+    "[BSTree] Found orphan nodes:",
+    orphanNodes.map((n) => n.address)
+  );
 
   // Calculate adaptive node size based on tree depth and available space
   const treeDepth = treeData ? getTreeDepth(treeData) : 1;
@@ -529,6 +536,67 @@ export function renderBSTreeVisualization(
     }
   }
 
+  // Draw connections from variables to orphan nodes
+  if (orphanNodes && orphanNodes.length > 0) {
+    console.log("[BSTree] Checking for connections to orphan nodes...");
+
+    // Check both instance and local variable connection points
+    const allConnectionPoints = [
+      ...(instanceVarBoxResult?.connectionPoints || []),
+      ...(localVarBoxResult?.connectionPoints || []),
+    ];
+
+    allConnectionPoints.forEach((connectionPoint) => {
+      if (connectionPoint && connectionPoint.targetAddress) {
+        // Find if this connection point targets an orphan node
+        const targetOrphan = orphanNodes.find(
+          (orphan) => orphan.address === connectionPoint.targetAddress
+        );
+
+        if (targetOrphan && connectionPoint.sourceCoords) {
+          console.log(
+            `[BSTree] Drawing connection to orphan node ${targetOrphan.address}`
+          );
+
+          const sourceX = connectionPoint.sourceCoords.x;
+          const sourceY = connectionPoint.sourceCoords.y;
+          const targetX = targetOrphan.x;
+          const targetY =
+            targetOrphan.y -
+            (styles.node.headerHeight +
+              styles.node.fieldHeight * 3 +
+              styles.node.fieldSpacing * 2 +
+              styles.node.padding * 2) /
+              2;
+
+          // Validate coordinates
+          if (
+            typeof sourceX === "number" &&
+            typeof sourceY === "number" &&
+            typeof targetX === "number" &&
+            typeof targetY === "number" &&
+            !isNaN(sourceX) &&
+            !isNaN(sourceY) &&
+            !isNaN(targetX) &&
+            !isNaN(targetY)
+          ) {
+            // Create H-V orthogonal path to orphan node
+            const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
+
+            contentGroup
+              .append("path")
+              .attr("d", pathData)
+              .attr("fill", "none")
+              .attr("stroke", "#ef4444") // Red color for orphan connections
+              .attr("stroke-width", styles.connection.strokeWidth)
+              .attr("marker-end", "url(#arrowhead)")
+              .attr("stroke-dasharray", "5,5"); // Dashed line to indicate orphan connection
+          }
+        }
+      }
+    });
+  }
+
   // Draw all connections
   console.log("[BSTree] About to draw connections:", allConnections.length);
   allConnections.forEach((conn, index) => {
@@ -548,7 +616,21 @@ export function renderBSTreeVisualization(
     }
   });
 
-  return { nodePositions, connections: allConnections };
+  // Render orphan nodes above the variable boxes, centered between them
+  const orphanStartY = varBoxY - 150; // Position above the variable boxes
+  const orphanStartX =
+    centerBetweenBoxes - (orphanNodes.length * (styles.node.width + 50)) / 2; // Center horizontally
+
+  const orphanNodesArea = renderOrphanNodes(
+    contentGroup,
+    orphanNodes,
+    orphanStartX,
+    orphanStartY,
+    styles,
+    nodePositions
+  );
+
+  return { nodePositions, connections: allConnections, orphanNodesArea };
 }
 
 // Helper function to parse tree structure from addressObjectMap
@@ -1293,4 +1375,157 @@ function validateTreeStructure(rootNode) {
 
   console.log("[BSTree] Tree validation passed");
   return true;
+}
+
+// Helper function to find orphan nodes (nodes not connected to the main tree)
+function findOrphanNodes(rootAddress, addressObjectMap) {
+  const connectedNodes = new Set();
+  const orphanNodes = [];
+
+  // First, collect all nodes that are connected to the main tree
+  function collectConnectedNodes(address) {
+    if (!address || connectedNodes.has(address) || !addressObjectMap[address]) {
+      return;
+    }
+
+    connectedNodes.add(address);
+    const nodeData = addressObjectMap[address];
+
+    // Recursively collect left and right children
+    if (nodeData.left) {
+      collectConnectedNodes(nodeData.left);
+    }
+    if (nodeData.right) {
+      collectConnectedNodes(nodeData.right);
+    }
+  }
+
+  // Collect all nodes connected to the root
+  if (rootAddress) {
+    collectConnectedNodes(rootAddress);
+  }
+
+  // Find orphan nodes - nodes in addressObjectMap but not connected to root
+  Object.keys(addressObjectMap).forEach((address) => {
+    const nodeData = addressObjectMap[address];
+    // Check if this looks like a tree node (has value property and potentially left/right)
+    if (
+      nodeData &&
+      typeof nodeData === "object" &&
+      ("value" in nodeData || "left" in nodeData || "right" in nodeData) &&
+      !connectedNodes.has(address)
+    ) {
+      orphanNodes.push({
+        address: address,
+        ...nodeData,
+        children: [], // Initialize as empty array for consistency
+      });
+    }
+  });
+
+  console.log(
+    "[BSTree] Found orphan nodes:",
+    orphanNodes.map((n) => n.address)
+  );
+  return orphanNodes;
+}
+
+// Helper function to render orphan nodes
+function renderOrphanNodes(
+  contentGroup,
+  orphanNodes,
+  startX,
+  startY,
+  styles,
+  nodePositions
+) {
+  if (!orphanNodes || orphanNodes.length === 0) {
+    return { width: 0, height: 0 };
+  }
+
+  console.log("[BSTree] Rendering orphan nodes:", orphanNodes.length);
+
+  const nodeSpacing = styles.node.width + 50; // Space between orphan nodes
+  const scale = 1; // No scaling for orphan nodes
+  let maxHeight = 0;
+
+  orphanNodes.forEach((node, index) => {
+    const nodeX = startX + index * nodeSpacing;
+    const nodeY = startY;
+
+    // Position the orphan node
+    node.x = nodeX;
+    node.y = nodeY;
+    node.level = 0; // Orphan nodes are at level 0
+
+    console.log(
+      `[BSTree] Positioning orphan node ${node.address} at (${nodeX}, ${nodeY})`
+    );
+
+    // Store position for potential connections
+    nodePositions[node.address] = {
+      x: nodeX,
+      y: nodeY,
+      width: styles.node.width,
+      height:
+        styles.node.headerHeight +
+        styles.node.fieldHeight * 3 +
+        styles.node.fieldSpacing * 2 +
+        styles.node.padding * 2,
+    };
+
+    // Render the orphan node using the same renderGenericNode function
+    try {
+      // Render the node with a different style to indicate it's an orphan
+      const orphanStyles = {
+        ...styles.node,
+        stroke: "#ef4444", // Red border for orphan nodes
+        titleFill: "#fef2f2", // Light red background
+        titleStroke: "#ef4444",
+      };
+
+      // Create nodeSpec in the same format as main tree nodes
+      const nodeSpec = {
+        x: nodeX, // Use direct coordinates (no transform needed)
+        y: nodeY,
+        address: node.address,
+        title: node.address, // Show address in the header
+        fields: {
+          value: node.value, // Add value as a field inside the box
+          left: node.left || "null",
+          right: node.right || "null",
+        },
+        isCurrent: false,
+        isIsolated: false,
+      };
+
+      console.log(`[BSTree] Orphan node spec for ${node.address}:`, nodeSpec);
+
+      renderGenericNode(
+        contentGroup,
+        nodeSpec,
+        orphanStyles,
+        nodePositions,
+        isAddress,
+        truncateAddress
+      );
+
+      const nodeHeight =
+        orphanStyles.headerHeight +
+        orphanStyles.fieldHeight * 3 +
+        orphanStyles.fieldSpacing * 2 +
+        orphanStyles.padding * 2;
+      maxHeight = Math.max(maxHeight, nodeHeight);
+    } catch (error) {
+      console.error(
+        `[BSTree] Error rendering orphan node ${node.address}:`,
+        error
+      );
+    }
+  });
+
+  return {
+    width: orphanNodes.length * nodeSpacing,
+    height: maxHeight, // No longer need extra height for label
+  };
 }
