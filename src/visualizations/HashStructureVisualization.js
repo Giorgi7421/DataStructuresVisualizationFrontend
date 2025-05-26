@@ -256,135 +256,8 @@ export function renderHashStructureVisualization(
   const bucketArrayY =
     leftSectionY +
     instanceVarBoxHeight +
-    40 +
+    80 + // Increased from 40 to move buckets array further down
     (remainingLeftSectionHeight - bucketArrayHeight) / 2;
-
-  // TEMPORARY: Draw layout borders for debugging
-  const debugGroup = contentGroup.append("g").attr("class", "debug-borders");
-
-  // Left section border (red)
-  debugGroup
-    .append("rect")
-    .attr("x", leftSectionX)
-    .attr("y", leftSectionY)
-    .attr("width", leftSectionWidth)
-    .attr("height", leftSectionHeight)
-    .attr("fill", "none")
-    .attr("stroke", "red")
-    .attr("stroke-width", 3)
-    .attr("stroke-dasharray", "10,5");
-
-  // Hash sections area border (blue)
-  debugGroup
-    .append("rect")
-    .attr("x", hashAreaX)
-    .attr("y", hashAreaY)
-    .attr("width", hashAreaWidth)
-    .attr("height", effectiveHashAreaHeight)
-    .attr("fill", "none")
-    .attr("stroke", "blue")
-    .attr("stroke-width", 3)
-    .attr("stroke-dasharray", "10,5");
-
-  // First horizontal section border (orange) - for local variables
-  debugGroup
-    .append("rect")
-    .attr("x", hashAreaX)
-    .attr("y", hashAreaY)
-    .attr("width", hashAreaWidth)
-    .attr("height", sectionHeight)
-    .attr("fill", "none")
-    .attr("stroke", "orange")
-    .attr("stroke-width", 2)
-    .attr("stroke-dasharray", "5,3");
-
-  // Instance variables area border (green)
-  debugGroup
-    .append("rect")
-    .attr("x", instanceVarBoxX - 5)
-    .attr("y", instanceVarBoxY - 5)
-    .attr("width", styles.varBox.width + 10)
-    .attr("height", (instanceVarBoxResult?.height || 80) + 10)
-    .attr("fill", "none")
-    .attr("stroke", "green")
-    .attr("stroke-width", 2);
-
-  // Local variables area border (cyan) - now in hash area
-  debugGroup
-    .append("rect")
-    .attr("x", localVarBoxX - 5)
-    .attr("y", localVarBoxY - 5)
-    .attr("width", styles.varBox.width + 10)
-    .attr("height", (localVarBoxResult?.height || 80) + 10)
-    .attr("fill", "none")
-    .attr("stroke", "cyan")
-    .attr("stroke-width", 2);
-
-  // Buckets array area border (purple)
-  debugGroup
-    .append("rect")
-    .attr("x", bucketArrayX - 5)
-    .attr("y", bucketArrayY - 5)
-    .attr("width", styles.bucketArray.width + 10)
-    .attr("height", bucketArrayHeight + 10)
-    .attr("fill", "none")
-    .attr("stroke", "purple")
-    .attr("stroke-width", 2);
-
-  // Add labels for each section
-  debugGroup
-    .append("text")
-    .attr("x", leftSectionX + 5)
-    .attr("y", leftSectionY + 15)
-    .attr("font-size", "12px")
-    .attr("font-weight", "bold")
-    .attr("fill", "red")
-    .text("LEFT SECTION");
-
-  debugGroup
-    .append("text")
-    .attr("x", hashAreaX + 5)
-    .attr("y", hashAreaY + 15)
-    .attr("font-size", "12px")
-    .attr("font-weight", "bold")
-    .attr("fill", "blue")
-    .text("HASH SECTIONS AREA");
-
-  debugGroup
-    .append("text")
-    .attr("x", hashAreaX + 5)
-    .attr("y", hashAreaY + 35)
-    .attr("font-size", "10px")
-    .attr("font-weight", "bold")
-    .attr("fill", "orange")
-    .text("SECTION 0 (Local Vars)");
-
-  debugGroup
-    .append("text")
-    .attr("x", instanceVarBoxX)
-    .attr("y", instanceVarBoxY - 8)
-    .attr("font-size", "10px")
-    .attr("font-weight", "bold")
-    .attr("fill", "green")
-    .text("INSTANCE VARS");
-
-  debugGroup
-    .append("text")
-    .attr("x", localVarBoxX)
-    .attr("y", localVarBoxY - 8)
-    .attr("font-size", "10px")
-    .attr("font-weight", "bold")
-    .attr("fill", "cyan")
-    .text("LOCAL VARS");
-
-  debugGroup
-    .append("text")
-    .attr("x", bucketArrayX)
-    .attr("y", bucketArrayY - 8)
-    .attr("font-size", "10px")
-    .attr("font-weight", "bold")
-    .attr("fill", "purple")
-    .text("BUCKETS ARRAY");
 
   // Render buckets array directly in the left section at the calculated position
   if (hashData && hashData.buckets) {
@@ -449,20 +322,34 @@ export function renderHashStructureVisualization(
         .attr("fill", styles.bucketArray.bucketFill)
         .attr("stroke", styles.bucketArray.bucketStroke);
 
-      // Bucket index
+      // Bucket index (left side)
       bucketArrayGroup
         .append("text")
-        .attr("x", bucketArrayX + 20)
+        .attr("x", bucketArrayX + 15)
         .attr("y", bucketY + styles.bucketArray.bucketHeight / 2 + 4)
         .attr("font-size", styles.bucketArray.fontSize)
         .attr("fill", styles.bucketArray.indexTextFill)
         .text(bucket.index);
 
-      // Bucket pointer indicator
+      // Bucket value/address (center)
+      const bucketValue = bucket.address || "null";
+      const displayValue =
+        bucketValue === "null" ? "null" : truncateAddress(bucketValue);
+
+      bucketArrayGroup
+        .append("text")
+        .attr("x", bucketArrayX + styles.bucketArray.width / 2)
+        .attr("y", bucketY + styles.bucketArray.bucketHeight / 2 + 4)
+        .attr("text-anchor", "middle")
+        .attr("font-size", styles.bucketArray.fontSize)
+        .attr("fill", bucketValue === "null" ? "#64748b" : "#0ea5e9")
+        .text(displayValue);
+
+      // Bucket pointer indicator (right side)
       if (bucket.chain) {
         bucketArrayGroup
           .append("circle")
-          .attr("cx", bucketArrayX + styles.bucketArray.width - 20)
+          .attr("cx", bucketArrayX + styles.bucketArray.width - 15)
           .attr("cy", bucketY + styles.bucketArray.bucketHeight / 2)
           .attr("r", 3)
           .attr("fill", styles.connection.color);
@@ -733,18 +620,6 @@ function renderHashStructure(
     const sectionX = sectionsStartX;
     const sectionY = sectionsStartY + bucketSectionIndex * sectionHeight;
 
-    // Draw horizontal section divider (except for the last one)
-    if (bucketSectionIndex < totalSections - 1) {
-      contentGroup
-        .append("line")
-        .attr("x1", sectionX)
-        .attr("y1", sectionY + sectionHeight)
-        .attr("x2", sectionX + sectionsAreaWidth)
-        .attr("y2", sectionY + sectionHeight)
-        .attr("stroke", "#e2e8f0")
-        .attr("stroke-width", 2);
-    }
-
     // Render horizontal chain if it exists
     if (bucket.chain) {
       // Calculate the actual total node height including all components
@@ -783,12 +658,36 @@ function renderHashStructure(
         const targetY =
           nodePositions[firstNode.address].y + styles.node.headerHeight / 2;
 
+        // Calculate variable horizontal distance based on bucket index
+        // Start with larger distance for top buckets, decrease as we go down
+        const baseDistance = 120; // Base distance for bucket 0
+        const distanceReduction = 15; // Reduce distance by this amount per bucket
+        const minDistance = 40; // Minimum distance to maintain
+        const horizontalDistance = Math.max(
+          minDistance,
+          baseDistance - bucket.index * distanceReduction
+        );
+
+        // Create H-V-H path with rounded corners
+        const midX = sourceX + horizontalDistance;
+        const cornerRadius = 8;
+
+        // Calculate path with rounded corners
+        const pathData = `M ${sourceX} ${sourceY} 
+                         L ${midX - cornerRadius} ${sourceY} 
+                         Q ${midX} ${sourceY} ${midX} ${
+          sourceY + (sourceY < targetY ? cornerRadius : -cornerRadius)
+        }
+                         L ${midX} ${
+          targetY + (sourceY < targetY ? -cornerRadius : cornerRadius)
+        }
+                         Q ${midX} ${targetY} ${midX + cornerRadius} ${targetY}
+                         L ${targetX} ${targetY}`;
+
         contentGroup
-          .append("line")
-          .attr("x1", sourceX)
-          .attr("y1", sourceY)
-          .attr("x2", targetX)
-          .attr("y2", targetY)
+          .append("path")
+          .attr("d", pathData)
+          .attr("fill", "none")
           .attr("stroke", styles.connection.color)
           .attr("stroke-width", styles.connection.strokeWidth)
           .attr("marker-end", "url(#arrowhead)");
