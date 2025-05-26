@@ -474,6 +474,7 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
   // Parse bucket array and chains
   const buckets = [];
   const actualBucketCount = bucketCount || Object.keys(bucketsData).length;
+  const chainedNodeAddresses = new Set(); // Track all nodes that are part of chains
 
   console.log(`[HashStructure] Processing ${actualBucketCount} buckets`);
   console.log(`[HashStructure] Buckets data:`, bucketsData);
@@ -488,6 +489,13 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
 
     console.log(`[HashStructure] Bucket ${i}: chain = `, chain);
 
+    // Track all addresses in this chain
+    if (chain) {
+      chain.forEach((node) => {
+        chainedNodeAddresses.add(node.address);
+      });
+    }
+
     buckets.push({
       index: i,
       address: bucketAddress,
@@ -495,13 +503,80 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
     });
   }
 
+  // Find orphan nodes - nodes that exist in addressObjectMap but are not in any chain
+  const orphanNodes = findOrphanNodes(
+    addressObjectMap,
+    chainedNodeAddresses,
+    bucketsAddress
+  );
+
   console.log(`[HashStructure] Final parsed buckets:`, buckets);
+  console.log(`[HashStructure] Found orphan nodes:`, orphanNodes);
 
   return {
     bucketsAddress,
     buckets,
     bucketCount: actualBucketCount,
+    orphanNodes,
   };
+}
+
+// Helper function to find orphan nodes
+function findOrphanNodes(
+  addressObjectMap,
+  chainedNodeAddresses,
+  bucketsAddress
+) {
+  const orphanNodes = [];
+
+  console.log("[HashStructure] Finding orphan nodes...");
+  console.log(
+    "[HashStructure] Chained node addresses:",
+    Array.from(chainedNodeAddresses)
+  );
+  console.log("[HashStructure] Buckets address to exclude:", bucketsAddress);
+
+  // Check each address in the addressObjectMap
+  for (const [address, nodeData] of Object.entries(addressObjectMap)) {
+    // Skip if this is the buckets array itself
+    if (address === bucketsAddress) {
+      continue;
+    }
+
+    // Skip if this address is already part of a chain
+    if (chainedNodeAddresses.has(address)) {
+      continue;
+    }
+
+    // Skip if this doesn't look like a node (e.g., arrays)
+    if (Array.isArray(nodeData)) {
+      continue;
+    }
+
+    // Check if this looks like a hash node (has key/value or similar structure)
+    if (nodeData && typeof nodeData === "object") {
+      const hasNodeLikeStructure =
+        nodeData.hasOwnProperty("key") ||
+        nodeData.hasOwnProperty("value") ||
+        nodeData.hasOwnProperty("data") ||
+        nodeData.hasOwnProperty("linkAddress") ||
+        nodeData.hasOwnProperty("nextAddress") ||
+        nodeData.hasOwnProperty("next");
+
+      if (hasNodeLikeStructure) {
+        console.log(`[HashStructure] Found orphan node: ${address}`, nodeData);
+        orphanNodes.push({
+          address: address,
+          ...nodeData,
+        });
+      }
+    }
+  }
+
+  console.log(
+    `[HashStructure] Total orphan nodes found: ${orphanNodes.length}`
+  );
+  return orphanNodes;
 }
 
 // Helper function to parse a chain of nodes
@@ -612,6 +687,48 @@ function renderHashStructure(
     sectionsAreaWidth,
     extension: sectionsAreaWidth - availableWidth,
   });
+
+  // Render orphan nodes in the local variables section (section 0) if they exist
+  if (hashData.orphanNodes && hashData.orphanNodes.length > 0) {
+    console.log(
+      "[HashStructure] Rendering orphan nodes in local variables section..."
+    );
+
+    // Calculate position for orphan nodes in section 0 (local variables section)
+    const localVarSectionY = sectionsStartY;
+
+    // Position orphan nodes to the right of the local variables box
+    // Start after the local variables box with some spacing
+    const orphanNodesStartX = sectionsStartX + 400; // Start after local variables box
+
+    // Calculate the actual total node height including all components
+    const fieldCount = 3;
+    const fieldsAreaHeight =
+      fieldCount * styles.node.fieldHeight +
+      (fieldCount - 1) * styles.node.fieldSpacing;
+    const actualNodeHeight =
+      styles.node.headerHeight + styles.node.padding * 2 + fieldsAreaHeight;
+
+    // Center orphan nodes vertically in the local variables section
+    const orphanNodesY =
+      localVarSectionY + sectionHeight / 2 - actualNodeHeight / 2;
+
+    renderHorizontalChain(
+      contentGroup,
+      hashData.orphanNodes,
+      orphanNodesStartX,
+      orphanNodesY,
+      nodeWidth,
+      nodeSpacing,
+      styles,
+      nodePositions,
+      sectionsAreaWidth
+    );
+
+    console.log(
+      `[HashStructure] Rendered ${hashData.orphanNodes.length} orphan nodes in local variables section`
+    );
+  }
 
   // Render horizontal sections and node chains (buckets array is rendered separately in main layout)
   hashData.buckets.forEach((bucket, index) => {
@@ -759,8 +876,8 @@ function renderHorizontalChain(
       address: node.address,
       title: node.address,
       fields: {
-        key: node.key || node.data || "N/A",
-        value: node.value || "N/A",
+        key: node.key || node.data || "null",
+        value: node.value || "null",
         linkAddress:
           node.linkAddress || node.nextAddress || node.next || "null",
       },
