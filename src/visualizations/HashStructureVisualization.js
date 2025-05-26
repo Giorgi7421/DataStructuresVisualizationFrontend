@@ -212,8 +212,7 @@ export function renderHashStructureVisualization(
 
   // Position local variables box in the top horizontal section (section 0)
   const localVarBoxX = hashAreaX + 30;
-  const localVarBoxY =
-    hashAreaY + sectionHeight / 2 - styles.varBox.headerHeight / 2;
+  const localVarBoxY = instanceVarBoxY; // Align top with instance variables box
 
   let localVarBoxResult;
   try {
