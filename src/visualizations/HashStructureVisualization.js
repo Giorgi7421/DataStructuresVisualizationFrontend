@@ -633,7 +633,7 @@ function renderHashStructure(
       renderHorizontalChain(
         contentGroup,
         bucket.chain,
-        sectionX + 100,
+        sectionX + 200,
         sectionY + sectionHeight / 2 - actualNodeHeight / 2,
         nodeWidth,
         nodeSpacing,
@@ -660,9 +660,9 @@ function renderHashStructure(
 
         // Calculate variable horizontal distance based on bucket index
         // Start with larger distance for top buckets, decrease as we go down
-        const baseDistance = 120; // Base distance for bucket 0
+        const baseDistance = 200; // Base distance for bucket 0
         const distanceReduction = 15; // Reduce distance by this amount per bucket
-        const minDistance = 40; // Minimum distance to maintain
+        const minDistance = 20; // Minimum distance to maintain
         const horizontalDistance = Math.max(
           minDistance,
           baseDistance - bucket.index * distanceReduction
