@@ -373,7 +373,8 @@ export function renderHashStructureVisualization(
         totalSections,
         sectionHeight,
         styles,
-        nodePositions
+        nodePositions,
+        instanceVarBoxY
       );
 
       // Draw connections from variables to hash structure
@@ -667,7 +668,8 @@ function renderHashStructure(
   totalSections,
   sectionHeight,
   styles,
-  nodePositions
+  nodePositions,
+  variableBoxY
 ) {
   const nodeWidth = styles.node.width;
   const nodeSpacing = 30; // Reduced from 60 to position nodes closer together
@@ -708,9 +710,8 @@ function renderHashStructure(
     const actualNodeHeight =
       styles.node.headerHeight + styles.node.padding * 2 + fieldsAreaHeight;
 
-    // Center orphan nodes vertically in the local variables section
-    const orphanNodesY =
-      localVarSectionY + sectionHeight / 2 - actualNodeHeight / 2;
+    // Align orphan nodes' top edge with the variable boxes' top edge
+    const orphanNodesY = variableBoxY;
 
     renderHorizontalChain(
       contentGroup,
@@ -1012,27 +1013,80 @@ function drawVariableConnections(
 
   // Draw connections from local variables to specific nodes
   if (localVarBoxResult?.connectionPoints) {
+    console.log(
+      "[HashStructure] Processing local variable connections:",
+      localVarBoxResult.connectionPoints
+    );
+    console.log(
+      "[HashStructure] Available node positions:",
+      Object.keys(nodePositions)
+    );
+
     localVarBoxResult.connectionPoints.forEach((connectionPoint) => {
+      console.log(
+        "[HashStructure] Processing connection point:",
+        connectionPoint
+      );
+
       if (
         connectionPoint.targetAddress &&
         nodePositions[connectionPoint.targetAddress]
       ) {
-        const sourceX = connectionPoint.sourceCoords.x;
-        const sourceY = connectionPoint.sourceCoords.y;
-        const targetPos = nodePositions[connectionPoint.targetAddress];
-        const targetX = targetPos.x;
-        const targetY = targetPos.y + styles.node.headerHeight / 2;
+        console.log(
+          `[HashStructure] Found target node for address ${connectionPoint.targetAddress}`
+        );
 
-        // Create orthogonal path
-        const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
+        const targetPos = nodePositions[connectionPoint.targetAddress];
+
+        // Position arrow to touch the right edge of the address tag
+        const arrowLength = 80; // Increased arrow length for maximum visibility
+        const arrowEndX = targetPos.x + targetPos.width; // Touch the right edge exactly (no gap)
+        const arrowStartX = arrowEndX + arrowLength; // Start further to the right
+        const arrowY = targetPos.y + styles.node.headerHeight / 2; // Centered on address tag
+
+        console.log(
+          `[HashStructure] Drawing arrow indicator touching right edge at (${arrowStartX}, ${arrowY}) to (${arrowEndX}, ${arrowY}) for node ${connectionPoint.targetAddress}`
+        );
+
+        // Draw horizontal line approaching from the right toward the left
+        contentGroup
+          .append("line")
+          .attr("x1", arrowStartX)
+          .attr("y1", arrowY)
+          .attr("x2", arrowEndX)
+          .attr("y2", arrowY)
+          .attr("stroke", "#2563eb")
+          .attr("stroke-width", 2);
+
+        // Draw arrowhead pointing left (toward the node)
+        const arrowheadSize = 5;
+        contentGroup
+          .append("polygon")
+          .attr(
+            "points",
+            `${arrowEndX},${arrowY} ${arrowEndX + arrowheadSize},${
+              arrowY - arrowheadSize / 2
+            } ${arrowEndX + arrowheadSize},${arrowY + arrowheadSize / 2}`
+          )
+          .attr("fill", "#2563eb");
+
+        // Add text label above the arrow showing the variable name
+        const textY = arrowY - 8; // 8px above the arrow
+        const textX = arrowStartX - arrowLength / 2; // Centered on the arrow
 
         contentGroup
-          .append("path")
-          .attr("d", pathData)
-          .attr("fill", "none")
-          .attr("stroke", "#2563eb")
-          .attr("stroke-width", styles.connection.strokeWidth)
-          .attr("marker-end", "url(#arrowhead)");
+          .append("text")
+          .attr("x", textX)
+          .attr("y", textY)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "10px")
+          .attr("font-weight", "bold")
+          .attr("fill", "#2563eb")
+          .text(connectionPoint.varName);
+      } else {
+        console.log(
+          `[HashStructure] No target node found for address ${connectionPoint.targetAddress}`
+        );
       }
     });
   }
