@@ -571,11 +571,22 @@ function drawVariableConnections(
       const sourceX = bucketsConnectionPoint.sourceCoords.x;
       const sourceY = bucketsConnectionPoint.sourceCoords.y;
       const targetX = nodePositions["buckets"].x;
-      const targetY =
-        nodePositions["buckets"].y + styles.bucketArray.headerHeight / 2;
+      const targetY = nodePositions["buckets"].y; // Top edge of the buckets array
 
-      // Create orthogonal path
-      const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
+      // Create 5-segment path
+      const horizontalExtension = 20; // 1st part: go right
+      const verticalDrop = 40; // 2nd part: go down
+      const bucketArrayRightEdge =
+        nodePositions["buckets"].x + nodePositions["buckets"].width;
+      const additionalLeftDistance = 20; // 4th part: go a bit further left
+
+      const extendedX = sourceX + horizontalExtension;
+      const dropY = sourceY + verticalDrop;
+      const rightEdgeX = bucketArrayRightEdge; // 3rd part: reach right edge
+      const finalLeftX = bucketArrayRightEdge - additionalLeftDistance; // 4th part: go further left
+
+      // Create 5-segment path: start -> right -> down -> left to right edge -> further left -> down to target
+      const pathData = `M ${sourceX} ${sourceY} L ${extendedX} ${sourceY} L ${extendedX} ${dropY} L ${rightEdgeX} ${dropY} L ${finalLeftX} ${dropY} L ${finalLeftX} ${targetY}`;
 
       contentGroup
         .append("path")
