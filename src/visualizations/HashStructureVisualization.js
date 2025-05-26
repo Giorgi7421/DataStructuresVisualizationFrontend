@@ -909,9 +909,21 @@ function renderHorizontalChain(
       const targetX = nextNodeX; // Left edge of next node
       const targetY = nodeY + styles.node.headerHeight / 2; // Address tag position
 
-      // Create H-V-H path (horizontal-vertical-horizontal)
+      // Create H-V-H path with rounded corners (horizontal-vertical-horizontal)
       const midX = sourceX + (targetX - sourceX) / 2;
-      const pathData = `M ${sourceX} ${sourceY} L ${midX} ${sourceY} L ${midX} ${targetY} L ${targetX} ${targetY}`;
+      const cornerRadius = 8; // Radius for rounded corners
+
+      // Calculate path with rounded corners
+      const pathData = `M ${sourceX} ${sourceY} 
+                       L ${midX - cornerRadius} ${sourceY} 
+                       Q ${midX} ${sourceY} ${midX} ${
+        sourceY + (sourceY < targetY ? cornerRadius : -cornerRadius)
+      }
+                       L ${midX} ${
+        targetY + (sourceY < targetY ? -cornerRadius : cornerRadius)
+      }
+                       Q ${midX} ${targetY} ${midX + cornerRadius} ${targetY}
+                       L ${targetX} ${targetY}`;
 
       console.log(
         `[HashStructure] renderHorizontalChain: Drawing H-V-H connection from node ${index} to node ${
