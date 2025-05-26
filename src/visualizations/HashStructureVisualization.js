@@ -122,11 +122,18 @@ export function renderHashStructureVisualization(
   // Define arrowheads
   defineArrowheads(contentGroup, styles.connection.arrowSize);
 
-  // Position calculations
-  const varBoxY = 20;
-  const varBoxSpacing = 40;
-  const instanceVarBoxX = 30;
-  const localVarBoxX = instanceVarBoxX + styles.varBox.width + varBoxSpacing;
+  // Position calculations - create a left section that covers full Y-axis and maximize space usage
+  const leftSectionX = 10; // Minimal margin from left edge
+  const leftSectionY = 10; // Minimal margin from top
+  const leftSectionWidth = Math.max(
+    styles.varBox.width + 20, // Width for instance variables box plus padding
+    styles.bucketArray.width + 20
+  ); // Width for bucket array, whichever is larger
+  const leftSectionHeight = height - 20; // Cover entire Y-axis minus minimal padding
+
+  // Position instance variables at top left of left section
+  const instanceVarBoxX = leftSectionX;
+  const instanceVarBoxY = leftSectionY;
 
   // Render instance variables box
   let instanceVarBoxResult;
@@ -136,7 +143,7 @@ export function renderHashStructureVisualization(
       "Instance Variables",
       instanceVariables,
       instanceVarBoxX,
-      varBoxY,
+      instanceVarBoxY,
       styles.varBox,
       "instance",
       isAddress
@@ -153,7 +160,33 @@ export function renderHashStructureVisualization(
     instanceVarBoxResult = { height: 80, connectionPoints: [] };
   }
 
-  // Render local variables box
+  // Calculate hash structure area position - maximize remaining space
+  const hashAreaY = leftSectionY; // Start from same Y as left section
+  const hashAreaX = leftSectionX + leftSectionWidth + 10; // Minimal gap after left section
+  const hashAreaWidth = width - hashAreaX - 10; // Use almost all remaining width to right edge
+  const hashAreaHeight = leftSectionHeight; // Same height as left section (full height)
+
+  // Calculate number of horizontal sections needed (1 for local vars + number of buckets)
+  const totalSections =
+    hashData && hashData.buckets ? hashData.buckets.length + 1 : 2;
+
+  // Calculate minimum section height needed for nodes with padding
+  const minSectionHeight =
+    styles.node.headerHeight + styles.node.fieldHeight * 3 + 40; // Node height + padding
+  const calculatedTotalHeight = totalSections * minSectionHeight;
+
+  // Use the larger of calculated height or available height
+  const effectiveHashAreaHeight = Math.max(
+    hashAreaHeight,
+    calculatedTotalHeight
+  );
+  const sectionHeight = effectiveHashAreaHeight / totalSections;
+
+  // Position local variables box in the top horizontal section (section 0)
+  const localVarBoxX = hashAreaX + 20; // Some padding from left edge of hash area
+  const localVarBoxY =
+    hashAreaY + sectionHeight / 2 - styles.varBox.headerHeight / 2; // Center vertically in top section
+
   let localVarBoxResult;
   try {
     localVarBoxResult = renderVariableBox(
@@ -161,7 +194,7 @@ export function renderHashStructureVisualization(
       "Local Variables",
       localVariables,
       localVarBoxX,
-      varBoxY,
+      localVarBoxY,
       styles.varBox,
       "local",
       isAddress
@@ -178,17 +211,236 @@ export function renderHashStructureVisualization(
     localVarBoxResult = { height: 80, connectionPoints: [] };
   }
 
-  // Calculate hash structure area position
-  const hashAreaY =
-    varBoxY +
-    Math.max(
-      instanceVarBoxResult?.height || 80,
-      localVarBoxResult?.height || 80
-    ) +
-    60;
+  // Calculate buckets array positioning - position it below the instance variables in the left section
+  const instanceVarBoxHeight = instanceVarBoxResult?.height || 80;
+  const remainingLeftSectionHeight =
+    leftSectionHeight - instanceVarBoxHeight - 40; // Remaining space after instance variables and spacing
+  const bucketArrayHeight =
+    hashData && hashData.buckets
+      ? styles.bucketArray.headerHeight +
+        hashData.buckets.length * styles.bucketArray.bucketHeight +
+        styles.bucketArray.padding * 2
+      : 100;
 
-  const hashAreaX = 50;
-  const hashAreaWidth = width - hashAreaX - 50;
+  // Position buckets array below instance variables, centered horizontally in left section
+  const bucketArrayX =
+    leftSectionX + (leftSectionWidth - styles.bucketArray.width) / 2; // Center horizontally in left section
+  const bucketArrayY =
+    leftSectionY +
+    instanceVarBoxHeight +
+    40 +
+    (remainingLeftSectionHeight - bucketArrayHeight) / 2; // Below instance variables, centered vertically in remaining space
+
+  // TEMPORARY: Draw layout borders for debugging
+  const debugGroup = contentGroup.append("g").attr("class", "debug-borders");
+
+  // Left section border (red)
+  debugGroup
+    .append("rect")
+    .attr("x", leftSectionX)
+    .attr("y", leftSectionY)
+    .attr("width", leftSectionWidth)
+    .attr("height", leftSectionHeight)
+    .attr("fill", "none")
+    .attr("stroke", "red")
+    .attr("stroke-width", 3)
+    .attr("stroke-dasharray", "10,5");
+
+  // Hash sections area border (blue)
+  debugGroup
+    .append("rect")
+    .attr("x", hashAreaX)
+    .attr("y", hashAreaY)
+    .attr("width", hashAreaWidth)
+    .attr("height", effectiveHashAreaHeight)
+    .attr("fill", "none")
+    .attr("stroke", "blue")
+    .attr("stroke-width", 3)
+    .attr("stroke-dasharray", "10,5");
+
+  // First horizontal section border (orange) - for local variables
+  debugGroup
+    .append("rect")
+    .attr("x", hashAreaX)
+    .attr("y", hashAreaY)
+    .attr("width", hashAreaWidth)
+    .attr("height", sectionHeight)
+    .attr("fill", "none")
+    .attr("stroke", "orange")
+    .attr("stroke-width", 2)
+    .attr("stroke-dasharray", "5,3");
+
+  // Instance variables area border (green)
+  debugGroup
+    .append("rect")
+    .attr("x", instanceVarBoxX - 5)
+    .attr("y", instanceVarBoxY - 5)
+    .attr("width", styles.varBox.width + 10)
+    .attr("height", (instanceVarBoxResult?.height || 80) + 10)
+    .attr("fill", "none")
+    .attr("stroke", "green")
+    .attr("stroke-width", 2);
+
+  // Local variables area border (cyan) - now in hash area
+  debugGroup
+    .append("rect")
+    .attr("x", localVarBoxX - 5)
+    .attr("y", localVarBoxY - 5)
+    .attr("width", styles.varBox.width + 10)
+    .attr("height", (localVarBoxResult?.height || 80) + 10)
+    .attr("fill", "none")
+    .attr("stroke", "cyan")
+    .attr("stroke-width", 2);
+
+  // Buckets array area border (purple)
+  debugGroup
+    .append("rect")
+    .attr("x", bucketArrayX - 5)
+    .attr("y", bucketArrayY - 5)
+    .attr("width", styles.bucketArray.width + 10)
+    .attr("height", bucketArrayHeight + 10)
+    .attr("fill", "none")
+    .attr("stroke", "purple")
+    .attr("stroke-width", 2);
+
+  // Add labels for each section
+  debugGroup
+    .append("text")
+    .attr("x", leftSectionX + 5)
+    .attr("y", leftSectionY + 15)
+    .attr("font-size", "12px")
+    .attr("font-weight", "bold")
+    .attr("fill", "red")
+    .text("LEFT SECTION");
+
+  debugGroup
+    .append("text")
+    .attr("x", hashAreaX + 5)
+    .attr("y", hashAreaY + 15)
+    .attr("font-size", "12px")
+    .attr("font-weight", "bold")
+    .attr("fill", "blue")
+    .text("HASH SECTIONS AREA");
+
+  debugGroup
+    .append("text")
+    .attr("x", hashAreaX + 5)
+    .attr("y", hashAreaY + 35)
+    .attr("font-size", "10px")
+    .attr("font-weight", "bold")
+    .attr("fill", "orange")
+    .text("SECTION 0 (Local Vars)");
+
+  debugGroup
+    .append("text")
+    .attr("x", instanceVarBoxX)
+    .attr("y", instanceVarBoxY - 8)
+    .attr("font-size", "10px")
+    .attr("font-weight", "bold")
+    .attr("fill", "green")
+    .text("INSTANCE VARS");
+
+  debugGroup
+    .append("text")
+    .attr("x", localVarBoxX)
+    .attr("y", localVarBoxY - 8)
+    .attr("font-size", "10px")
+    .attr("font-weight", "bold")
+    .attr("fill", "cyan")
+    .text("LOCAL VARS");
+
+  debugGroup
+    .append("text")
+    .attr("x", bucketArrayX)
+    .attr("y", bucketArrayY - 8)
+    .attr("font-size", "10px")
+    .attr("font-weight", "bold")
+    .attr("fill", "purple")
+    .text("BUCKETS ARRAY");
+
+  // Render buckets array directly in the left section at the calculated position
+  if (hashData && hashData.buckets) {
+    const bucketArrayGroup = contentGroup
+      .append("g")
+      .attr("class", "bucket-array");
+
+    // Bucket array background
+    bucketArrayGroup
+      .append("rect")
+      .attr("x", bucketArrayX)
+      .attr("y", bucketArrayY)
+      .attr("width", styles.bucketArray.width)
+      .attr("height", bucketArrayHeight)
+      .attr("fill", styles.bucketArray.fill)
+      .attr("stroke", styles.bucketArray.stroke)
+      .attr("stroke-width", 2);
+
+    // Bucket array header
+    bucketArrayGroup
+      .append("rect")
+      .attr("x", bucketArrayX)
+      .attr("y", bucketArrayY)
+      .attr("width", styles.bucketArray.width)
+      .attr("height", styles.bucketArray.headerHeight)
+      .attr("fill", styles.bucketArray.titleFill)
+      .attr("stroke", styles.bucketArray.titleStroke);
+
+    bucketArrayGroup
+      .append("text")
+      .attr("x", bucketArrayX + styles.bucketArray.width / 2)
+      .attr("y", bucketArrayY + styles.bucketArray.headerHeight / 2 + 4)
+      .attr("text-anchor", "middle")
+      .attr("font-size", styles.bucketArray.titleFontSize)
+      .attr("font-weight", "bold")
+      .attr("fill", styles.bucketArray.titleTextFill)
+      .text("buckets");
+
+    // Store bucket array position
+    nodePositions["buckets"] = {
+      x: bucketArrayX,
+      y: bucketArrayY,
+      width: styles.bucketArray.width,
+      height: bucketArrayHeight,
+    };
+
+    // Render individual bucket cells
+    hashData.buckets.forEach((bucket, index) => {
+      const bucketY =
+        bucketArrayY +
+        styles.bucketArray.headerHeight +
+        styles.bucketArray.padding +
+        index * styles.bucketArray.bucketHeight;
+
+      // Render bucket cell
+      bucketArrayGroup
+        .append("rect")
+        .attr("x", bucketArrayX + 5)
+        .attr("y", bucketY)
+        .attr("width", styles.bucketArray.width - 10)
+        .attr("height", styles.bucketArray.bucketHeight - 2)
+        .attr("fill", styles.bucketArray.bucketFill)
+        .attr("stroke", styles.bucketArray.bucketStroke);
+
+      // Bucket index
+      bucketArrayGroup
+        .append("text")
+        .attr("x", bucketArrayX + 20)
+        .attr("y", bucketY + styles.bucketArray.bucketHeight / 2 + 4)
+        .attr("font-size", styles.bucketArray.fontSize)
+        .attr("fill", styles.bucketArray.indexTextFill)
+        .text(bucket.index);
+
+      // Bucket pointer indicator
+      if (bucket.chain) {
+        bucketArrayGroup
+          .append("circle")
+          .attr("cx", bucketArrayX + styles.bucketArray.width - 20)
+          .attr("cy", bucketY + styles.bucketArray.bucketHeight / 2)
+          .attr("r", 3)
+          .attr("fill", styles.connection.color);
+      }
+    });
+  }
 
   // Render hash structure if data exists
   if (hashData && hashData.buckets) {
@@ -201,6 +453,11 @@ export function renderHashStructureVisualization(
         hashAreaX,
         hashAreaY,
         hashAreaWidth,
+        effectiveHashAreaHeight,
+        bucketArrayX,
+        bucketArrayY,
+        totalSections,
+        sectionHeight,
         styles,
         nodePositions
       );
@@ -361,109 +618,57 @@ function renderHashStructure(
   startX,
   startY,
   availableWidth,
+  availableHeight,
+  bucketArrayX,
+  bucketArrayY,
+  totalSections,
+  sectionHeight,
   styles,
   nodePositions
 ) {
-  const bucketArrayWidth = styles.bucketArray.width;
-  const bucketHeight = styles.bucketArray.bucketHeight;
   const nodeWidth = styles.node.width;
   const nodeSpacing = 20;
-  const chainSpacing = 60;
 
-  // Calculate bucket array height
-  const bucketArrayHeight =
-    styles.bucketArray.headerHeight +
-    hashData.buckets.length * bucketHeight +
-    styles.bucketArray.padding * 2;
+  // Calculate horizontal sections area - use full available width and height
+  const sectionsStartX = startX; // Start at the beginning of hash area
+  const sectionsStartY = startY; // Start at the beginning of hash area
+  const sectionsAreaWidth = availableWidth; // Use full available width
+  const sectionsAreaHeight = availableHeight; // Use full available height
 
-  // Render bucket array container
-  const bucketArrayGroup = contentGroup
-    .append("g")
-    .attr("class", "bucket-array");
-
-  // Bucket array background
-  bucketArrayGroup
-    .append("rect")
-    .attr("x", startX)
-    .attr("y", startY)
-    .attr("width", bucketArrayWidth)
-    .attr("height", bucketArrayHeight)
-    .attr("fill", styles.bucketArray.fill)
-    .attr("stroke", styles.bucketArray.stroke)
-    .attr("stroke-width", 2);
-
-  // Bucket array header
-  bucketArrayGroup
-    .append("rect")
-    .attr("x", startX)
-    .attr("y", startY)
-    .attr("width", bucketArrayWidth)
-    .attr("height", styles.bucketArray.headerHeight)
-    .attr("fill", styles.bucketArray.titleFill)
-    .attr("stroke", styles.bucketArray.titleStroke);
-
-  bucketArrayGroup
-    .append("text")
-    .attr("x", startX + bucketArrayWidth / 2)
-    .attr("y", startY + styles.bucketArray.headerHeight / 2 + 4)
-    .attr("text-anchor", "middle")
-    .attr("font-size", styles.bucketArray.titleFontSize)
-    .attr("font-weight", "bold")
-    .attr("fill", styles.bucketArray.titleTextFill)
-    .text("buckets");
-
-  // Store bucket array position
-  nodePositions["buckets"] = {
-    x: startX,
-    y: startY,
-    width: bucketArrayWidth,
-    height: bucketArrayHeight,
-  };
-
-  // Render individual buckets and chains
+  // Render horizontal sections and node chains (buckets array is rendered separately in main layout)
   hashData.buckets.forEach((bucket, index) => {
-    const bucketY =
-      startY +
-      styles.bucketArray.headerHeight +
-      styles.bucketArray.padding +
-      index * bucketHeight;
+    // Calculate horizontal section for this bucket (section 0 is for local variables, so buckets start from section 1)
+    const bucketSectionIndex = bucket.index + 1; // Offset by 1 since section 0 is for local variables
+    const sectionX = sectionsStartX;
+    const sectionY = sectionsStartY + bucketSectionIndex * sectionHeight;
 
-    // Render bucket cell
-    bucketArrayGroup
-      .append("rect")
-      .attr("x", startX + 5)
-      .attr("y", bucketY)
-      .attr("width", bucketArrayWidth - 10)
-      .attr("height", bucketHeight - 2)
-      .attr("fill", styles.bucketArray.bucketFill)
-      .attr("stroke", styles.bucketArray.bucketStroke);
-
-    // Bucket index
-    bucketArrayGroup
-      .append("text")
-      .attr("x", startX + 20)
-      .attr("y", bucketY + bucketHeight / 2 + 4)
-      .attr("font-size", styles.bucketArray.fontSize)
-      .attr("fill", styles.bucketArray.indexTextFill)
-      .text(index);
-
-    // Bucket pointer indicator
-    if (bucket.chain) {
-      bucketArrayGroup
-        .append("circle")
-        .attr("cx", startX + bucketArrayWidth - 20)
-        .attr("cy", bucketY + bucketHeight / 2)
-        .attr("r", 3)
-        .attr("fill", styles.connection.color);
+    // Draw horizontal section divider (except for the last one)
+    if (bucketSectionIndex < totalSections - 1) {
+      contentGroup
+        .append("line")
+        .attr("x1", sectionX)
+        .attr("y1", sectionY + sectionHeight)
+        .attr("x2", sectionX + sectionsAreaWidth)
+        .attr("y2", sectionY + sectionHeight)
+        .attr("stroke", "#e2e8f0")
+        .attr("stroke-width", 2);
     }
 
-    // Render chain if it exists
+    // Render horizontal chain if it exists
     if (bucket.chain) {
-      renderChain(
+      // Calculate the actual total node height including all components
+      const fieldCount = 3; // key, value, next
+      const fieldsAreaHeight =
+        fieldCount * styles.node.fieldHeight +
+        (fieldCount - 1) * styles.node.fieldSpacing;
+      const actualNodeHeight =
+        styles.node.headerHeight + styles.node.padding * 2 + fieldsAreaHeight;
+
+      renderHorizontalChain(
         contentGroup,
         bucket.chain,
-        startX + bucketArrayWidth + chainSpacing,
-        bucketY,
+        sectionX + 20, // Start with some padding from left edge
+        sectionY + sectionHeight / 2 - actualNodeHeight / 2, // Center vertically in section using actual node height
         nodeWidth,
         nodeSpacing,
         styles,
@@ -473,8 +678,15 @@ function renderHashStructure(
       // Draw connection from bucket to first node in chain
       const firstNode = bucket.chain[0];
       if (firstNode && nodePositions[firstNode.address]) {
-        const sourceX = startX + bucketArrayWidth;
-        const sourceY = bucketY + bucketHeight / 2;
+        // Calculate bucket cell position for connection
+        const bucketCellY =
+          bucketArrayY +
+          styles.bucketArray.headerHeight +
+          styles.bucketArray.padding +
+          bucket.index * styles.bucketArray.bucketHeight;
+
+        const sourceX = bucketArrayX + styles.bucketArray.width;
+        const sourceY = bucketCellY + styles.bucketArray.bucketHeight / 2;
         const targetX = nodePositions[firstNode.address].x;
         const targetY =
           nodePositions[firstNode.address].y + styles.node.headerHeight / 2;
@@ -493,8 +705,8 @@ function renderHashStructure(
   });
 }
 
-// Helper function to render a chain of nodes
-function renderChain(
+// Helper function to render a horizontal chain of nodes
+function renderHorizontalChain(
   contentGroup,
   chain,
   startX,
@@ -533,10 +745,10 @@ function renderChain(
       truncateAddress
     );
 
-    // Draw connection to next node
+    // Draw horizontal connection to next node
     if (index < chain.length - 1) {
       const nextNodeX = startX + (index + 1) * (nodeWidth + nodeSpacing);
-      const connectionY = nodeY + styles.node.headerHeight / 2;
+      const connectionY = nodeY + styles.node.headerHeight / 2; // Center of the node
 
       contentGroup
         .append("line")
@@ -571,22 +783,13 @@ function drawVariableConnections(
       const sourceX = bucketsConnectionPoint.sourceCoords.x;
       const sourceY = bucketsConnectionPoint.sourceCoords.y;
       const targetX = nodePositions["buckets"].x;
-      const targetY = nodePositions["buckets"].y; // Top edge of the buckets array
+      const targetY =
+        nodePositions["buckets"].y + nodePositions["buckets"].height / 2;
 
-      // Create 5-segment path
-      const horizontalExtension = 20; // 1st part: go right
-      const verticalDrop = 40; // 2nd part: go down
-      const bucketArrayRightEdge =
-        nodePositions["buckets"].x + nodePositions["buckets"].width;
-      const additionalLeftDistance = 20; // 4th part: go a bit further left
-
-      const extendedX = sourceX + horizontalExtension;
-      const dropY = sourceY + verticalDrop;
-      const rightEdgeX = bucketArrayRightEdge; // 3rd part: reach right edge
-      const finalLeftX = bucketArrayRightEdge - additionalLeftDistance; // 4th part: go further left
-
-      // Create 5-segment path: start -> right -> down -> left to right edge -> further left -> down to target
-      const pathData = `M ${sourceX} ${sourceY} L ${extendedX} ${sourceY} L ${extendedX} ${dropY} L ${rightEdgeX} ${dropY} L ${finalLeftX} ${dropY} L ${finalLeftX} ${targetY}`;
+      // Create simple path from source to target
+      const pathData = `M ${sourceX} ${sourceY} L ${
+        sourceX + 20
+      } ${sourceY} L ${sourceX + 20} ${targetY} L ${targetX} ${targetY}`;
 
       contentGroup
         .append("path")
@@ -608,7 +811,7 @@ function drawVariableConnections(
         const sourceX = connectionPoint.sourceCoords.x;
         const sourceY = connectionPoint.sourceCoords.y;
         const targetPos = nodePositions[connectionPoint.targetAddress];
-        const targetX = targetPos.x + targetPos.width;
+        const targetX = targetPos.x;
         const targetY = targetPos.y + styles.node.headerHeight / 2;
 
         // Create orthogonal path
