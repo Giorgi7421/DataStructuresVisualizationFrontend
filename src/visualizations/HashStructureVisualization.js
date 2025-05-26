@@ -588,11 +588,18 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
   const buckets = [];
   const actualBucketCount = bucketCount || Object.keys(bucketsData).length;
 
+  console.log(`[HashStructure] Processing ${actualBucketCount} buckets`);
+  console.log(`[HashStructure] Buckets data:`, bucketsData);
+
   for (let i = 0; i < actualBucketCount; i++) {
     const bucketAddress = bucketsData[i] || bucketsData[i.toString()];
+    console.log(`[HashStructure] Bucket ${i}: address = ${bucketAddress}`);
+
     const chain = bucketAddress
       ? parseChain(bucketAddress, addressObjectMap)
       : null;
+
+    console.log(`[HashStructure] Bucket ${i}: chain = `, chain);
 
     buckets.push({
       index: i,
@@ -600,6 +607,8 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
       chain: chain,
     });
   }
+
+  console.log(`[HashStructure] Final parsed buckets:`, buckets);
 
   return {
     bucketsAddress,
@@ -611,18 +620,40 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
 // Helper function to parse a chain of nodes
 function parseChain(startAddress, addressObjectMap) {
   if (!startAddress || !addressObjectMap[startAddress]) {
+    console.log(
+      `[HashStructure] parseChain: Invalid start address: ${startAddress}`
+    );
     return null;
   }
+
+  console.log(
+    `[HashStructure] parseChain: Starting chain from ${startAddress}`
+  );
 
   const nodes = [];
   let currentAddress = startAddress;
   const visited = new Set();
+  const MAX_CHAIN_LENGTH = 50; // Prevent infinite loops
 
-  while (currentAddress && !visited.has(currentAddress)) {
+  while (
+    currentAddress &&
+    !visited.has(currentAddress) &&
+    nodes.length < MAX_CHAIN_LENGTH
+  ) {
     visited.add(currentAddress);
     const nodeData = addressObjectMap[currentAddress];
 
-    if (!nodeData) break;
+    if (!nodeData) {
+      console.log(
+        `[HashStructure] parseChain: No data found for address ${currentAddress}`
+      );
+      break;
+    }
+
+    console.log(
+      `[HashStructure] parseChain: Processing node ${currentAddress}:`,
+      nodeData
+    );
 
     const node = {
       address: currentAddress,
@@ -631,11 +662,34 @@ function parseChain(startAddress, addressObjectMap) {
 
     nodes.push(node);
 
-    // Look for next pointer (common names: next, link, successor)
-    currentAddress =
-      nodeData.next || nodeData.link || nodeData.successor || null;
+    // Look for next pointer with multiple possible names (similar to linked structure visualization)
+    const nextAddress =
+      nodeData.nextAddress ||
+      nodeData.next ||
+      nodeData.linkAddress ||
+      nodeData.link ||
+      nodeData.successor ||
+      null;
+
+    console.log(
+      `[HashStructure] parseChain: Next address for ${currentAddress}: ${nextAddress}`
+    );
+
+    // Check if next address is valid
+    if (!nextAddress || nextAddress === "0x0" || nextAddress === "null") {
+      console.log(
+        `[HashStructure] parseChain: End of chain reached at ${currentAddress}`
+      );
+      break;
+    }
+
+    currentAddress = nextAddress;
   }
 
+  console.log(
+    `[HashStructure] parseChain: Completed chain with ${nodes.length} nodes:`,
+    nodes.map((n) => n.address)
+  );
   return nodes.length > 0 ? nodes : null;
 }
 
@@ -655,7 +709,7 @@ function renderHashStructure(
   nodePositions
 ) {
   const nodeWidth = styles.node.width;
-  const nodeSpacing = 60; // Increased from 20 to spread nodes out much more
+  const nodeSpacing = 30; // Reduced from 60 to position nodes closer together
 
   // Calculate horizontal sections area - use ALL available width and extend even further
   const sectionsStartX = startX;
@@ -755,6 +809,17 @@ function renderHorizontalChain(
   nodePositions,
   availableWidth
 ) {
+  console.log(
+    `[HashStructure] renderHorizontalChain: Starting with ${chain.length} nodes`
+  );
+  console.log(
+    `[HashStructure] renderHorizontalChain: Chain addresses:`,
+    chain.map((n) => n.address)
+  );
+  console.log(
+    `[HashStructure] renderHorizontalChain: Start position: (${startX}, ${startY})`
+  );
+
   // Calculate dynamic spacing to aggressively distribute nodes across available width
   const totalNodesWidth = chain.length * nodeWidth;
   const usableWidth = availableWidth - startX - 20; // Reduced from 50px to only 20px margin on right
@@ -767,7 +832,7 @@ function renderHorizontalChain(
       : baseNodeSpacing;
 
   // Increase the maximum spacing even more to allow maximum spread
-  const maxSpacing = 500; // Increased from 300 to allow even more spread
+  const maxSpacing = 80; // Reduced from 500 to keep nodes closer together
   const finalSpacing = Math.min(dynamicSpacing, maxSpacing);
 
   console.log("[HashStructure] Chain spacing calculations:", {
@@ -784,6 +849,10 @@ function renderHorizontalChain(
     const nodeX = startX + index * (nodeWidth + finalSpacing);
     const nodeY = startY;
 
+    console.log(
+      `[HashStructure] renderHorizontalChain: Rendering node ${index} (${node.address}) at position (${nodeX}, ${nodeY})`
+    );
+
     // Create node specification
     const nodeSpec = {
       x: nodeX,
@@ -793,11 +862,17 @@ function renderHorizontalChain(
       fields: {
         key: node.key || node.data || "N/A",
         value: node.value || "N/A",
-        next: node.next || "null",
+        linkAddress:
+          node.linkAddress || node.nextAddress || node.next || "null",
       },
       isCurrent: false,
       isIsolated: false,
     };
+
+    console.log(
+      `[HashStructure] renderHorizontalChain: Node spec for ${node.address}:`,
+      nodeSpec
+    );
 
     // Render the node
     renderGenericNode(
@@ -809,22 +884,52 @@ function renderHorizontalChain(
       truncateAddress
     );
 
+    console.log(
+      `[HashStructure] renderHorizontalChain: Node ${node.address} rendered, position stored:`,
+      nodePositions[node.address]
+    );
+
     // Draw horizontal connection to next node
     if (index < chain.length - 1) {
+      const nextNode = chain[index + 1];
       const nextNodeX = startX + (index + 1) * (nodeWidth + finalSpacing);
-      const connectionY = nodeY + styles.node.headerHeight / 2;
+
+      // Calculate connection points similar to linked structure visualization
+      // Source: from the linkAddress field of current node
+      const sourceX = nodeX + nodeWidth - 10; // Right edge of current node
+      const sourceY =
+        nodeY + styles.node.headerHeight + styles.node.fieldHeight * 2.5; // linkAddress field position
+
+      // Target: to the address tag of next node
+      const targetX = nextNodeX; // Left edge of next node
+      const targetY = nodeY + styles.node.headerHeight / 2; // Address tag position
+
+      // Create H-V-H path (horizontal-vertical-horizontal)
+      const midX = sourceX + (targetX - sourceX) / 2;
+      const pathData = `M ${sourceX} ${sourceY} L ${midX} ${sourceY} L ${midX} ${targetY} L ${targetX} ${targetY}`;
+
+      console.log(
+        `[HashStructure] renderHorizontalChain: Drawing H-V-H connection from node ${index} to node ${
+          index + 1
+        }`
+      );
+      console.log(
+        `[HashStructure] renderHorizontalChain: Path from (${sourceX}, ${sourceY}) to (${targetX}, ${targetY})`
+      );
 
       contentGroup
-        .append("line")
-        .attr("x1", nodeX + nodeWidth)
-        .attr("y1", connectionY)
-        .attr("x2", nextNodeX)
-        .attr("y2", connectionY)
+        .append("path")
+        .attr("d", pathData)
+        .attr("fill", "none")
         .attr("stroke", styles.connection.color)
         .attr("stroke-width", styles.connection.strokeWidth)
         .attr("marker-end", "url(#arrowhead)");
     }
   });
+
+  console.log(
+    `[HashStructure] renderHorizontalChain: Completed rendering ${chain.length} nodes`
+  );
 }
 
 // Helper function to draw connections from variables to hash structure
