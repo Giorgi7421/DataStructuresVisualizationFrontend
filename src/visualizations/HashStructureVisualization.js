@@ -868,13 +868,21 @@ function drawVariableConnections(
       const sourceX = bucketsConnectionPoint.sourceCoords.x;
       const sourceY = bucketsConnectionPoint.sourceCoords.y;
       const targetX = nodePositions["buckets"].x;
-      const targetY =
-        nodePositions["buckets"].y + nodePositions["buckets"].height / 2;
+      const targetY = nodePositions["buckets"].y; // Connect to top of buckets array
 
-      // Create simple path from source to target
-      const pathData = `M ${sourceX} ${sourceY} L ${
-        sourceX + 20
-      } ${sourceY} L ${sourceX + 20} ${targetY} L ${targetX} ${targetY}`;
+      // Create simple 5-part path with sharp corners
+      const pathData = `M ${sourceX} ${sourceY} 
+                       L ${sourceX + 20} ${sourceY}
+                       L ${sourceX + 20} ${sourceY + 45}
+                       L ${targetX + nodePositions["buckets"].width} ${
+        sourceY + 45
+      }
+                       L ${targetX + nodePositions["buckets"].width - 10} ${
+        sourceY + 45
+      }
+                       L ${
+                         targetX + nodePositions["buckets"].width - 10
+                       } ${targetY}`;
 
       contentGroup
         .append("path")
