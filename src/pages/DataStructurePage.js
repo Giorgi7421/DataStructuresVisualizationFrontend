@@ -119,6 +119,14 @@ const dsOperationArgs = {
     forward: { args: [], method: "patch" },
     back: { args: [], method: "patch" },
   },
+  MAP: {
+    put: { args: ["key", "value"], method: "patch" }, // Following API spec (GET method)
+    get: { args: ["key"], method: "get" },
+    clear: { args: [], method: "patch" }, // Following API spec (GET method)
+    size: { args: [], method: "get" },
+    isEmpty: { args: [], method: "get" },
+    containsKey: { args: ["key"], method: "get" },
+  },
 };
 
 // Big O notation mapping for all data structures and their implementations
@@ -339,7 +347,7 @@ const bigONotations = {
       HASH: "O(n)",
       TREE: "O(n)",
     },
-    remove: {
+    get: {
       ARRAY: "O(n)",
       HASH: "O(n)",
       TREE: "O(n)",
@@ -350,16 +358,16 @@ const bigONotations = {
       TREE: "O(n)",
     },
     size: {
-      ARRAY: "O(n)",
-      HASH: "O(n)",
-      TREE: "O(n)",
+      ARRAY: "O(1)",
+      HASH: "O(1)",
+      TREE: "O(1)",
     },
     isEmpty: {
-      ARRAY: "O(n)",
-      HASH: "O(n)",
-      TREE: "O(n)",
+      ARRAY: "O(1)",
+      HASH: "O(1)",
+      TREE: "O(1)",
     },
-    get: {
+    containsKey: {
       ARRAY: "O(n)",
       HASH: "O(n)",
       TREE: "O(n)",
@@ -428,6 +436,38 @@ const bigONotations = {
     },
     back: {
       WEB_BROWSER: "O(1)",
+    },
+  },
+  MAP: {
+    put: {
+      ARRAY: "O(n)",
+      HASH: "O(n)",
+      TREE: "O(n)",
+    },
+    get: {
+      ARRAY: "O(n)",
+      HASH: "O(n)",
+      TREE: "O(n)",
+    },
+    clear: {
+      ARRAY: "O(n)",
+      HASH: "O(n)",
+      TREE: "O(n)",
+    },
+    size: {
+      ARRAY: "O(1)",
+      HASH: "O(1)",
+      TREE: "O(1)",
+    },
+    isEmpty: {
+      ARRAY: "O(1)",
+      HASH: "O(1)",
+      TREE: "O(1)",
+    },
+    containsKey: {
+      ARRAY: "O(n)",
+      HASH: "O(n)",
+      TREE: "O(n)",
     },
   },
 };
@@ -1617,6 +1657,7 @@ function DataStructurePage() {
         BIG_INTEGER: "big-integer",
         GRID: "grid",
         WEB_BROWSER: "web-browser",
+        MAP: "map",
       };
       const controller = controllerMap[type];
       let method = "patch";
@@ -1647,9 +1688,15 @@ function DataStructurePage() {
       let endpoint = "";
       // Types that HAVE selectable implementations (and currentImpl should be defined)
       if (
-        ["VECTOR", "TREE", "STACK", "SET", "QUEUE", "EDITOR_BUFFER"].includes(
-          type
-        )
+        [
+          "VECTOR",
+          "TREE",
+          "STACK",
+          "SET",
+          "QUEUE",
+          "EDITOR_BUFFER",
+          "MAP",
+        ].includes(type)
       ) {
         if (!currentImpl || currentImpl.toUpperCase() === "NULL") {
           setError(
