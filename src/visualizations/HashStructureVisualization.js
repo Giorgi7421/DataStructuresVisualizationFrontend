@@ -896,9 +896,14 @@ function renderHorizontalChain(
 
       // Calculate connection points similar to linked structure visualization
       // Source: from the linkAddress field of current node
-      const sourceX = nodeX + nodeWidth - 10; // Right edge of current node
+      const sourceX = nodeX + nodeWidth; // Right edge of current node (not inside)
       const sourceY =
-        nodeY + styles.node.headerHeight + styles.node.fieldHeight * 2.5; // linkAddress field position
+        nodeY +
+        styles.node.headerHeight +
+        styles.node.padding +
+        styles.node.fieldHeight * 2 +
+        styles.node.fieldSpacing * 2 +
+        styles.node.fieldHeight / 2; // Exact middle of linkAddress field (3rd field)
 
       // Target: to the address tag of next node
       const targetX = nextNodeX; // Left edge of next node
