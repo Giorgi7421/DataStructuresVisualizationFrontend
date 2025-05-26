@@ -18,6 +18,8 @@ export function renderHashStructureVisualization(
   console.log("[HashStructure] Starting visualization with:", {
     operation,
     memorySnapshot,
+    width,
+    height,
   });
 
   // Define arrowheads for connections
@@ -59,11 +61,11 @@ export function renderHashStructureVisualization(
   // Styles for hash structure visualization
   const styles = {
     varBox: {
-      width: 200,
-      headerHeight: 25,
-      fieldHeight: 25,
-      fieldSpacing: 5,
-      padding: 10,
+      width: 280,
+      headerHeight: 30,
+      fieldHeight: 28,
+      fieldSpacing: 6,
+      padding: 12,
       fill: "#ffffff",
       stroke: "#94a3b8",
       titleFill: "#94a3b8",
@@ -74,14 +76,14 @@ export function renderHashStructureVisualization(
       addressValueFill: "#0ea5e9",
       fieldRectFill: "white",
       fieldRectStroke: "#e2e8f0",
-      fontSize: "12px",
-      titleFontSize: "13px",
+      fontSize: "13px",
+      titleFontSize: "14px",
     },
     bucketArray: {
-      width: 120,
-      headerHeight: 30,
-      bucketHeight: 35,
-      padding: 10,
+      width: 160,
+      headerHeight: 35,
+      bucketHeight: 40,
+      padding: 12,
       fill: "#ffffff",
       stroke: "#94a3b8",
       titleFill: "#f1f5f9",
@@ -90,15 +92,15 @@ export function renderHashStructureVisualization(
       bucketFill: "#ffffff",
       bucketStroke: "#cbd5e1",
       indexTextFill: "#64748b",
-      fontSize: "12px",
-      titleFontSize: "14px",
+      fontSize: "13px",
+      titleFontSize: "15px",
     },
     node: {
-      width: 140,
-      headerHeight: 25,
-      fieldHeight: 25,
-      fieldSpacing: 5,
-      padding: 10,
+      width: 180,
+      headerHeight: 30,
+      fieldHeight: 28,
+      fieldSpacing: 6,
+      padding: 12,
       fill: "#ffffff",
       stroke: "#94a3b8",
       titleFill: "#f8fafc",
@@ -109,8 +111,8 @@ export function renderHashStructureVisualization(
       addressTextFill: "#0ea5e9",
       fieldRectFill: "white",
       fieldRectStroke: "#e2e8f0",
-      fontSize: "12px",
-      titleFontSize: "13px",
+      fontSize: "13px",
+      titleFontSize: "14px",
     },
     connection: {
       strokeWidth: 2,
@@ -122,18 +124,18 @@ export function renderHashStructureVisualization(
   // Define arrowheads
   defineArrowheads(contentGroup, styles.connection.arrowSize);
 
-  // Position calculations - create a left section that covers full Y-axis and maximize space usage
-  const leftSectionX = 10; // Minimal margin from left edge
-  const leftSectionY = 10; // Minimal margin from top
+  // Position calculations - use much more of the available space
+  const leftSectionX = 20;
+  const leftSectionY = 20;
   const leftSectionWidth = Math.max(
-    styles.varBox.width + 20, // Width for instance variables box plus padding
-    styles.bucketArray.width + 20
-  ); // Width for bucket array, whichever is larger
-  const leftSectionHeight = height - 20; // Cover entire Y-axis minus minimal padding
+    styles.varBox.width + 40,
+    styles.bucketArray.width + 40
+  );
+  const leftSectionHeight = height - 40;
 
   // Position instance variables at top left of left section
-  const instanceVarBoxX = leftSectionX;
-  const instanceVarBoxY = leftSectionY;
+  const instanceVarBoxX = leftSectionX + 10;
+  const instanceVarBoxY = leftSectionY + 10;
 
   // Render instance variables box
   let instanceVarBoxResult;
@@ -160,19 +162,45 @@ export function renderHashStructureVisualization(
     instanceVarBoxResult = { height: 80, connectionPoints: [] };
   }
 
-  // Calculate hash structure area position - maximize remaining space
+  // Calculate hash structure area position - use much more space
   const hashAreaY = leftSectionY; // Start from same Y as left section
-  const hashAreaX = leftSectionX + leftSectionWidth + 10; // Minimal gap after left section
-  const hashAreaWidth = width - hashAreaX - 10; // Use almost all remaining width to right edge
+  const hashAreaX = leftSectionX + leftSectionWidth + 30; // Increased gap from 10
+
+  // IMPORTANT: Calculate the actual available width after accounting for auto-fit scaling
+  // The auto-fit will scale down the content, so we need to use much more of the nominal width
+  // to ensure we fill the available space after scaling
+  const baseHashAreaWidth = width - hashAreaX - 30; // Basic calculation
+
+  // Be extremely aggressive with scaling compensation
+  // Estimate how much the content will be scaled down and compensate heavily
+  const estimatedContentWidth = leftSectionWidth + baseHashAreaWidth;
+  const estimatedScale = Math.min((width - 80) / estimatedContentWidth, 1); // 80px total padding
+
+  // Use extremely aggressive compensation - multiply by 4.0 instead of 2.5
+  const scalingCompensation = estimatedScale < 1 ? 4.0 / estimatedScale : 3.0;
+  const hashAreaWidth = baseHashAreaWidth * scalingCompensation;
+
+  console.log("[HashStructure] Width calculations:", {
+    width,
+    baseHashAreaWidth,
+    estimatedScale,
+    scalingCompensation,
+    finalHashAreaWidth: hashAreaWidth,
+  });
+
   const hashAreaHeight = leftSectionHeight; // Same height as left section (full height)
 
   // Calculate number of horizontal sections needed (1 for local vars + number of buckets)
   const totalSections =
     hashData && hashData.buckets ? hashData.buckets.length + 1 : 2;
 
-  // Calculate minimum section height needed for nodes with padding
+  // Calculate minimum section height needed for nodes with padding - use larger values
   const minSectionHeight =
-    styles.node.headerHeight + styles.node.fieldHeight * 3 + 40; // Node height + padding
+    styles.node.headerHeight +
+    styles.node.fieldHeight * 3 +
+    styles.node.fieldSpacing * 2 +
+    styles.node.padding * 2 +
+    60;
   const calculatedTotalHeight = totalSections * minSectionHeight;
 
   // Use the larger of calculated height or available height
@@ -183,9 +211,9 @@ export function renderHashStructureVisualization(
   const sectionHeight = effectiveHashAreaHeight / totalSections;
 
   // Position local variables box in the top horizontal section (section 0)
-  const localVarBoxX = hashAreaX + 20; // Some padding from left edge of hash area
+  const localVarBoxX = hashAreaX + 30;
   const localVarBoxY =
-    hashAreaY + sectionHeight / 2 - styles.varBox.headerHeight / 2; // Center vertically in top section
+    hashAreaY + sectionHeight / 2 - styles.varBox.headerHeight / 2;
 
   let localVarBoxResult;
   try {
@@ -214,7 +242,7 @@ export function renderHashStructureVisualization(
   // Calculate buckets array positioning - position it below the instance variables in the left section
   const instanceVarBoxHeight = instanceVarBoxResult?.height || 80;
   const remainingLeftSectionHeight =
-    leftSectionHeight - instanceVarBoxHeight - 40; // Remaining space after instance variables and spacing
+    leftSectionHeight - instanceVarBoxHeight - 40;
   const bucketArrayHeight =
     hashData && hashData.buckets
       ? styles.bucketArray.headerHeight +
@@ -224,12 +252,12 @@ export function renderHashStructureVisualization(
 
   // Position buckets array below instance variables, centered horizontally in left section
   const bucketArrayX =
-    leftSectionX + (leftSectionWidth - styles.bucketArray.width) / 2; // Center horizontally in left section
+    leftSectionX + (leftSectionWidth - styles.bucketArray.width) / 2;
   const bucketArrayY =
     leftSectionY +
     instanceVarBoxHeight +
     40 +
-    (remainingLeftSectionHeight - bucketArrayHeight) / 2; // Below instance variables, centered vertically in remaining space
+    (remainingLeftSectionHeight - bucketArrayHeight) / 2;
 
   // TEMPORARY: Draw layout borders for debugging
   const debugGroup = contentGroup.append("g").attr("class", "debug-borders");
@@ -627,18 +655,27 @@ function renderHashStructure(
   nodePositions
 ) {
   const nodeWidth = styles.node.width;
-  const nodeSpacing = 20;
+  const nodeSpacing = 60; // Increased from 20 to spread nodes out much more
 
-  // Calculate horizontal sections area - use full available width and height
-  const sectionsStartX = startX; // Start at the beginning of hash area
-  const sectionsStartY = startY; // Start at the beginning of hash area
-  const sectionsAreaWidth = availableWidth; // Use full available width
-  const sectionsAreaHeight = availableHeight; // Use full available height
+  // Calculate horizontal sections area - use ALL available width and extend even further
+  const sectionsStartX = startX;
+  const sectionsStartY = startY;
+
+  // Use the full available width plus massive extension to maximize space usage
+  // Since we've already compensated for auto-fit scaling, extend much further
+  const sectionsAreaWidth = availableWidth + 800; // Increased from 400 to extend massively further
+  const sectionsAreaHeight = availableHeight;
+
+  console.log("[HashStructure] Section area calculations:", {
+    availableWidth,
+    sectionsAreaWidth,
+    extension: sectionsAreaWidth - availableWidth,
+  });
 
   // Render horizontal sections and node chains (buckets array is rendered separately in main layout)
   hashData.buckets.forEach((bucket, index) => {
     // Calculate horizontal section for this bucket (section 0 is for local variables, so buckets start from section 1)
-    const bucketSectionIndex = bucket.index + 1; // Offset by 1 since section 0 is for local variables
+    const bucketSectionIndex = bucket.index + 1;
     const sectionX = sectionsStartX;
     const sectionY = sectionsStartY + bucketSectionIndex * sectionHeight;
 
@@ -657,7 +694,7 @@ function renderHashStructure(
     // Render horizontal chain if it exists
     if (bucket.chain) {
       // Calculate the actual total node height including all components
-      const fieldCount = 3; // key, value, next
+      const fieldCount = 3;
       const fieldsAreaHeight =
         fieldCount * styles.node.fieldHeight +
         (fieldCount - 1) * styles.node.fieldSpacing;
@@ -667,12 +704,13 @@ function renderHashStructure(
       renderHorizontalChain(
         contentGroup,
         bucket.chain,
-        sectionX + 20, // Start with some padding from left edge
-        sectionY + sectionHeight / 2 - actualNodeHeight / 2, // Center vertically in section using actual node height
+        sectionX + 100,
+        sectionY + sectionHeight / 2 - actualNodeHeight / 2,
         nodeWidth,
         nodeSpacing,
         styles,
-        nodePositions
+        nodePositions,
+        sectionsAreaWidth
       );
 
       // Draw connection from bucket to first node in chain
@@ -712,12 +750,38 @@ function renderHorizontalChain(
   startX,
   startY,
   nodeWidth,
-  nodeSpacing,
+  baseNodeSpacing,
   styles,
-  nodePositions
+  nodePositions,
+  availableWidth
 ) {
+  // Calculate dynamic spacing to aggressively distribute nodes across available width
+  const totalNodesWidth = chain.length * nodeWidth;
+  const usableWidth = availableWidth - startX - 20; // Reduced from 50px to only 20px margin on right
+  const availableSpacingWidth = usableWidth - totalNodesWidth;
+
+  // Be much more aggressive with spacing - use most of the available space
+  const dynamicSpacing =
+    chain.length > 1
+      ? Math.max(baseNodeSpacing, availableSpacingWidth / (chain.length - 1))
+      : baseNodeSpacing;
+
+  // Increase the maximum spacing even more to allow maximum spread
+  const maxSpacing = 500; // Increased from 300 to allow even more spread
+  const finalSpacing = Math.min(dynamicSpacing, maxSpacing);
+
+  console.log("[HashStructure] Chain spacing calculations:", {
+    chainLength: chain.length,
+    totalNodesWidth,
+    usableWidth,
+    availableSpacingWidth,
+    dynamicSpacing,
+    finalSpacing,
+    availableWidth,
+  });
+
   chain.forEach((node, index) => {
-    const nodeX = startX + index * (nodeWidth + nodeSpacing);
+    const nodeX = startX + index * (nodeWidth + finalSpacing);
     const nodeY = startY;
 
     // Create node specification
@@ -747,8 +811,8 @@ function renderHorizontalChain(
 
     // Draw horizontal connection to next node
     if (index < chain.length - 1) {
-      const nextNodeX = startX + (index + 1) * (nodeWidth + nodeSpacing);
-      const connectionY = nodeY + styles.node.headerHeight / 2; // Center of the node
+      const nextNodeX = startX + (index + 1) * (nodeWidth + finalSpacing);
+      const connectionY = nodeY + styles.node.headerHeight / 2;
 
       contentGroup
         .append("line")
@@ -821,7 +885,7 @@ function drawVariableConnections(
           .append("path")
           .attr("d", pathData)
           .attr("fill", "none")
-          .attr("stroke", "#2563eb") // Blue for local variable connections
+          .attr("stroke", "#2563eb")
           .attr("stroke-width", styles.connection.strokeWidth)
           .attr("marker-end", "url(#arrowhead)");
       }

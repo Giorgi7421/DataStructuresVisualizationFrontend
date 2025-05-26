@@ -2641,7 +2641,29 @@ function DataStructurePage() {
                               {`(${
                                 op.parameters &&
                                 Object.keys(op.parameters).length > 0
-                                  ? Object.values(op.parameters).join(", ")
+                                  ? (() => {
+                                      // Get the correct parameter order from dsOperationArgs
+                                      const type =
+                                        dataStructure?.type?.toUpperCase();
+                                      const operationArgs =
+                                        dsOperationArgs[type]?.[op.operation]
+                                          ?.args || [];
+
+                                      if (operationArgs.length > 0) {
+                                        // Display parameters in the correct order
+                                        return operationArgs
+                                          .map(
+                                            (argName) =>
+                                              op.parameters[argName] || ""
+                                          )
+                                          .join(", ");
+                                      } else {
+                                        // Fallback to Object.values if no args defined
+                                        return Object.values(
+                                          op.parameters
+                                        ).join(", ");
+                                      }
+                                    })()
                                   : ""
                               })`}
                               {op.state &&
