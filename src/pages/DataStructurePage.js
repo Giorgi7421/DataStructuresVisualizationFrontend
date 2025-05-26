@@ -1758,11 +1758,24 @@ function DataStructurePage() {
       }));
       setError(null);
     } catch (err) {
-      setError(
-        "Failed to perform operation: " +
-          (err.response?.data?.message || err.message)
-      );
-      console.error(err);
+      // Enhanced error handling to show specific backend messages
+      let errorMessage = "Failed to perform operation";
+
+      if (err.response?.data) {
+        // Backend response data is the error message itself
+        errorMessage =
+          typeof err.response.data === "string"
+            ? err.response.data
+            : err.response.data.message ||
+              err.response.data.error ||
+              JSON.stringify(err.response.data);
+      } else if (err.message) {
+        // General error message
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
+      console.error("Operation failed:", err);
     } finally {
       setProcessingOperation(false);
       setLoading(false);
