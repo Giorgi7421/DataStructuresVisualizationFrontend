@@ -2255,12 +2255,12 @@ function DataStructurePage() {
               break;
             case "ARRAY_MAP":
               renderArrayStructureVisualization(
-                tempGroup,
-                width,
-                height,
-                effectiveOperation,
-                memorySnapshot,
-                snapshotIdentifier
+                contentGroup,
+                800,
+                600,
+                operationState,
+                snapshot,
+                `export_snapshot_${i}`
               );
               break;
             case "TREE_MAP":
