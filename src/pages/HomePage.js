@@ -1,4 +1,3 @@
-// src/pages/HomePage.js
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { dataStructureService } from "../services/api";
@@ -6,7 +5,7 @@ import { PlusIcon, TrashIcon } from "lucide-react";
 
 function HomePage() {
   const navigate = useNavigate();
-  // Get implementation options based on data structure type
+
   const getImplementationOptions = (type) => {
     switch (type) {
       case "VECTOR":
@@ -118,7 +117,7 @@ function HomePage() {
     if (window.confirm(`Are you sure you want to delete '${name}'?`)) {
       try {
         await dataStructureService.deleteByName(name);
-        // Refresh the list after deletion
+
         fetchDataStructures();
       } catch (err) {
         setError("Failed to delete data structure");
@@ -132,7 +131,6 @@ function HomePage() {
     try {
       setCreating(true);
 
-      // Construct the endpoint based on type and implementation
       let endpoint = newDSType.toLowerCase().replace(/_/g, "-");
       if (hasMultipleImplementations(newDSType)) {
         endpoint += `/create/${newDSImplementation}/${encodeURIComponent(
@@ -142,12 +140,10 @@ function HomePage() {
         endpoint += `/create/${encodeURIComponent(newDSName)}`;
       }
 
-      // Add number parameter for big-integer
       if (newDSType === "BIG_INTEGER") {
         endpoint += `/${encodeURIComponent(newDSNumber)}`;
       }
 
-      // Add rows and columns for grid
       if (newDSType === "GRID") {
         endpoint += `/${encodeURIComponent(newGridRows)}/${encodeURIComponent(
           newGridColumns
@@ -161,7 +157,6 @@ function HomePage() {
 
       const response = await dataStructureService.create(endpoint);
 
-      // Create a complete data structure object
       const newDataStructure = {
         id: response.data.id,
         name: newDSName,
@@ -180,7 +175,6 @@ function HomePage() {
       setNewGridRows("3");
       setNewGridColumns("3");
 
-      // Navigate to the new data structure's page
       navigate(`/datastructure/${newDataStructure.id}`, {
         state: { dataStructure: newDataStructure },
       });
@@ -192,57 +186,51 @@ function HomePage() {
     }
   };
 
-  // Get appropriate icon based on data structure type
   const getTypeIcon = (type) => {
     switch (type) {
       case "VECTOR":
-        return "📏"; // Ruler for vector
+        return "📏";
       case "STACK":
-        return "📚"; // Books for stack
+        return "📚";
       case "QUEUE":
-        return "🔄"; // Circular arrows for queue
+        return "🔄";
       case "MAP":
-        return "🗺️"; // Map for map
+        return "🗺️";
       case "TREE":
-        return "🌳"; // Tree for tree
+        return "🌳";
       case "SET":
-        return "🔢"; // Numbers for set
+        return "🔢";
       case "EDITOR_BUFFER":
-        return "📝"; // Memo for editor buffer
+        return "📝";
       case "GRID":
-        return "📊"; // Chart for grid
+        return "📊";
       case "DEQUE":
-        return "↔️"; // Left-right arrows for deque
+        return "↔️";
       case "WEB_BROWSER":
-        return "🌐"; // Globe for web browser
+        return "🌐";
       case "BIG_INTEGER":
-        return "🔢"; // Numbers for big numbers
+        return "🔢";
       default:
-        return "📊"; // Default chart icon
+        return "📊";
     }
   };
 
-  // Format data structure type to display name
   const formatType = (type) => {
     if (!type) return "";
-    // Convert SNAKE_CASE to Title Case
+
     return type
       .split("_")
       .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
       .join(" ");
   };
 
-  // Helper function to check if a data structure type has multiple implementations
   const hasMultipleImplementations = (type) => {
     const options = getImplementationOptions(type);
-    // Show implementation dropdown for TREE even though it only has one option
-    // and for any type that actually has multiple options
+
     return options.length > 1 || type === "TREE";
   };
 
-  // Format implementation to display name
   const formatImplementation = (implementation) => {
-    // Convert SNAKE_CASE to Title Case
     return implementation
       .split("_")
       .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
@@ -370,7 +358,7 @@ function HomePage() {
                   value={newDSType}
                   onChange={(e) => {
                     setNewDSType(e.target.value);
-                    // Reset implementation when type changes
+
                     setNewDSImplementation(
                       getImplementationOptions(e.target.value)[0]?.value || ""
                     );

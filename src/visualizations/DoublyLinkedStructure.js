@@ -7,7 +7,6 @@ import {
   generateOrthogonalPath,
 } from "../utils/visualizationUtils";
 
-// Reimplementation: Align with LinkedListVectorVisualization standards
 export const renderDoublyLinkedStructureVisualization = (
   contentGroup,
   width,
@@ -27,10 +26,8 @@ export const renderDoublyLinkedStructureVisualization = (
   const instanceVariables = state.instanceVariables || {};
   const addressObjectMap = state.addressObjectMap || {};
 
-  // --- Styles (Aligned with LinkedListVectorVisualization) ---
   const styles = {
     varBox: {
-      // From LLV
       width: 250,
       headerHeight: 25,
       fieldHeight: 25,
@@ -50,14 +47,13 @@ export const renderDoublyLinkedStructureVisualization = (
       titleFontSize: "13px",
     },
     node: {
-      // From LLV - base style
       width: 180,
       headerHeight: 25,
       fieldHeight: 25,
       fieldSpacing: 5,
       padding: 10,
-      fill: "#ffffff", // Standard node fill
-      stroke: "#94a3b8", // Standard node stroke
+      fill: "#ffffff",
+      stroke: "#94a3b8",
       titleFill: "#94a3b8",
       titleStroke: "#94a3b8",
       titleTextFill: "#334155",
@@ -68,27 +64,24 @@ export const renderDoublyLinkedStructureVisualization = (
       fieldRectStroke: "#e2e8f0",
       fontSize: "12px",
       titleFontSize: "13px",
-      height: 100, // Default height
-      // Specific styles for current/isolated can be applied via nodeSpec.style override
-      currentFill: "#e0f2fe", // Light blue for current page (override)
-      currentStroke: "#0284c7", // Stronger blue for current page (override)
-      isolatedFill: "#fefce8", // Light yellow for orphans (override)
-      isolatedStroke: "#ca8a04", // Darker yellow for orphans (override)
+      height: 100,
+      currentFill: "#e0f2fe",
+      currentStroke: "#0284c7",
+      isolatedFill: "#fefce8",
+      isolatedStroke: "#ca8a04",
     },
     connection: {
-      // From LLV
       strokeWidth: 1.5,
-      instanceVarColor: "#334155", // Dark Gray for instance/local
-      nextColor: "#2563eb", // Blue for 'next' pointers
-      prevColor: "#dc2626", // Red for 'prev' pointers (like in LLV)
-      llInstanceVarMarkerId: "browser-instance-var-arrow", // Separate marker for var arrows
-      llNextMarkerId: "browser-next-arrow", // Used for ALL connections
-      llPrevMarkerId: "browser-prev-arrow", // Marker for 'prev' arrows
+      instanceVarColor: "#334155",
+      nextColor: "#2563eb",
+      prevColor: "#dc2626",
+      llInstanceVarMarkerId: "browser-instance-var-arrow",
+      llNextMarkerId: "browser-next-arrow",
+      llPrevMarkerId: "browser-prev-arrow",
       cornerRadius: 8,
-      defaultColor: "#64748b", // Fallback color
+      defaultColor: "#64748b",
     },
     layout: {
-      // From LLV
       nodeSpacingX: 60,
       varBoxSpacingY: 20,
       nodesStartXOffset: 60,
@@ -96,25 +89,22 @@ export const renderDoublyLinkedStructureVisualization = (
       orphanNodeSpacingX: 40,
       mainChainRightMargin: 60,
       topToMainSpacing: 40,
-      sectionWidth: width / 3, // Divide width into three equal sections
-      sectionHeight: height / 4, // Divide height into four equal sections
-      sectionSpacingY: 40, // Increased from 20 to 40 for more vertical spacing
+      sectionWidth: width / 3,
+      sectionHeight: height / 4,
+      sectionSpacingY: 40,
     },
   };
 
-  // Calculate section boundaries
   const leftSectionEnd = styles.layout.sectionWidth;
   const rightSectionStart = width - styles.layout.sectionWidth;
   const rightSectionWidth =
     styles.layout.sectionWidth - styles.layout.mainChainRightMargin;
 
-  // Calculate section heights
   const topSectionHeight = styles.layout.sectionHeight;
   const mainSectionHeight = styles.layout.sectionHeight;
   const orphanSectionHeight = styles.layout.sectionHeight;
   const bottomSectionHeight = styles.layout.sectionHeight;
 
-  // Calculate layer positions with proper spacing
   const topLayerY = styles.layout.sectionSpacingY;
   const mainChainLayerY =
     topLayerY + topSectionHeight + styles.layout.sectionSpacingY;
@@ -123,14 +113,12 @@ export const renderDoublyLinkedStructureVisualization = (
   const localVarsLayerY =
     orphanLayerY + orphanSectionHeight + styles.layout.sectionSpacingY;
 
-  // --- Define Arrowheads ---
   let defs = contentGroup.select("defs");
   if (defs.empty()) {
     defs = contentGroup.append("defs");
   }
   defineArrowheads(defs, styles);
 
-  // --- Initialization ---
   const nodePositions = {};
   const allConnections = [];
   const visited = new Set();
@@ -140,12 +128,10 @@ export const renderDoublyLinkedStructureVisualization = (
   const nodeHeight = styles.node.height;
   const nodeSpacingX = styles.layout.nodeSpacingX;
 
-  // Define var box width reliably first
   const instanceVarsBoxWidth = styles.varBox.width;
   const localVarsBoxWidth = styles.varBox.width;
   const nodeWidth = styles.node.width;
 
-  // --- 1. INITIAL MAIN CHAIN TRAVERSAL (Populate visited set) ---
   console.log(
     "[DLS Step 1] Starting Initial Main Chain Traversal for 'visited' set."
   );
@@ -193,7 +179,6 @@ export const renderDoublyLinkedStructureVisualization = (
   );
 
   if (trueStartAddress && addressObjectMap[trueStartAddress]) {
-    // Traverse backwards from trueStartAddress for visited set
     let count = 0;
     let currentForVisited = trueStartAddress;
     while (
@@ -202,7 +187,7 @@ export const renderDoublyLinkedStructureVisualization = (
       currentForVisited !== "null" &&
       count < MAX_NODES_TO_RENDER
     ) {
-      if (visited.has(currentForVisited)) break; // Already visited (e.g. if trueStartAddress was part of a loop detected from 'next' traversal)
+      if (visited.has(currentForVisited)) break;
       visited.add(currentForVisited);
       const nodeData = addressObjectMap[currentForVisited];
       if (!nodeData) break;
@@ -210,23 +195,20 @@ export const renderDoublyLinkedStructureVisualization = (
       count++;
     }
 
-    // Traverse forwards from trueStartAddress for visited set
-    count = 0; // Reset count for forward traversal
-    currentForVisited = trueStartAddress; // Start again from the true start for forward pass
-    // The first node (trueStartAddress) is already added by the backward pass if it's the start of backward pass, or will be added here.
+    count = 0;
+    currentForVisited = trueStartAddress;
     while (
       currentForVisited &&
       currentForVisited !== "0x0" &&
       currentForVisited !== "null" &&
       count < MAX_NODES_TO_RENDER
     ) {
-      visited.add(currentForVisited); // Add to visited (safe if already there)
+      visited.add(currentForVisited);
       const nodeData = addressObjectMap[currentForVisited];
       if (!nodeData) break;
       currentForVisited = nodeData.nextAddress || nodeData.next;
       count++;
       if (visited.has(currentForVisited) && count < MAX_NODES_TO_RENDER) {
-        // Break if we hit an already visited node (loop detection)
         console.log(
           "[DLS Step 1] Loop detected during forward traversal for visited set, breaking."
         );
@@ -236,7 +218,6 @@ export const renderDoublyLinkedStructureVisualization = (
   }
   console.log("[DLS Step 1] Visited set populated:", visited);
 
-  // --- 2. ORPHAN CHAIN ORDERING (Define orderedOrphanAddrs) ---
   console.log("[DLS Step 2] Starting Orphan Chain Ordering");
   const orphanAddrs = Object.keys(addressObjectMap).filter(
     (addr) =>
@@ -276,7 +257,6 @@ export const renderDoublyLinkedStructureVisualization = (
   });
   console.log("[DLS Step 2] Ordered orphan addresses:", orderedOrphanAddrs);
 
-  // --- 3. GRID SETUP (Define mainChainStartX, mainChainY, etc.) ---
   console.log("[DLS Step 3] Starting Grid Setup");
   const gridRows = 4;
   const baseGridCols = 3;
@@ -301,13 +281,10 @@ export const renderDoublyLinkedStructureVisualization = (
       ? remainingWidthForOtherCells / (baseGridCols - 1)
       : remainingWidthForOtherCells;
 
-  // Conceptual layout: Orphans (col 0), Instance/Local Vars (col 1), Main Chain (col 2)
   const cellWidthsArray = [];
-  // Order of cells for colXCoords: Orphan, Other1 (e.g. IV/LV), Other2 (e.g. MainChain)
   cellWidthsArray[0] = calculatedOrphanCellWidth;
   cellWidthsArray[1] = otherCellWidth;
   cellWidthsArray[2] = otherCellWidth;
-  // Ensure the total width does not exceed canvas width, adjust if necessary (basic scaling)
   let totalCalculatedWidth = cellWidthsArray.reduce((a, b) => a + b, 0);
   if (totalCalculatedWidth > width) {
     const scaleFactor = width / totalCalculatedWidth;
@@ -320,12 +297,9 @@ export const renderDoublyLinkedStructureVisualization = (
     colXCoords.push(colXCoords[i] + cellWidthsArray[i]);
   }
 
-  // Grid cell assignments (adjust X based on desired column for each element)
-  // Orphan Area (e.g. First Column)
   const orphanCellLeft = colXCoords[0];
   const orphanGridY = cellHeight * 2 + cellHeight / 2 - styles.node.height / 2;
 
-  // Instance Vars (e.g. Middle Column, Top Row)
   const instanceVarsX =
     colXCoords[1] + cellWidthsArray[1] / 2 - styles.varBox.width / 2;
   const instanceVarsY =
@@ -334,11 +308,9 @@ export const renderDoublyLinkedStructureVisualization = (
     styles.varBox.headerHeight / 2 -
     styles.varBox.padding;
 
-  // Main Chain (e.g. Rightmost Column, Middle Row)
   const mainChainStartX = colXCoords[2] + styles.layout.nodesStartXOffset;
   const mainChainY = cellHeight * 1 + cellHeight / 2 - styles.node.height / 2;
 
-  // Local Vars (e.g. Middle Column, Bottom Row)
   const localVarsX =
     colXCoords[1] + cellWidthsArray[1] / 2 - styles.varBox.width / 2;
   const localVarsY =
@@ -354,16 +326,14 @@ export const renderDoublyLinkedStructureVisualization = (
     `[DLS Step 3] Cell Widths: Orphan=${cellWidthsArray[0]}, IV/LV Col=${cellWidthsArray[1]}, Main Col=${cellWidthsArray[2]}`
   );
 
-  // --- EXISTING RENDER Instance Variables (Top, Center) ---
-  // This will use instanceVarsX, instanceVarsY from Step 3
-  let instanceVarsBoxInfo = null; // Keep for potential use in connection drawing or other layout
+  let instanceVarsBoxInfo = null;
   if (Object.keys(instanceVariables).length > 0) {
     const instanceVarsResult = renderVariableBox(
       contentGroup,
       "Instance Variables",
       instanceVariables,
-      instanceVarsX, // Use new grid X
-      instanceVarsY, // Use new grid Y
+      instanceVarsX,
+      instanceVarsY,
       styles.varBox,
       "instance",
       isAddress
@@ -372,52 +342,30 @@ export const renderDoublyLinkedStructureVisualization = (
     instanceVarsBoxInfo = {
       x: instanceVarsX,
       y: instanceVarsY,
-      width: styles.varBox.width, // varBox has fixed width
+      width: styles.varBox.width,
       height: instanceVarsResult.height,
     };
     nodePositions["instance_vars_box"] = instanceVarsBoxInfo;
   }
   console.log("[DLS] Instance Variables Rendered (if any).");
 
-  // --- COMMENT OUT OLD MAIN CHAIN AND ORPHAN RENDERING LOGIC ---
-  /*
-  // --- 2. Render Main Chain (Second Layer, Right Section) ---
-  // ... (lots of old main chain rendering logic here) ...
-  console.log(`[DoublyLinkedViz Layout] Start Address: ${startAddress}`);
-  console.log(`[DoublyLinkedViz Layout] Address Object Map:`, addressObjectMap);
-
-  // --- Simplified Rendering: Start from the head of the list ---
-  if (startAddress && addressObjectMap[startAddress]) {
-    // ... (old logic for rendering start node, then prev nodes, then next nodes) ...
-  } else {
-    // Handle case where no valid start node was found
-    // ...
-  }
-
-  // --- 3. Render Orphan Nodes (Third Layer, Left Section) ---
-  // ... (old orphan rendering logic here) ...
-  */
   console.log(
     "[DLS] Old Main Chain and Orphan rendering sections are COMMENTED OUT."
   );
 
-  // --- STEP 4: MAIN CHAIN LAYOUT (Populate mainListSpecs) ---
   console.log("[DLS Step 4] Starting Main Chain Layout.");
   const mainListSpecs = [];
-  // Use trueStartAddress determined in Step 1 for layout
   const layoutStartAddress = trueStartAddress;
 
   if (layoutStartAddress && addressObjectMap[layoutStartAddress]) {
     let nodesToProcess = [];
     let tempAddr;
 
-    // Gather nodes to the left (previous)
     let leftNodes = [];
     tempAddr = layoutStartAddress;
     let count = 0;
-    const visitedForLayout = new Set(); // Separate visited set for this layout pass to handle rendering sequence
+    const visitedForLayout = new Set();
 
-    // First, process the layoutStartAddress node itself
     const startNodeDataForLayout = addressObjectMap[layoutStartAddress];
     if (startNodeDataForLayout) {
       nodesToProcess.push({
@@ -427,7 +375,6 @@ export const renderDoublyLinkedStructureVisualization = (
       });
       visitedForLayout.add(layoutStartAddress);
 
-      // Gather previous nodes
       tempAddr =
         startNodeDataForLayout.previousAddress || startNodeDataForLayout.prev;
       count = 0;
@@ -440,14 +387,13 @@ export const renderDoublyLinkedStructureVisualization = (
       ) {
         const nodeData = addressObjectMap[tempAddr];
         if (!nodeData) break;
-        leftNodes.unshift({ addr: tempAddr, data: nodeData }); // Add to beginning to maintain order for left rendering
+        leftNodes.unshift({ addr: tempAddr, data: nodeData });
         visitedForLayout.add(tempAddr);
         tempAddr = nodeData.previousAddress || nodeData.prev;
         count++;
       }
       nodesToProcess = [...leftNodes, ...nodesToProcess];
 
-      // Gather next nodes
       tempAddr =
         startNodeDataForLayout.nextAddress || startNodeDataForLayout.next;
       count = 0;
@@ -467,8 +413,7 @@ export const renderDoublyLinkedStructureVisualization = (
       }
     }
 
-    // Now layout nodesToProcess which are ordered: prevs, current, nexts
-    let currentLayoutX = mainChainStartX; // Start from the left of the main chain area defined by grid
+    let currentLayoutX = mainChainStartX;
 
     nodesToProcess.forEach((nodeInfo) => {
       const { addr: currentLayoutAddr, data: nodeData, position } = nodeInfo;
@@ -483,7 +428,7 @@ export const renderDoublyLinkedStructureVisualization = (
         x: currentLayoutX,
         y: mainChainY,
         address: currentLayoutAddr,
-        title: currentLayoutAddr, // Always address as per user request
+        title: currentLayoutAddr,
         fields: nodeFields,
         isIsolated: false,
         style: nodeSpecificStyle,
@@ -548,15 +493,12 @@ export const renderDoublyLinkedStructureVisualization = (
     mainListSpecs.length
   );
 
-  // --- STEP 5: ORPHAN CHAIN LAYOUT (Populate orphanSpecs) ---
   console.log(
     "[DLS Step 5] Starting Orphan Chain Layout - Single Line Horizontal."
   );
   const orphanSpecs = [];
-  // orphanCellLeft and orphanGridY are defined in Step 3
-  // calculatedOrphanCellWidth (cellWidthsArray[0]) is also from Step 3 and defines the total available width for orphans
-  let currentOrphanX = orphanCellLeft + orphanCellPadding; // Start X for orphan layout
-  const currentOrphanY = orphanGridY; // Orphans will be on a single Y-level
+  let currentOrphanX = orphanCellLeft + orphanCellPadding;
+  const currentOrphanY = orphanGridY;
 
   orderedOrphanAddrs.forEach((addr) => {
     const nodeData = addressObjectMap[addr];
@@ -564,7 +506,7 @@ export const renderDoublyLinkedStructureVisualization = (
       console.warn(
         `[DLS Step 5] Invalid node data for orphan address: ${addr}`
       );
-      return; // Skip this orphan if data is invalid
+      return;
     }
 
     const orphanNodeFields = {
@@ -582,9 +524,9 @@ export const renderDoublyLinkedStructureVisualization = (
 
     orphanSpecs.push({
       x: currentOrphanX,
-      y: currentOrphanY, // All orphans on the same Y level
+      y: currentOrphanY,
       address: addr,
-      title: addr, // Always address as per user request
+      title: addr,
       fields: orphanNodeFields,
       isIsolated: true,
       style: orphanNodeStyle,
@@ -593,11 +535,10 @@ export const renderDoublyLinkedStructureVisualization = (
       x: currentOrphanX,
       y: currentOrphanY,
       width: styles.node.width,
-      height: styles.node.height, // Use styles.node.height
+      height: styles.node.height,
       fields: orphanNodeFields,
     };
 
-    // Add connections for this orphan node's 'next' and 'prev'
     const orphanNextAddr = orphanNodeFields.next;
     if (
       orphanNextAddr &&
@@ -628,7 +569,6 @@ export const renderDoublyLinkedStructureVisualization = (
     currentOrphanX += styles.node.width + styles.layout.orphanNodeSpacingX;
   });
 
-  // Render orphan nodes
   orphanSpecs.forEach((spec) => {
     try {
       renderGenericNode(
@@ -651,15 +591,13 @@ export const renderDoublyLinkedStructureVisualization = (
     orphanSpecs.length
   );
 
-  // --- EXISTING RENDER Local Variables (Bottom, Center) ---
-  // This will use localVarsX, localVarsY from Step 3
   if (Object.keys(localVariables).length > 0) {
     const localVarsResult = renderVariableBox(
       contentGroup,
       "Local Variables",
       localVariables,
-      localVarsX, // Use new grid X
-      localVarsY, // Use new grid Y
+      localVarsX,
+      localVarsY,
       styles.varBox,
       "local",
       isAddress
@@ -674,18 +612,10 @@ export const renderDoublyLinkedStructureVisualization = (
   }
   console.log("[DLS] Local Variables Rendered (if any).");
 
-  // --- EXISTING Render Connections (Arrow Drawing Logic) ---
-  // This logic should largely remain, as it processes 'allConnections'
-  // which will be populated by the new Step 4 and Step 5.
   const connectionsGroup = contentGroup
     .append("g")
     .attr("class", "connections-group");
   allConnections.forEach((conn) => {
-    // ... (Paste existing comprehensive arrow drawing logic here) ...
-    // It should correctly use conn.type ('ll_next', 'll_prev') and
-    // styles.connection properties (colors, markerIds)
-    // Ensure sourcePoint and targetPoint calculations are robust.
-    // --- START OF COPIED ARROW LOGIC ---
     let sourcePoint, targetPoint;
     let path = "";
     let markerId = styles.connection.llNextMarkerId;
@@ -947,7 +877,6 @@ export const renderDoublyLinkedStructureVisualization = (
         targetPoint
       );
     }
-    // --- END OF COPIED ARROW LOGIC ---
   });
   console.log("[DLS] Connection Drawing Attempted.");
 

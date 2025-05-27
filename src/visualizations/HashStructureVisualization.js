@@ -22,7 +22,6 @@ export function renderHashStructureVisualization(
     height,
   });
 
-  // Define arrowheads for connections
   const arrowheadSize = 8;
   contentGroup
     .append("defs")
@@ -50,15 +49,12 @@ export function renderHashStructureVisualization(
     addressObjectMap,
   });
 
-  // Initialize positions and connections arrays
   const nodePositions = {};
   const allConnections = [];
 
-  // Parse hash structure
   const hashData = parseHashStructure(instanceVariables, addressObjectMap);
   console.log("[HashStructure] Parsed hash data:", hashData);
 
-  // Styles for hash structure visualization
   const styles = {
     varBox: {
       width: 280,
@@ -121,10 +117,8 @@ export function renderHashStructureVisualization(
     },
   };
 
-  // Define arrowheads
   defineArrowheads(contentGroup, styles.connection.arrowSize);
 
-  // Position calculations - use much more of the available space
   const leftSectionX = 20;
   const leftSectionY = 20;
   const leftSectionWidth = Math.max(
@@ -133,11 +127,9 @@ export function renderHashStructureVisualization(
   );
   const leftSectionHeight = height - 40;
 
-  // Position instance variables at top left of left section
   const instanceVarBoxX = leftSectionX + 10;
   const instanceVarBoxY = leftSectionY + 10;
 
-  // Render instance variables box
   let instanceVarBoxResult;
   try {
     instanceVarBoxResult = renderVariableBox(
@@ -162,21 +154,14 @@ export function renderHashStructureVisualization(
     instanceVarBoxResult = { height: 80, connectionPoints: [] };
   }
 
-  // Calculate hash structure area position - use much more space
-  const hashAreaY = leftSectionY; // Start from same Y as left section
-  const hashAreaX = leftSectionX + leftSectionWidth + 30; // Increased gap from 10
+  const hashAreaY = leftSectionY;
+  const hashAreaX = leftSectionX + leftSectionWidth + 30;
 
-  // IMPORTANT: Calculate the actual available width after accounting for auto-fit scaling
-  // The auto-fit will scale down the content, so we need to use much more of the nominal width
-  // to ensure we fill the available space after scaling
-  const baseHashAreaWidth = width - hashAreaX - 30; // Basic calculation
+  const baseHashAreaWidth = width - hashAreaX - 30;
 
-  // Be extremely aggressive with scaling compensation
-  // Estimate how much the content will be scaled down and compensate heavily
   const estimatedContentWidth = leftSectionWidth + baseHashAreaWidth;
-  const estimatedScale = Math.min((width - 80) / estimatedContentWidth, 1); // 80px total padding
+  const estimatedScale = Math.min((width - 80) / estimatedContentWidth, 1);
 
-  // Use extremely aggressive compensation - multiply by 4.0 instead of 2.5
   const scalingCompensation = estimatedScale < 1 ? 4.0 / estimatedScale : 3.0;
   const hashAreaWidth = baseHashAreaWidth * scalingCompensation;
 
@@ -188,13 +173,11 @@ export function renderHashStructureVisualization(
     finalHashAreaWidth: hashAreaWidth,
   });
 
-  const hashAreaHeight = leftSectionHeight; // Same height as left section (full height)
+  const hashAreaHeight = leftSectionHeight;
 
-  // Calculate number of horizontal sections needed (1 for local vars + number of buckets)
   const totalSections =
     hashData && hashData.buckets ? hashData.buckets.length + 1 : 2;
 
-  // Calculate minimum section height needed for nodes with padding - use larger values
   const minSectionHeight =
     styles.node.headerHeight +
     styles.node.fieldHeight * 3 +
@@ -203,16 +186,14 @@ export function renderHashStructureVisualization(
     60;
   const calculatedTotalHeight = totalSections * minSectionHeight;
 
-  // Use the larger of calculated height or available height
   const effectiveHashAreaHeight = Math.max(
     hashAreaHeight,
     calculatedTotalHeight
   );
   const sectionHeight = effectiveHashAreaHeight / totalSections;
 
-  // Position local variables box in the top horizontal section (section 0)
   const localVarBoxX = hashAreaX + 30;
-  const localVarBoxY = instanceVarBoxY; // Align top with instance variables box
+  const localVarBoxY = instanceVarBoxY;
 
   let localVarBoxResult;
   try {
@@ -238,7 +219,6 @@ export function renderHashStructureVisualization(
     localVarBoxResult = { height: 80, connectionPoints: [] };
   }
 
-  // Calculate buckets array positioning - position it below the instance variables in the left section
   const instanceVarBoxHeight = instanceVarBoxResult?.height || 80;
   const remainingLeftSectionHeight =
     leftSectionHeight - instanceVarBoxHeight - 40;
@@ -249,22 +229,19 @@ export function renderHashStructureVisualization(
         styles.bucketArray.padding * 2
       : 100;
 
-  // Position buckets array below instance variables, centered horizontally in left section
   const bucketArrayX =
     leftSectionX + (leftSectionWidth - styles.bucketArray.width) / 2;
   const bucketArrayY =
     leftSectionY +
     instanceVarBoxHeight +
-    80 + // Increased from 40 to move buckets array further down
+    80 +
     (remainingLeftSectionHeight - bucketArrayHeight) / 2;
 
-  // Render buckets array directly in the left section at the calculated position
   if (hashData && hashData.buckets) {
     const bucketArrayGroup = contentGroup
       .append("g")
       .attr("class", "bucket-array");
 
-    // Bucket array background
     bucketArrayGroup
       .append("rect")
       .attr("x", bucketArrayX)
@@ -275,7 +252,6 @@ export function renderHashStructureVisualization(
       .attr("stroke", styles.bucketArray.stroke)
       .attr("stroke-width", 2);
 
-    // Bucket array header
     bucketArrayGroup
       .append("rect")
       .attr("x", bucketArrayX)
@@ -295,7 +271,6 @@ export function renderHashStructureVisualization(
       .attr("fill", styles.bucketArray.titleTextFill)
       .text("buckets");
 
-    // Store bucket array position
     nodePositions["buckets"] = {
       x: bucketArrayX,
       y: bucketArrayY,
@@ -303,7 +278,6 @@ export function renderHashStructureVisualization(
       height: bucketArrayHeight,
     };
 
-    // Render individual bucket cells
     hashData.buckets.forEach((bucket, index) => {
       const bucketY =
         bucketArrayY +
@@ -311,7 +285,6 @@ export function renderHashStructureVisualization(
         styles.bucketArray.padding +
         index * styles.bucketArray.bucketHeight;
 
-      // Render bucket cell
       bucketArrayGroup
         .append("rect")
         .attr("x", bucketArrayX + 5)
@@ -321,7 +294,6 @@ export function renderHashStructureVisualization(
         .attr("fill", styles.bucketArray.bucketFill)
         .attr("stroke", styles.bucketArray.bucketStroke);
 
-      // Bucket index (left side)
       bucketArrayGroup
         .append("text")
         .attr("x", bucketArrayX + 15)
@@ -330,7 +302,6 @@ export function renderHashStructureVisualization(
         .attr("fill", styles.bucketArray.indexTextFill)
         .text(bucket.index);
 
-      // Bucket value/address (center)
       const bucketValue = bucket.address || "null";
       const displayValue =
         bucketValue === "null" ? "null" : truncateAddress(bucketValue);
@@ -344,7 +315,6 @@ export function renderHashStructureVisualization(
         .attr("fill", bucketValue === "null" ? "#64748b" : "#0ea5e9")
         .text(displayValue);
 
-      // Bucket pointer indicator (right side)
       if (bucket.chain) {
         bucketArrayGroup
           .append("circle")
@@ -356,7 +326,6 @@ export function renderHashStructureVisualization(
     });
   }
 
-  // Render hash structure if data exists
   if (hashData && hashData.buckets) {
     console.log("[HashStructure] Rendering hash structure...");
 
@@ -377,7 +346,6 @@ export function renderHashStructureVisualization(
         instanceVarBoxY
       );
 
-      // Draw connections from variables to hash structure
       drawVariableConnections(
         contentGroup,
         instanceVarBoxResult,
@@ -396,7 +364,6 @@ export function renderHashStructureVisualization(
         error
       );
 
-      // Render error message
       contentGroup
         .append("text")
         .attr("x", hashAreaX + hashAreaWidth / 2)
@@ -411,7 +378,6 @@ export function renderHashStructureVisualization(
       "[HashStructure] No hash data found, displaying empty visualization"
     );
 
-    // Show empty hash structure message
     contentGroup
       .append("text")
       .attr("x", hashAreaX + hashAreaWidth / 2)
@@ -425,16 +391,13 @@ export function renderHashStructureVisualization(
   return { nodePositions, connections: allConnections };
 }
 
-// Helper function to parse hash structure from state
 function parseHashStructure(instanceVariables, addressObjectMap) {
   console.log("[HashStructure] Parsing hash structure...");
 
-  // Look for common hash structure variable names
   const hashVariableNames = ["buckets", "table", "data", "hashTable", "map"];
   let bucketsAddress = null;
   let bucketCount = 0;
 
-  // Find buckets array address
   for (const varName of hashVariableNames) {
     if (instanceVariables[varName] && isAddress(instanceVariables[varName])) {
       bucketsAddress = instanceVariables[varName];
@@ -445,7 +408,6 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
     }
   }
 
-  // Also check for bucket count
   const countVariableNames = ["nBuckets", "bucketCount", "capacity", "size"];
   for (const varName of countVariableNames) {
     if (
@@ -471,10 +433,9 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
     return null;
   }
 
-  // Parse bucket array and chains
   const buckets = [];
   const actualBucketCount = bucketCount || Object.keys(bucketsData).length;
-  const chainedNodeAddresses = new Set(); // Track all nodes that are part of chains
+  const chainedNodeAddresses = new Set();
 
   console.log(`[HashStructure] Processing ${actualBucketCount} buckets`);
   console.log(`[HashStructure] Buckets data:`, bucketsData);
@@ -489,7 +450,6 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
 
     console.log(`[HashStructure] Bucket ${i}: chain = `, chain);
 
-    // Track all addresses in this chain
     if (chain) {
       chain.forEach((node) => {
         chainedNodeAddresses.add(node.address);
@@ -503,7 +463,6 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
     });
   }
 
-  // Find orphan nodes - nodes that exist in addressObjectMap but are not in any chain
   const orphanNodes = findOrphanNodes(
     addressObjectMap,
     chainedNodeAddresses,
@@ -521,7 +480,6 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
   };
 }
 
-// Helper function to find orphan nodes
 function findOrphanNodes(
   addressObjectMap,
   chainedNodeAddresses,
@@ -536,24 +494,19 @@ function findOrphanNodes(
   );
   console.log("[HashStructure] Buckets address to exclude:", bucketsAddress);
 
-  // Check each address in the addressObjectMap
   for (const [address, nodeData] of Object.entries(addressObjectMap)) {
-    // Skip if this is the buckets array itself
     if (address === bucketsAddress) {
       continue;
     }
 
-    // Skip if this address is already part of a chain
     if (chainedNodeAddresses.has(address)) {
       continue;
     }
 
-    // Skip if this doesn't look like a node (e.g., arrays)
     if (Array.isArray(nodeData)) {
       continue;
     }
 
-    // Check if this looks like a hash node (has key/value or similar structure)
     if (nodeData && typeof nodeData === "object") {
       const hasNodeLikeStructure =
         nodeData.hasOwnProperty("key") ||
@@ -579,7 +532,6 @@ function findOrphanNodes(
   return orphanNodes;
 }
 
-// Helper function to parse a chain of nodes
 function parseChain(startAddress, addressObjectMap) {
   if (!startAddress || !addressObjectMap[startAddress]) {
     console.log(
@@ -595,7 +547,7 @@ function parseChain(startAddress, addressObjectMap) {
   const nodes = [];
   let currentAddress = startAddress;
   const visited = new Set();
-  const MAX_CHAIN_LENGTH = 50; // Prevent infinite loops
+  const MAX_CHAIN_LENGTH = 50;
 
   while (
     currentAddress &&
@@ -624,7 +576,6 @@ function parseChain(startAddress, addressObjectMap) {
 
     nodes.push(node);
 
-    // Look for next pointer with multiple possible names (similar to linked structure visualization)
     const nextAddress =
       nodeData.nextAddress ||
       nodeData.next ||
@@ -637,7 +588,6 @@ function parseChain(startAddress, addressObjectMap) {
       `[HashStructure] parseChain: Next address for ${currentAddress}: ${nextAddress}`
     );
 
-    // Check if next address is valid
     if (!nextAddress || nextAddress === "0x0" || nextAddress === "null") {
       console.log(
         `[HashStructure] parseChain: End of chain reached at ${currentAddress}`
@@ -655,7 +605,6 @@ function parseChain(startAddress, addressObjectMap) {
   return nodes.length > 0 ? nodes : null;
 }
 
-// Helper function to render the hash structure
 function renderHashStructure(
   contentGroup,
   hashData,
@@ -672,15 +621,12 @@ function renderHashStructure(
   variableBoxY
 ) {
   const nodeWidth = styles.node.width;
-  const nodeSpacing = 60; // Increased from 30 to 60 for more horizontal spacing between chain nodes
+  const nodeSpacing = 60;
 
-  // Calculate horizontal sections area - use ALL available width and extend even further
   const sectionsStartX = startX;
   const sectionsStartY = startY;
 
-  // Use the full available width plus massive extension to maximize space usage
-  // Since we've already compensated for auto-fit scaling, extend much further
-  const sectionsAreaWidth = availableWidth + 800; // Increased from 400 to extend massively further
+  const sectionsAreaWidth = availableWidth + 800;
   const sectionsAreaHeight = availableHeight;
 
   console.log("[HashStructure] Section area calculations:", {
@@ -689,20 +635,15 @@ function renderHashStructure(
     extension: sectionsAreaWidth - availableWidth,
   });
 
-  // Render orphan nodes in the local variables section (section 0) if they exist
   if (hashData.orphanNodes && hashData.orphanNodes.length > 0) {
     console.log(
       "[HashStructure] Rendering orphan nodes in local variables section..."
     );
 
-    // Calculate position for orphan nodes in section 0 (local variables section)
     const localVarSectionY = sectionsStartY;
 
-    // Position orphan nodes to the right of the local variables box
-    // Start after the local variables box with some spacing
-    const orphanNodesStartX = sectionsStartX + 400; // Start after local variables box
+    const orphanNodesStartX = sectionsStartX + 400;
 
-    // Calculate the actual total node height including all components
     const fieldCount = calculateMaxFieldCount(hashData.orphanNodes);
     const fieldsAreaHeight =
       fieldCount * styles.node.fieldHeight +
@@ -710,7 +651,6 @@ function renderHashStructure(
     const actualNodeHeight =
       styles.node.headerHeight + styles.node.padding * 2 + fieldsAreaHeight;
 
-    // Align orphan nodes' top edge with the variable boxes' top edge
     const orphanNodesY = variableBoxY;
 
     renderHorizontalChain(
@@ -730,16 +670,12 @@ function renderHashStructure(
     );
   }
 
-  // Render horizontal sections and node chains (buckets array is rendered separately in main layout)
   hashData.buckets.forEach((bucket, index) => {
-    // Calculate horizontal section for this bucket (section 0 is for local variables, so buckets start from section 1)
     const bucketSectionIndex = bucket.index + 1;
     const sectionX = sectionsStartX;
     const sectionY = sectionsStartY + bucketSectionIndex * sectionHeight;
 
-    // Render horizontal chain if it exists
     if (bucket.chain) {
-      // Calculate the actual total node height including all components
       const fieldCount = calculateMaxFieldCount(bucket.chain);
       const fieldsAreaHeight =
         fieldCount * styles.node.fieldHeight +
@@ -759,10 +695,8 @@ function renderHashStructure(
         sectionsAreaWidth
       );
 
-      // Draw connection from bucket to first node in chain
       const firstNode = bucket.chain[0];
       if (firstNode && nodePositions[firstNode.address]) {
-        // Calculate bucket cell position for connection
         const bucketCellY =
           bucketArrayY +
           styles.bucketArray.headerHeight +
@@ -775,21 +709,17 @@ function renderHashStructure(
         const targetY =
           nodePositions[firstNode.address].y + styles.node.headerHeight / 2;
 
-        // Calculate variable horizontal distance based on bucket index
-        // Start with larger distance for top buckets, decrease as we go down
-        const baseDistance = 200; // Base distance for bucket 0
-        const distanceReduction = 15; // Reduce distance by this amount per bucket
-        const minDistance = 20; // Minimum distance to maintain
+        const baseDistance = 200;
+        const distanceReduction = 15;
+        const minDistance = 20;
         const horizontalDistance = Math.max(
           minDistance,
           baseDistance - bucket.index * distanceReduction
         );
 
-        // Create H-V-H path with rounded corners
         const midX = sourceX + horizontalDistance;
         const cornerRadius = 8;
 
-        // Calculate path with rounded corners
         const pathData = `M ${sourceX} ${sourceY} 
                          L ${midX - cornerRadius} ${sourceY} 
                          Q ${midX} ${sourceY} ${midX} ${
@@ -813,10 +743,9 @@ function renderHashStructure(
   });
 }
 
-// Helper function to calculate the maximum field count in a chain of nodes
 function calculateMaxFieldCount(nodes) {
   if (!nodes || nodes.length === 0) {
-    return 3; // Default minimum field count
+    return 3;
   }
 
   let maxFieldCount = 0;
@@ -826,26 +755,20 @@ function calculateMaxFieldCount(nodes) {
     maxFieldCount = Math.max(maxFieldCount, fieldCount);
   });
 
-  // Ensure minimum of 3 fields for reasonable display
   return Math.max(maxFieldCount, 3);
 }
 
-// Helper function to extract actual fields from a node object
 function extractNodeFields(node) {
   const fields = {};
 
-  // Skip the address field since it's used as the title
   const skipFields = ["address"];
 
-  // Extract all fields from the node object
   for (const [key, value] of Object.entries(node)) {
     if (!skipFields.includes(key)) {
-      // Convert null/undefined to "null" for display
       fields[key] = value !== null && value !== undefined ? value : "null";
     }
   }
 
-  // If no fields found, provide default structure
   if (Object.keys(fields).length === 0) {
     fields.data = "null";
   }
@@ -857,7 +780,6 @@ function extractNodeFields(node) {
   return fields;
 }
 
-// Helper function to render a horizontal chain of nodes
 function renderHorizontalChain(
   contentGroup,
   chain,
@@ -880,19 +802,16 @@ function renderHorizontalChain(
     `[HashStructure] renderHorizontalChain: Start position: (${startX}, ${startY})`
   );
 
-  // Calculate dynamic spacing to aggressively distribute nodes across available width
   const totalNodesWidth = chain.length * nodeWidth;
-  const usableWidth = availableWidth - startX - 20; // Reduced from 50px to only 20px margin on right
+  const usableWidth = availableWidth - startX - 20;
   const availableSpacingWidth = usableWidth - totalNodesWidth;
 
-  // Be much more aggressive with spacing - use most of the available space
   const dynamicSpacing =
     chain.length > 1
       ? Math.max(baseNodeSpacing, availableSpacingWidth / (chain.length - 1))
       : baseNodeSpacing;
 
-  // Increase the maximum spacing to allow more spread between nodes
-  const maxSpacing = 170; // Increased from 80 to 150 for more spacing between nodes
+  const maxSpacing = 170;
   const finalSpacing = Math.min(dynamicSpacing, maxSpacing);
 
   console.log("[HashStructure] Chain spacing calculations:", {
@@ -913,7 +832,6 @@ function renderHorizontalChain(
       `[HashStructure] renderHorizontalChain: Rendering node ${index} (${node.address}) at position (${nodeX}, ${nodeY})`
     );
 
-    // Create node specification
     const nodeSpec = {
       x: nodeX,
       y: nodeY,
@@ -929,7 +847,6 @@ function renderHorizontalChain(
       nodeSpec
     );
 
-    // Render the node
     renderGenericNode(
       contentGroup,
       nodeSpec,
@@ -944,12 +861,10 @@ function renderHorizontalChain(
       nodePositions[node.address]
     );
 
-    // Draw horizontal connection to next node
     if (index < chain.length - 1) {
       const nextNode = chain[index + 1];
       const nextNodeX = startX + (index + 1) * (nodeWidth + finalSpacing);
 
-      // Find the field that contains the next pointer (linkAddress, nextAddress, next, etc.)
       const nodeFields = Object.keys(nodeSpec.fields);
       const nextPointerFields = [
         "linkAddress",
@@ -961,7 +876,6 @@ function renderHorizontalChain(
       let nextPointerFieldIndex = -1;
       let nextPointerFieldName = null;
 
-      // Look for the next pointer field
       for (const fieldName of nextPointerFields) {
         const fieldIndex = nodeFields.indexOf(fieldName);
         if (fieldIndex !== -1) {
@@ -971,7 +885,6 @@ function renderHorizontalChain(
         }
       }
 
-      // If no standard next pointer field found, use the last field as default
       if (nextPointerFieldIndex === -1 && nodeFields.length > 0) {
         nextPointerFieldIndex = nodeFields.length - 1;
         nextPointerFieldName = nodeFields[nextPointerFieldIndex];
@@ -981,8 +894,7 @@ function renderHorizontalChain(
         `[HashStructure] Connection from node ${index}: using field '${nextPointerFieldName}' at index ${nextPointerFieldIndex} out of ${nodeFields.length} total fields`
       );
 
-      // Calculate connection points based on the actual field position
-      const sourceX = nodeX + nodeWidth; // Right edge of current node
+      const sourceX = nodeX + nodeWidth;
       const sourceY =
         nextPointerFieldIndex >= 0
           ? nodeY +
@@ -990,18 +902,15 @@ function renderHorizontalChain(
             styles.node.padding +
             nextPointerFieldIndex *
               (styles.node.fieldHeight + styles.node.fieldSpacing) +
-            styles.node.fieldHeight / 2 // Middle of the identified field
-          : nodeY + styles.node.headerHeight / 2; // Fallback to header if no fields
+            styles.node.fieldHeight / 2
+          : nodeY + styles.node.headerHeight / 2;
 
-      // Target: to the address tag of next node
-      const targetX = nextNodeX; // Left edge of next node
-      const targetY = nodeY + styles.node.headerHeight / 2; // Address tag position
+      const targetX = nextNodeX;
+      const targetY = nodeY + styles.node.headerHeight / 2;
 
-      // Create H-V-H path with rounded corners (horizontal-vertical-horizontal)
       const midX = sourceX + (targetX - sourceX) / 2;
-      const cornerRadius = 8; // Radius for rounded corners
+      const cornerRadius = 8;
 
-      // Calculate path with rounded corners
       const pathData = `M ${sourceX} ${sourceY} 
                        L ${midX - cornerRadius} ${sourceY} 
                        Q ${midX} ${sourceY} ${midX} ${
@@ -1037,7 +946,6 @@ function renderHorizontalChain(
   );
 }
 
-// Helper function to draw connections from variables to hash structure
 function drawVariableConnections(
   contentGroup,
   instanceVarBoxResult,
@@ -1046,7 +954,6 @@ function drawVariableConnections(
   nodePositions,
   styles
 ) {
-  // Draw connection from instance variables to buckets array
   if (instanceVarBoxResult?.connectionPoints && nodePositions["buckets"]) {
     const bucketsConnectionPoint = instanceVarBoxResult.connectionPoints.find(
       (cp) =>
@@ -1057,9 +964,8 @@ function drawVariableConnections(
       const sourceX = bucketsConnectionPoint.sourceCoords.x;
       const sourceY = bucketsConnectionPoint.sourceCoords.y;
       const targetX = nodePositions["buckets"].x;
-      const targetY = nodePositions["buckets"].y; // Connect to top of buckets array
+      const targetY = nodePositions["buckets"].y;
 
-      // Create simple 5-part path with sharp corners
       const pathData = `M ${sourceX} ${sourceY} 
                        L ${sourceX + 20} ${sourceY}
                        L ${sourceX + 20} ${sourceY + 45}
@@ -1083,7 +989,6 @@ function drawVariableConnections(
     }
   }
 
-  // Draw connections from local variables to specific nodes
   if (localVarBoxResult?.connectionPoints) {
     console.log(
       "[HashStructure] Processing local variable connections:",
@@ -1110,17 +1015,15 @@ function drawVariableConnections(
 
         const targetPos = nodePositions[connectionPoint.targetAddress];
 
-        // Position arrow to touch the right edge of the address tag
-        const arrowLength = 80; // Increased arrow length for maximum visibility
-        const arrowEndX = targetPos.x + targetPos.width; // Touch the right edge exactly (no gap)
-        const arrowStartX = arrowEndX + arrowLength; // Start further to the right
-        const arrowY = targetPos.y + styles.node.headerHeight / 2; // Centered on address tag
+        const arrowLength = 80;
+        const arrowEndX = targetPos.x + targetPos.width;
+        const arrowStartX = arrowEndX + arrowLength;
+        const arrowY = targetPos.y + styles.node.headerHeight / 2;
 
         console.log(
           `[HashStructure] Drawing arrow indicator touching right edge at (${arrowStartX}, ${arrowY}) to (${arrowEndX}, ${arrowY}) for node ${connectionPoint.targetAddress}`
         );
 
-        // Draw horizontal line approaching from the right toward the left
         contentGroup
           .append("line")
           .attr("x1", arrowStartX)
@@ -1130,7 +1033,6 @@ function drawVariableConnections(
           .attr("stroke", "#2563eb")
           .attr("stroke-width", 2);
 
-        // Draw arrowhead pointing left (toward the node)
         const arrowheadSize = 5;
         contentGroup
           .append("polygon")
@@ -1142,9 +1044,8 @@ function drawVariableConnections(
           )
           .attr("fill", "#2563eb");
 
-        // Add text label above the arrow showing the variable name
-        const textY = arrowY - 8; // 8px above the arrow
-        const textX = arrowStartX - arrowLength / 2; // Centered on the arrow
+        const textY = arrowY - 8;
+        const textX = arrowStartX - arrowLength / 2;
 
         contentGroup
           .append("text")

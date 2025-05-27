@@ -1,4 +1,3 @@
-// src/pages/RegisterPage.js
 import React, { useState, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
@@ -15,7 +14,6 @@ function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate passwords match
     if (password !== confirmPassword) {
       setPasswordError("Passwords do not match");
       return;
@@ -28,7 +26,6 @@ function RegisterPage() {
     setIsLoading(false);
 
     if (success) {
-      // Navigate to home page since we're automatically logged in
       navigate("/home");
     }
   };

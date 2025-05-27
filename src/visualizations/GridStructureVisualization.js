@@ -18,7 +18,6 @@ export function renderGridStructureVisualization(
   const instanceVariables = state.instanceVariables || state || {};
   const addressObjectMap = state.addressObjectMap || {};
 
-  // --- Determine the primary 'addresses' array and its address ('elemsAddress') ---
   let elemsAddress = null;
   let addresses = [];
   if (
@@ -45,17 +44,14 @@ export function renderGridStructureVisualization(
       addresses = addressObjectMap[elemsAddress];
     }
   }
-  // --- End of logic to find addresses array ---
 
-  // --- Identify unreferenced row arrays and calculate their required height ---
-  const stylesForCalc = { cell: { height: 40 }, padding: 5 }; // Minimal styles for height calc before full styles obj
+  const stylesForCalc = { cell: { height: 40 }, padding: 5 };
   const unreferencedRowSpacing = 5;
   const unreferencedSectionBottomMargin = 15;
   let unreferencedRowsBlockHeight = 0;
   let unreferencedRowAddrs = [];
 
   if (addressObjectMap) {
-    // Ensure addressObjectMap is available
     const allPotentialRowArrayAddrs = Object.keys(addressObjectMap).filter(
       (key) => key !== elemsAddress && Array.isArray(addressObjectMap[key])
     );
@@ -72,7 +68,7 @@ export function renderGridStructureVisualization(
       unreferencedRowsBlockHeight =
         unreferencedRowAddrs.length *
           (stylesForCalc.cell.height + unreferencedRowSpacing) -
-        unreferencedRowSpacing + // No spacing after the last one
+        unreferencedRowSpacing +
         unreferencedSectionBottomMargin;
       console.log(
         "[GridViz] Unreferenced rows identified:",
@@ -84,12 +80,10 @@ export function renderGridStructureVisualization(
       console.log("[GridViz] No unreferenced rows identified.");
     }
   }
-  // --- End of unreferenced rows calculation ---
 
   const nodePositions = {};
   const allConnections = [];
 
-  // Styles (similar to array visualization)
   const styles = {
     varBox: {
       width: 200,
@@ -134,13 +128,12 @@ export function renderGridStructureVisualization(
     },
   };
 
-  // Define arrowheads
   let defs = contentGroup.select("defs");
   if (defs.empty()) {
     defs = contentGroup.append("defs");
   }
   defineArrowheads(defs, styles);
-  // Explicitly define the array-arrow marker
+
   if (defs.select("#array-arrow").empty()) {
     defs
       .append("marker")
@@ -157,31 +150,29 @@ export function renderGridStructureVisualization(
       .attr("fill", styles.connection.color || "#334155");
   }
 
-  // --- Adjust main grid starting positions based on unreferenced rows height ---
-  const topMargin = 30; // The absolute top margin of the canvas
+  const topMargin = 30;
   const varBoxX = 30;
   let mainGridStartY = topMargin + unreferencedRowsBlockHeight;
 
   const addressesArrayX = varBoxX + styles.varBox.width + 60;
-  const addressesArrayY = mainGridStartY + 10; // This is for the vertical array
+  const addressesArrayY = mainGridStartY + 10;
   const addressBoxX = addressesArrayX;
   const addressBoxY = addressesArrayY - styles.cell.height;
 
-  let varBoxY = // Calculate varBoxY relative to the (now shifted) addressesArrayY
+  let varBoxY =
     addressesArrayY +
     styles.cell.height / 2 -
     styles.varBox.headerHeight -
     styles.varBox.fieldHeight / 2;
 
-  // --- START: Render unreferenced rows at the top ---
   if (unreferencedRowAddrs.length > 0) {
     let currentUnreferencedY = topMargin;
-    const unreferencedRowAddressBoxX = addressesArrayX + 140 + 120; // Align with main grid's horizontal rows X
+    const unreferencedRowAddressBoxX = addressesArrayX + 140 + 120;
     const unreferencedRowDataStartX = unreferencedRowAddressBoxX + 100;
 
     unreferencedRowAddrs.forEach((unrefAddr) => {
       const rowAddressBoxWidth = 100;
-      // Address Box for the unreferenced row
+
       contentGroup
         .append("rect")
         .attr("x", unreferencedRowAddressBoxX)
@@ -203,10 +194,8 @@ export function renderGridStructureVisualization(
         .attr("fill", styles.varBox.addressValueFill)
         .text(truncateAddress(String(unrefAddr), 10));
 
-      // Data cells for the unreferenced row
       const rowData = addressObjectMap[unrefAddr] || [];
       if (rowData.length > 0) {
-        // Arrow from address box to first cell of unreferenced row
         contentGroup
           .append("path")
           .attr(
@@ -261,10 +250,9 @@ export function renderGridStructureVisualization(
           .style("font-size", styles.cell.fontSize)
           .text(truncateAddress(String(cellValue), 10));
       });
-      currentUnreferencedY += styles.cell.height + 5; // Move Y for next unreferenced row (5 is unreferencedRowSpacing)
+      currentUnreferencedY += styles.cell.height + 5;
     });
   }
-  // --- END: Render unreferenced rows at the top ---
 
   const instanceVarBoxResult = renderVariableBox(
     contentGroup,
@@ -276,15 +264,10 @@ export function renderGridStructureVisualization(
     "instance",
     isAddress
   );
-  // Collect connections from instance variables if any (though elems is handled separately below)
+
   if (instanceVarBoxResult && instanceVarBoxResult.connectionPoints) {
-    // Filter out the elems connection if we are drawing it manually, or ensure it's styled distinctly
-    // For now, let's assume renderVariableBox doesn't draw for 'elems' if we handle it manually.
-    // Or, if it does, this new logic will draw ON TOP OF IT or DUPLICATE it for local vars.
-    // We are primarily interested in local var connections here.
   }
 
-  // Render local variable box below addresses array
   const localVariables = state.localVariables || {};
   if (Object.keys(localVariables).length > 0) {
     const addressesArrayHeight = addresses.length * styles.cell.height;
@@ -305,7 +288,6 @@ export function renderGridStructureVisualization(
     }
   }
 
-  // Arrow from 'elems' field in Instance Variables to the start of addresses array (main elems pointer)
   if (elemsAddress && instanceVarBoxResult.connectionPoints) {
     const elemsConnectionPoint = instanceVarBoxResult.connectionPoints.find(
       (p) => p.sourceName.endsWith("-elems")
@@ -314,9 +296,8 @@ export function renderGridStructureVisualization(
       const startX = elemsConnectionPoint.sourceCoords.x;
       const startY = elemsConnectionPoint.sourceCoords.y;
 
-      // Target the middle of the left side of the addressBox above the vertical addresses array
-      const endTargetX = addressBoxX; // Target left edge
-      const endTargetY = addressBoxY + styles.cell.height / 2; // Target vertical middle
+      const endTargetX = addressBoxX;
+      const endTargetY = addressBoxY + styles.cell.height / 2;
 
       const path = generateOrthogonalPath(
         { x: startX, y: startY },
@@ -334,7 +315,6 @@ export function renderGridStructureVisualization(
         .attr("stroke-width", styles.connection.strokeWidth)
         .attr("marker-end", `url(#${styles.connection.markerId})`);
     } else {
-      // Fallback logic (can be kept or removed if the above is reliable)
       const instanceVarKeys = Object.keys(instanceVariables);
       const fieldIndex = instanceVarKeys.indexOf("elems");
       if (
@@ -349,7 +329,7 @@ export function renderGridStructureVisualization(
           fieldIndex *
             (styles.varBox.fieldHeight + styles.varBox.fieldSpacing) +
           styles.varBox.fieldHeight / 2;
-        // Fallback still targets old way, consider updating if this path is taken often
+
         const endXfb = addressBoxX;
         const endYfb = addressBoxY + styles.cell.height / 2;
         contentGroup
@@ -377,7 +357,7 @@ export function renderGridStructureVisualization(
       .attr("fill", styles.cell.fill)
       .attr("stroke", styles.cell.stroke)
       .attr("stroke-width", 1);
-    // Draw index partition line (like in array viz)
+
     cellGroup
       .append("line")
       .attr("x1", 0)
@@ -386,7 +366,7 @@ export function renderGridStructureVisualization(
       .attr("y2", 18)
       .attr("stroke", styles.cell.stroke)
       .attr("stroke-width", 0.5);
-    // Index
+
     cellGroup
       .append("text")
       .attr("x", addressCellWidth / 2)
@@ -396,7 +376,7 @@ export function renderGridStructureVisualization(
       .attr("fill", "#64748b")
       .style("font-size", "10px")
       .text(idx);
-    // Address value
+
     cellGroup
       .append("text")
       .attr("x", addressCellWidth / 2)
@@ -407,7 +387,6 @@ export function renderGridStructureVisualization(
       .style("font-size", styles.cell.fontSize)
       .text(truncateAddress(String(rowAddress), 10));
 
-    // Store position of this row's address box
     nodePositions[rowAddress] = {
       x: cellX,
       y: cellY,
@@ -415,13 +394,12 @@ export function renderGridStructureVisualization(
       height: styles.cell.height,
     };
 
-    // Offset row arrays and address boxes to the right of the addresses array
     const gap = 120;
     const rowAddressBoxWidth = 100;
     const rowAddressBoxX = addressesArrayX + addressCellWidth + gap;
     const rowStartX = rowAddressBoxX + rowAddressBoxWidth;
     const rowStartY = cellY;
-    // Add address box to the left of the row array (wider)
+
     contentGroup
       .append("rect")
       .attr("x", rowAddressBoxX)
@@ -442,7 +420,7 @@ export function renderGridStructureVisualization(
       .attr("font-weight", "bold")
       .attr("fill", styles.varBox.addressValueFill)
       .text(truncateAddress(String(rowAddress), 10));
-    // Draw arrow from address cell to row address box (horizontal)
+
     const path = generateOrthogonalPath(
       {
         x: cellX + addressCellWidth,
@@ -465,7 +443,6 @@ export function renderGridStructureVisualization(
       .attr("stroke-width", styles.connection.strokeWidth)
       .attr("marker-end", "url(#array-arrow)");
 
-    // Draw horizontal arrow from right center of row address box to left center of first cell in row array
     if (
       addressObjectMap[rowAddress] &&
       addressObjectMap[rowAddress].length > 0
@@ -497,7 +474,6 @@ export function renderGridStructureVisualization(
         .attr("stroke-width", styles.connection.strokeWidth);
     }
 
-    // Render the row array horizontally
     const rowData = addressObjectMap[rowAddress] || [];
     rowData.forEach((cellValue, colIdx) => {
       const cellX2 = rowStartX + colIdx * styles.cell.width;
@@ -540,7 +516,6 @@ export function renderGridStructureVisualization(
         .text(truncateAddress(String(cellValue), 10));
     });
 
-    // Store position of the ACTUAL ROW TAG (rowAddressBox)
     nodePositions[rowAddress] = {
       x: rowAddressBoxX,
       y: rowStartY,
@@ -549,11 +524,10 @@ export function renderGridStructureVisualization(
     };
   });
 
-  // Add address box above the addresses array (for elemsAddress)
   if (addresses.length > 0 && elemsAddress) {
     const addressBoxX = addressesArrayX;
-    const addressBoxY = addressesArrayY - styles.cell.height; // flush with addresses array
-    // Draw the box
+    const addressBoxY = addressesArrayY - styles.cell.height;
+
     contentGroup
       .append("rect")
       .attr("x", addressBoxX)
@@ -564,7 +538,7 @@ export function renderGridStructureVisualization(
       .attr("stroke", styles.cell.stroke)
       .attr("stroke-width", 1)
       .attr("rx", 3);
-    // Draw the address value
+
     contentGroup
       .append("text")
       .attr("x", addressBoxX + addressCellWidth / 2)
@@ -575,7 +549,7 @@ export function renderGridStructureVisualization(
       .attr("font-weight", "bold")
       .attr("fill", styles.varBox.addressValueFill)
       .text(truncateAddress(String(elemsAddress), 10));
-    // Draw vertical arrow from address box to first cell of addresses array
+
     contentGroup
       .append("path")
       .attr(
@@ -600,7 +574,6 @@ export function renderGridStructureVisualization(
       .attr("stroke-width", styles.connection.strokeWidth);
   }
 
-  // --- ARROW DRAWING LOGIC (NEW SECTION) ---
   const connectionsGroup = contentGroup
     .append("g")
     .attr("class", "connections-from-local-vars");
@@ -611,7 +584,7 @@ export function renderGridStructureVisualization(
     }
 
     const sourcePoint = conn.sourceCoords;
-    const targetData = nodePositions[conn.targetAddress]; // Target is a row's address box
+    const targetData = nodePositions[conn.targetAddress];
 
     if (!targetData) {
       console.warn(
@@ -620,7 +593,6 @@ export function renderGridStructureVisualization(
       return;
     }
 
-    // Determine targetPoint on the edge of the targetData bounding box
     const targetPoint = {
       x:
         sourcePoint.x < targetData.x + targetData.width / 2
@@ -629,7 +601,7 @@ export function renderGridStructureVisualization(
       y: targetData.y + targetData.height / 2,
     };
 
-    const markerId = styles.connection.markerId; // "array-arrow"
+    const markerId = styles.connection.markerId;
     const color = styles.connection.color;
     const strokeWidth = styles.connection.strokeWidth;
     const cornerRadius = styles.connection.cornerRadius;
@@ -641,13 +613,13 @@ export function renderGridStructureVisualization(
     const xDistForOffset = deltaXOverallMid / 2 - cornerRadius * 2;
     const yDistForOffset = deltaYOverallMid * 0.4;
     initialOffset = Math.max(5, Math.min(30, xDistForOffset, yDistForOffset));
-    if (isNaN(initialOffset) || initialOffset < 5) initialOffset = 15; // Fallback
+    if (isNaN(initialOffset) || initialOffset < 5) initialOffset = 15;
 
     const path = generateOrthogonalPath(
       sourcePoint,
       targetPoint,
       cornerRadius,
-      "H-V-H", // Force H-V-H path style
+      "H-V-H",
       initialOffset,
       null
     );

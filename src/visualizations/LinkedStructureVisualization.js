@@ -1,5 +1,3 @@
-// This is a rename operation, content will be from LinkedListVisualization.js
-
 import {
   isAddress,
   truncateAddress,
@@ -18,24 +16,21 @@ export const renderLinkedStructureVisualization = (
   memorySnapshot
 ) => {
   console.log(
-    "TOP OF renderLinkedListVectorVisualization. Op:", // Renamed Log
+    "TOP OF renderLinkedListVectorVisualization. Op:",
     operation,
     "Snap:",
     memorySnapshot
   );
 
-  const state = memorySnapshot || operation.state || {}; // Prioritize snapshot
+  const state = memorySnapshot || operation.state || {};
   const localVariables = state.localVariables || {};
   const instanceVariables = state.instanceVariables || {};
   const addressObjectMap = state.addressObjectMap || {};
 
-  // Move visited to the top so it is available for orphan ordering
   const visited = new Set();
 
-  // Define styles, adjusting node styles for renderGenericNode
   const styles = {
     varBox: {
-      // Style for renderVariableBox
       width: 250,
       headerHeight: 25,
       fieldHeight: 25,
@@ -55,8 +50,7 @@ export const renderLinkedStructureVisualization = (
       titleFontSize: "13px",
     },
     node: {
-      // Styles for renderGenericNode
-      width: 180, // Slightly narrower nodes for LL?
+      width: 180,
       headerHeight: 25,
       fieldHeight: 25,
       fieldSpacing: 5,
@@ -68,34 +62,32 @@ export const renderLinkedStructureVisualization = (
       titleTextFill: "#334155",
       keyTextFill: "#334155",
       valueTextFill: "#334155",
-      addressTextFill: "#0284c7", // Blue for addresses
+      addressTextFill: "#0284c7",
       fieldRectFill: "none",
-      fieldRectStroke: "#e2e8f0", // Use borders for fields
+      fieldRectStroke: "#e2e8f0",
       fontSize: "12px",
       titleFontSize: "13px",
-      height: 100, // Added default height, was used in calculations
+      height: 100,
     },
     connection: {
       strokeWidth: 1.5,
-      instanceVarColor: "#334155", // Used by defineArrowheads for #ll-instance-var-arrow
-      nextColor: "#2563eb", // Used by defineArrowheads for #ll-next-arrow
-      // Define marker IDs used in this viz
+      instanceVarColor: "#334155",
+      nextColor: "#2563eb",
+
       llInstanceVarMarkerId: "ll-instance-var-arrow",
       llNextMarkerId: "ll-next-arrow",
       cornerRadius: 8,
-      defaultColor: "#64748b", // Fallback color
+      defaultColor: "#64748b",
     },
     layout: {
-      // Layout specific parameters
-      nodeSpacingX: 60, // Increased from 40
+      nodeSpacingX: 60,
       varBoxSpacingY: 20,
-      nodesStartXOffset: 60, // Space between var boxes and first node
-      layerSpacingY: 120, // Vertical space between layers
-      orphanNodeSpacingX: 40, // Spacing between orphan nodes
+      nodesStartXOffset: 60,
+      layerSpacingY: 120,
+      orphanNodeSpacingX: 40,
     },
   };
 
-  // Define Arrowheads using helper
   let defs = contentGroup.select("defs");
   if (defs.empty()) {
     defs = contentGroup.append("defs");
@@ -105,7 +97,6 @@ export const renderLinkedStructureVisualization = (
   const nodePositions = {};
   const allConnections = [];
 
-  // Declare main chain variables ONCE at the top
   let startAddress;
   let currentAddress;
   let nodesProcessedCount;
@@ -113,7 +104,6 @@ export const renderLinkedStructureVisualization = (
   let mainChainLeftmostX;
   let currentX;
 
-  // --- 1. INITIAL MAIN CHAIN TRAVERSAL (Populate visited set) ---
   startAddress =
     instanceVariables.start ||
     instanceVariables.head ||
@@ -150,7 +140,7 @@ export const renderLinkedStructureVisualization = (
     if (potentialStarts.length > 0) {
       startAddress = potentialStarts[0];
     } else if (allNodeAddrs.length > 0) {
-      startAddress = allNodeAddrs[0]; // Fallback to first node if no clear start
+      startAddress = allNodeAddrs[0];
     }
   }
 
@@ -166,19 +156,18 @@ export const renderLinkedStructureVisualization = (
     visited.add(tempCurrentAddress);
     const nodeData = addressObjectMap[tempCurrentAddress];
     if (!nodeData || typeof nodeData !== "object" || Array.isArray(nodeData)) {
-      break; // Invalid node data
+      break;
     }
     tempCurrentAddress = nodeData.nextAddress || nodeData.next;
     nodesVisitedCount++;
   }
 
-  // --- 2. ORPHAN CHAIN ORDERING (Define orderedOrphanAddrs) ---
   const orphanAddrs = Object.keys(addressObjectMap).filter(
     (addr) =>
       addressObjectMap[addr] &&
       typeof addressObjectMap[addr] === "object" &&
       !Array.isArray(addressObjectMap[addr]) &&
-      !visited.has(addr) // Use the populated visited set
+      !visited.has(addr)
   );
   const orphanNexts = new Set();
   orphanAddrs.forEach((addr) => {
@@ -192,7 +181,7 @@ export const renderLinkedStructureVisualization = (
   let orderedOrphanAddrs = [];
   orphanHeads.forEach((headAddr) => {
     let current = headAddr;
-    const chainVisitedThisOrphanRun = new Set(); // Avoid cycles within a single orphan chain run
+    const chainVisitedThisOrphanRun = new Set();
     while (
       current &&
       !chainVisitedThisOrphanRun.has(current) &&
@@ -210,28 +199,24 @@ export const renderLinkedStructureVisualization = (
     }
   });
 
-  // --- 3. GRID SETUP (Define mainChainStartX, mainChainY, etc.) ---
-  // --- GRID LAYOUT CONSTANTS ---
   const gridRows = 4;
-  const gridCols = 3; // This might be adjusted by dynamic width logic later
+  const gridCols = 3;
   const cellWidth = width / gridCols;
   const cellHeight = height / gridRows;
 
-  // --- DYNAMIC GRID LAYOUT FOR ORPHAN CHAIN ---
   const orphanNodeCount =
     orderedOrphanAddrs.length > 0 ? orderedOrphanAddrs.length : 1;
   const baseNodeWidth = styles.node.width;
   const baseSpacing = styles.layout.orphanNodeSpacingX;
   const orphanCellPadding = 20;
-  const calculatedOrphanCellWidth = // Renamed to avoid conflict if gridCols is changed
+  const calculatedOrphanCellWidth =
     orphanNodeCount * baseNodeWidth +
     (orphanNodeCount - 1) * baseSpacing +
     2 * orphanCellPadding;
 
-  const actualGridCols = 3; // Assuming a fixed 3-column conceptual layout for now
+  const actualGridCols = 3;
   const remainingWidth = Math.max(width - calculatedOrphanCellWidth, 1);
-  // If only 1 column remains for other cells, it takes all remaining width.
-  // If more than 1 column remains (e.g. gridCols = 3, 1 for orphans, 2 for others), divide fairly.
+
   const otherCellWidth =
     actualGridCols > 1 ? remainingWidth / (actualGridCols - 1) : remainingWidth;
 
@@ -239,8 +224,8 @@ export const renderLinkedStructureVisualization = (
     calculatedOrphanCellWidth,
     otherCellWidth,
     otherCellWidth,
-  ]; // Adjust if actualGridCols changes
-  // Ensure this array matches actualGridCols if it's dynamic
+  ];
+
   if (actualGridCols === 2) cellWidths.splice(2, 1);
   if (actualGridCols === 1) cellWidths.splice(1, 2);
 
@@ -249,44 +234,35 @@ export const renderLinkedStructureVisualization = (
     colX.push(colX[i] + cellWidths[i]);
   }
 
-  // Cell assignments (conceptual, might need review if actualGridCols changes)
-  // Instance Variables: (0,1) -> e.g. colX[1] based, if it exists
   const instanceVarsX =
     (colX[1] || 0) + (cellWidths[1] || width) / 2 - styles.varBox.width / 2;
   const instanceVarsY =
     cellHeight * 0 + cellHeight / 2 - styles.varBox.headerHeight;
-  // Main Chain: (1,2) -> e.g. colX[2] based
+
   const mainChainY = cellHeight * 1 + cellHeight / 2 - styles.node.height / 2;
-  const mainChainStartX = (colX[2] || colX[1] || 0) + 20; // Fallback if fewer columns
-  // Orphan Chain: (2,0) -> e.g. colX[0] based
+  const mainChainStartX = (colX[2] || colX[1] || 0) + 20;
+
   const orphanCellLeft = colX[0];
   const orphanCellTop = cellHeight * 2;
   const orphanCellHeight = cellHeight;
-  // Local Variables: (3,1) -> e.g. colX[1] based
+
   const localVarsX =
     (colX[1] || 0) + (cellWidths[1] || width) / 2 - styles.varBox.width / 2;
   const localVarsY =
     cellHeight * 3 + cellHeight / 2 - styles.varBox.headerHeight;
 
-  // --- 4. MAIN CHAIN LAYOUT (Populate mainListSpecs) ---
   const mainListSpecs = [];
-  currentAddress = startAddress; // Re-initialize for this pass
-  nodesProcessedCount = 0; // Re-initialize
-  mainChainLeftmostX = mainChainStartX; // Initialize with start X
-  currentX = mainChainStartX; // Initialize currentX for layout
+  currentAddress = startAddress;
+  nodesProcessedCount = 0;
+  mainChainLeftmostX = mainChainStartX;
+  currentX = mainChainStartX;
 
   while (
     currentAddress &&
     currentAddress !== "0x0" &&
     currentAddress !== "null" &&
-    // No need to check visited.has() here if we are strictly following the main chain from startAddress
-    // and assuming it's acyclic for layout purposes, or relying on MAX_NODES_TO_RENDER.
-    // If main chain could have nodes also in orphan list due to complex structures, ensure `visited` logic is robust.
     nodesProcessedCount < MAX_NODES_TO_RENDER
   ) {
-    // If this node was ALREADY processed by orphan logic AND ALSO part of main chain path (complex cases),
-    // it would be in `visited`. The first pass (populating `visited`) is key for orphan detection.
-    // This second pass is for LAYING OUT the main chain identified.
     const nodeData = addressObjectMap[currentAddress];
     if (!nodeData || typeof nodeData !== "object" || Array.isArray(nodeData)) {
       break;
@@ -320,36 +296,32 @@ export const renderLinkedStructureVisualization = (
       title:
         nodeData.title || nodeData.url || truncateAddress(currentAddress, 6),
       fields: nodeFields,
-      isIsolated: false, // Main chain nodes are not isolated by definition here
+      isIsolated: false,
       style: styles.node,
     });
 
-    // ADD MAIN CHAIN CONNECTIONS HERE
     const nextNodeAddr = nodeData.nextAddress || nodeData.next;
     if (nextNodeAddr && nextNodeAddr !== "0x0" && nextNodeAddr !== "null") {
-      // Ensure the target node actually exists in the map before creating a connection
-      // This prevents trying to draw arrows to non-existent or invalid addresses
       if (addressObjectMap[nextNodeAddr]) {
         allConnections.push({
-          sourceName: currentAddress, // The current node's address
-          targetAddress: nextNodeAddr, // The next node's address
-          type: "ll_next", // Standard type for main chain next pointers
+          sourceName: currentAddress,
+          targetAddress: nextNodeAddr,
+          type: "ll_next",
         });
       }
     }
-    // END OF ADDED MAIN CHAIN CONNECTIONS
 
     currentX += styles.node.width + styles.layout.nodeSpacingX;
     mainChainLeftmostX = Math.min(
       mainChainLeftmostX,
       currentX - (styles.node.width + styles.layout.nodeSpacingX)
-    ); // track leftmost edge of the first node
-    currentAddress = nextNodeAddr; // Use the already determined nextNodeAddr for the next iteration
+    );
+    currentAddress = nextNodeAddr;
     nodesProcessedCount++;
   }
 
   if (nodesProcessedCount === MAX_NODES_TO_RENDER) {
-    console.warn("LinkedListVectorViz: Reached max node render limit."); // Renamed Log
+    console.warn("LinkedListVectorViz: Reached max node render limit.");
   }
 
   mainListSpecs.forEach((spec) => {
@@ -364,14 +336,13 @@ export const renderLinkedStructureVisualization = (
       );
     } catch (e) {
       console.error(
-        "[LinkedListVectorViz] Error rendering MAIN LIST node:", // Renamed Log
+        "[LinkedListVectorViz] Error rendering MAIN LIST node:",
         spec.address,
         e
       );
     }
   });
 
-  // --- 5. ORPHAN CHAIN LAYOUT ---
   let orphanStartXGrid = orphanCellLeft + orphanCellPadding;
   const orphanYGrid =
     orphanCellTop + (orphanCellHeight - styles.node.height) / 2;
@@ -414,11 +385,11 @@ export const renderLinkedStructureVisualization = (
     orphanXGrid += baseNodeWidth + baseSpacing;
     visited.add(addr);
   });
-  // Draw next-pointer arrows for orphans
+
   orphanSpecs.forEach((spec) => {
     const nodeData = addressObjectMap[spec.address];
     const nextAddr = nodeData.nextAddress || nodeData.next;
-    // Check if nextAddr is a valid node in the overall map, not just another orphan
+
     if (
       nextAddr &&
       nextAddr !== "0x0" &&
@@ -428,11 +399,11 @@ export const renderLinkedStructureVisualization = (
       allConnections.push({
         sourceName: spec.address,
         targetAddress: nextAddr,
-        type: "ll_next", // Use the standard 'll_next' type for styling consistency
+        type: "ll_next",
       });
     }
   });
-  // Render all orphanSpecs
+
   orphanSpecs.forEach((spec) => {
     try {
       renderGenericNode(
@@ -452,7 +423,6 @@ export const renderLinkedStructureVisualization = (
     }
   });
 
-  // --- INSTANCE VARIABLES BOX ---
   let instanceVarsBoxHeight = 0;
   if (Object.keys(instanceVariables).length > 0) {
     const instanceVarsResult = renderVariableBox(
@@ -475,7 +445,6 @@ export const renderLinkedStructureVisualization = (
     };
   }
 
-  // --- LOCAL VARIABLES BOX ---
   let localVarsBoxHeight = 0;
   if (Object.keys(localVariables).length > 0) {
     const localVarsResult = renderVariableBox(
@@ -512,14 +481,11 @@ export const renderLinkedStructureVisualization = (
     const sNode = styles.node;
 
     const Y_THRESHOLD =
-      (sNode && typeof sNode.height === "number" ? sNode.height : 100) * 0.6; // Raised from 0.45
-    // X_THRESHOLD is no longer used for path style decision
-    // const X_THRESHOLD = (sNode && typeof sNode.width === 'number' ? sNode.width : 180) * 0.30;
+      (sNode && typeof sNode.height === "number" ? sNode.height : 100) * 0.6;
 
-    const HORIZONTAL_OVERSHOOT = 20; // For H-V path, non-overlapping case
-    const INITIAL_HORIZONTAL_SEGMENT_FOR_OVERLAP = 20; // For H-V path, overlapping case
+    const HORIZONTAL_OVERSHOOT = 20;
+    const INITIAL_HORIZONTAL_SEGMENT_FOR_OVERLAP = 20;
 
-    // 1. Determine Source BoundingBox and Specific Field Egress Coords
     let sourceBoundingBoxPosData;
     let specificFieldInitialCoords;
 
@@ -579,7 +545,6 @@ export const renderLinkedStructureVisualization = (
       return;
     }
 
-    // 2. Determine Target Position Data
     const targetPosData = nodePositions[conn.targetAddress];
     if (!targetPosData) {
       if (
@@ -620,15 +585,13 @@ export const renderLinkedStructureVisualization = (
       return;
     }
 
-    // 3. Define key coordinates for source and target
     const sourceOverallMidX =
       sourceBoundingBoxPosData.x + sourceBoundingBoxPosData.width / 2;
-    const sourceFieldActualY = specificFieldInitialCoords.y; // Y from the actual field for drawing origin
+    const sourceFieldActualY = specificFieldInitialCoords.y;
 
     const targetOverallMidX = targetPosData.x + targetPosData.width / 2;
     const targetOverallMidY = targetPosData.y + targetPosData.height / 2;
 
-    // Determine the Y-coordinate to use for the source side of the *path style decision*
     let decisionSourceY = sourceFieldActualY;
     if (conn.type === "ll_next" || conn.type === "ll_next_orphan") {
       if (
@@ -636,7 +599,7 @@ export const renderLinkedStructureVisualization = (
         typeof sourceBoundingBoxPosData.height === "number"
       ) {
         decisionSourceY =
-          sourceBoundingBoxPosData.y + sourceBoundingBoxPosData.height / 2; // Use node center Y
+          sourceBoundingBoxPosData.y + sourceBoundingBoxPosData.height / 2;
       } else {
         console.warn(
           "[LLV PathDecision] Missing sourceBoundingBoxPosData.height for ll_next, using field Y for decision."
@@ -657,11 +620,9 @@ export const renderLinkedStructureVisualization = (
       )}, Y_THRESH: ${Y_THRESHOLD.toFixed(2)}`
     );
 
-    // 4. Determine Egress Side from Source and set initial sourcePoint.y
-    // Egress side is based on overall X midpoints.
     const chosenEgressSide =
       targetOverallMidX < sourceOverallMidX ? "left" : "right";
-    sourcePoint = { y: sourceFieldActualY }; // Actual drawing point Y uses the specific field's Y
+    sourcePoint = { y: sourceFieldActualY };
     if (chosenEgressSide === "left") {
       sourcePoint.x = sourceBoundingBoxPosData.x;
     } else {
@@ -669,9 +630,7 @@ export const renderLinkedStructureVisualization = (
         sourceBoundingBoxPosData.x + sourceBoundingBoxPosData.width;
     }
 
-    // 5. Apply New Rules for Path Style and Target Point
     if (deltaYDecisionMid <= Y_THRESHOLD) {
-      // Only Y-Threshold for H-V-H
       pathOrientationHint = "H-V-H";
       targetPoint = {
         x:
@@ -682,7 +641,6 @@ export const renderLinkedStructureVisualization = (
       };
       console.log(`[LLV PathStyle] Chosen: H-V-H (Y-thresh met)`);
     } else {
-      // H-V path with overlap logic
       pathOrientationHint = "H-V_to_target_top";
       const sourceRightX =
         sourceBoundingBoxPosData.x + sourceBoundingBoxPosData.width;
@@ -696,15 +654,12 @@ export const renderLinkedStructureVisualization = (
       );
 
       if (!overlap) {
-        // Scenario 2.1: NO Horizontal Overlap
         let approachingEdgeX;
         let overshotX;
         if (chosenEgressSide === "right") {
-          // Source is to the left of target
           approachingEdgeX = targetPosData.x;
           overshotX = approachingEdgeX + HORIZONTAL_OVERSHOOT;
         } else {
-          // Source is to the right of target, or egressing left towards a target on the left
           approachingEdgeX = targetRightX;
           overshotX = approachingEdgeX - HORIZONTAL_OVERSHOOT;
         }
@@ -721,13 +676,10 @@ export const renderLinkedStructureVisualization = (
           )}, OvershotX: ${overshotX.toFixed(2)}`
         );
       } else {
-        // Scenario 2.2: Horizontal Overlap EXISTS
         let turnX;
         if (chosenEgressSide === "right") {
-          // Egressing right, into/towards overlap zone
           turnX = sourcePoint.x + INITIAL_HORIZONTAL_SEGMENT_FOR_OVERLAP;
         } else {
-          // Egressing left, into/towards overlap zone
           turnX = sourcePoint.x - INITIAL_HORIZONTAL_SEGMENT_FOR_OVERLAP;
         }
         targetPoint = {
@@ -745,7 +697,6 @@ export const renderLinkedStructureVisualization = (
       }
     }
 
-    // 6. Set Marker and Color based on original connection type
     if (conn.type === "ll_next" || conn.type === "ll_next_orphan") {
       markerId = styles.connection.llNextMarkerId || "ll-next-arrow";
       color = styles.connection.nextColor || "#2563eb";
@@ -755,11 +706,8 @@ export const renderLinkedStructureVisualization = (
       color = styles.connection.instanceVarColor || "#334155";
     }
 
-    // 7. Generate Path
-    let initialOffset = 15; // Default for H-V, can be small as targetPoint.x guides the turn
+    let initialOffset = 15;
     if (pathOrientationHint === "H-V-H") {
-      // For H-V-H, the offset determines the first/last horizontal segment length.
-      // Make it proportional to the smaller of half the X distance or a fraction of Y distance to prevent weird turns.
       const xDistForOffset = deltaXOverallMid / 2 - cornerRadius * 2;
       const yDistForOffset = Math.abs(targetPoint.y - sourcePoint.y) * 0.4;
       initialOffset = Math.max(5, Math.min(30, xDistForOffset, yDistForOffset));
@@ -774,7 +722,6 @@ export const renderLinkedStructureVisualization = (
       null
     );
 
-    // 8. Draw the path
     if (path && sourcePoint && targetPoint) {
       connectionsGroup
         .append("path")

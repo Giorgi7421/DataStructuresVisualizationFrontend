@@ -173,19 +173,15 @@ const renderObjectCellContent = (
     return;
   }
 
-  // Create a sub-group for the object node, positioned in the bottom part of the cell
   const nodeGroup = cellGroup.append("g").attr("class", "object-node");
 
-  // Calculate available space for the node (below the index partition)
   const nodeAreaHeight = cellHeight - indexPartHeight;
-  const nodeWidth = cellWidth - 4; // Small padding
-  const nodeHeight = Math.min(nodeAreaHeight - 4, 40); // Limit height and add padding
+  const nodeWidth = cellWidth - 4;
+  const nodeHeight = Math.min(nodeAreaHeight - 4, 40);
 
-  // Position the node in the center of the available area
   const nodeX = 2;
   const nodeY = indexPartHeight + 2;
 
-  // Draw a simple rectangle for the object container
   nodeGroup
     .append("rect")
     .attr("x", nodeX)
@@ -197,15 +193,13 @@ const renderObjectCellContent = (
     .attr("stroke-width", 1)
     .attr("rx", 3);
 
-  // Render field names and values (no addresses)
   const fields = Object.entries(objectData);
-  const maxFields = Math.min(fields.length, 3); // Limit to 3 fields max
-  const fieldHeight = Math.max(10, nodeHeight / maxFields - 2); // Calculate height per field
+  const maxFields = Math.min(fields.length, 3);
+  const fieldHeight = Math.max(10, nodeHeight / maxFields - 2);
 
   fields.slice(0, maxFields).forEach(([key, value], idx) => {
     const fieldY = nodeY + idx * fieldHeight + fieldHeight / 2 + 4;
 
-    // Render field name (key) on the left
     nodeGroup
       .append("text")
       .attr("x", nodeX + 4)
@@ -217,7 +211,6 @@ const renderObjectCellContent = (
       .attr("fill", "#64748b")
       .text(`${key}:`);
 
-    // Render field value on the right, but filter out address-like values
     const valueStr = String(value);
     const displayValue = isAddress(valueStr) ? "[ref]" : valueStr;
 
@@ -238,7 +231,6 @@ const renderObjectCellContent = (
   );
 };
 
-// Helper function to render a simple primitive cell content
 const renderPrimitiveCellContent = (
   cellGroup,
   cellWidth,
@@ -249,7 +241,6 @@ const renderPrimitiveCellContent = (
 ) => {
   const indexPartHeight = styles.arrayCell.indexPartitionHeight || 15;
 
-  // Draw partition line
   cellGroup
     .append("line")
     .attr("x1", 0)
@@ -259,7 +250,6 @@ const renderPrimitiveCellContent = (
     .attr("stroke", styles.arrayCell.stroke)
     .attr("stroke-width", 0.5);
 
-  // Draw index
   cellGroup
     .append("text")
     .attr("x", cellWidth / 2)
@@ -270,7 +260,6 @@ const renderPrimitiveCellContent = (
     .style("font-size", styles.arrayCell.indexFontSize)
     .text(index);
 
-  // Draw value
   cellGroup
     .append("text")
     .attr("x", cellWidth / 2)
@@ -297,7 +286,7 @@ export const renderArrayStructureVisualization = (
     memorySnapshot
   );
 
-  const state = memorySnapshot || operation.state || {}; // Prioritize snapshot
+  const state = memorySnapshot || operation.state || {};
   console.log(
     `[${
       snapshotIdentifier || "ArrayViz"
@@ -322,78 +311,71 @@ export const renderArrayStructureVisualization = (
     }
   );
 
-  // Define styles for array visualization
   const styles = {
     varBox: {
-      // Borrowing from defaultVisualizationStyles.varBox
-      width: 200, // Keep slightly narrower
+      width: 200,
       headerHeight: 25,
       fieldHeight: 25,
       fieldSpacing: 5,
       padding: 10,
       fill: "#ffffff",
-      stroke: "#94a3b8", // slate-400
+      stroke: "#94a3b8",
       titleFill: "#94a3b8",
       titleFillOpacity: 0.3,
       titleStroke: "#94a3b8",
-      textFill: "#334155", // slate-700
+      textFill: "#334155",
       valueTextFill: "#334155",
-      addressValueFill: "#0ea5e9", // sky-500
+      addressValueFill: "#0ea5e9",
       fieldRectFill: "white",
-      fieldRectStroke: "#e2e8f0", // slate-200
+      fieldRectStroke: "#e2e8f0",
       fontSize: "12px",
       titleFontSize: "13px",
     },
     arrayCell: {
-      width: 80, // Reduced width
-      height: 50, // Increased height
-      fill: "#ffffff", // White fill like nodes
-      stroke: "#94a3b8", // Slate stroke like nodes
-      textFill: "#334155", // Dark text like node values
-      indexTextFill: "#64748b", // Slate-500 for indices
+      width: 80,
+      height: 50,
+      fill: "#ffffff",
+      stroke: "#94a3b8",
+      textFill: "#334155",
+      indexTextFill: "#64748b",
       fontSize: "14px",
       indexFontSize: "10px",
-      indexPartitionHeight: 18, // Adjusted for new height
-      spacing: 0, // <<< SET TO 0
+      indexPartitionHeight: 18,
+      spacing: 0,
     },
     connection: {
-      // Borrowing from defaultVisualizationStyles.connection
       strokeWidth: 1.5,
-      instanceVarColor: "#334155", // Dark gray for instance vars
-      defaultColor: "#64748b", // Slate fallback
-      cornerRadius: 8, // Consistent corner radius
-      // Use a specific marker ID that defineArrowheads WILL create based on instanceVarColor
+      instanceVarColor: "#334155",
+      defaultColor: "#64748b",
+      cornerRadius: 8,
+
       llInstanceVarMarkerId: "array-instance-var-arrow",
     },
     layout: {
-      // Borrowing from defaultVisualizationStyles.layout
       nodeSpacingX: 60,
       varBoxSpacingY: 20,
       nodesStartXOffset: 60,
       layerSpacingY: 120,
-      // Array specific layout
+
       arrayTopMargin: 30,
       elementsPerRow: 10,
       rowSpacingY: 20,
     },
   };
 
-  // Define Arrowheads
   let defs = contentGroup.select("defs");
   if (defs.empty()) {
     defs = contentGroup.append("defs");
   }
-  defineArrowheads(defs, styles); // You might need a specific arrowhead for arrays
+  defineArrowheads(defs, styles);
 
-  // --- Layout Initialization ---
   const nodePositions = {};
   const allConnections = [];
   let intermediateBoxPos = null;
   const firstColX = 30;
   const varBoxTopMargin = styles.layout.arrayTopMargin || 30;
-  let currentLayoutY = varBoxTopMargin; // Initialize currentLayoutY ONCE
+  let currentLayoutY = varBoxTopMargin;
 
-  // --- 1. Render Instance Variables ---
   if (Object.keys(instanceVariables).length > 0) {
     const instanceVarsX = firstColX;
     const instanceVarsResult = renderVariableBox(
@@ -401,7 +383,7 @@ export const renderArrayStructureVisualization = (
       "Instance Variables",
       instanceVariables,
       instanceVarsX,
-      currentLayoutY, // Use currentLayoutY
+      currentLayoutY,
       styles.varBox,
       "instance",
       isAddress
@@ -416,7 +398,6 @@ export const renderArrayStructureVisualization = (
     currentLayoutY += instanceVarsResult.height + styles.layout.varBoxSpacingY;
   }
 
-  // --- Prepare data needed for intermediate box & array ---
   console.log(
     `[${snapshotIdentifier || "ArrayViz"}] Instance Variables:`,
     instanceVariables
@@ -454,7 +435,6 @@ export const renderArrayStructureVisualization = (
     arrayVarSourceCoords
   );
 
-  // --- 2. Render Local Variables (below instance vars) ---
   console.log(
     `[${snapshotIdentifier || "ArrayViz"} Debug] Local Variables object:`,
     JSON.parse(JSON.stringify(localVariables))
@@ -466,7 +446,7 @@ export const renderArrayStructureVisualization = (
       } Debug] Attempting to render Local Variables box.`
     );
     const localVarsX = firstColX;
-    const localVarsY = currentLayoutY; // Position below instance vars
+    const localVarsY = currentLayoutY;
     const { height: locHeight, connectionPoints: localConnPoints } =
       renderVariableBox(
         contentGroup,
@@ -489,7 +469,6 @@ export const renderArrayStructureVisualization = (
     currentLayoutY += locHeight + styles.layout.varBoxSpacingY;
   }
 
-  // --- 3. Render the Array/Vector (to the right of var boxes) ---
   let actualArrayData = [];
   if (
     arrayDataAddress &&
@@ -505,7 +484,6 @@ export const renderArrayStructureVisualization = (
       actualArrayData = [];
     }
   } else {
-    // Handle case where array data might be inline or missing
     if (Array.isArray(instanceVariables?.array)) {
       actualArrayData = instanceVariables.array;
     } else if (Array.isArray(instanceVariables?.data)) {
@@ -519,17 +497,15 @@ export const renderArrayStructureVisualization = (
   const elementsPerRow = styles.layout.elementsPerRow || 10;
   const rowSpacingY = styles.layout.rowSpacingY || 20;
 
-  let mainArraySystemBottomY = currentLayoutY; // Start with Y below var boxes
+  let mainArraySystemBottomY = currentLayoutY;
   let localVarsBoxPosition = nodePositions["local_vars_box"];
 
-  // --- Create Intermediate Address Box for Main Array ---
   if (arrayDataAddress && arrayVarSourceCoords) {
     const boxWidth = 80;
     const boxHeight = styles.arrayCell.height;
     const boxX =
       arrayVarSourceCoords.x + (styles.layout.nodeSpacingX || 60) / 2;
 
-    // Align top of intermediate box with top of instance variables box (or source field Y if no box)
     const instanceVarsBoxTopY = nodePositions["instance_vars_box"]
       ? nodePositions["instance_vars_box"].y
       : arrayVarSourceCoords
@@ -570,13 +546,12 @@ export const renderArrayStructureVisualization = (
     mainArraySystemBottomY = Math.max(mainArraySystemBottomY, boxY + boxHeight);
   }
 
-  // --- Render Main Array/Vector ---
   const arrayStartX = intermediateBoxPos
     ? intermediateBoxPos.x + intermediateBoxPos.width
     : firstColX + styles.varBox.width + (styles.layout.nodeSpacingX || 60);
   const arrayStartY = intermediateBoxPos
     ? intermediateBoxPos.y
-    : varBoxTopMargin; // Or currentLayoutY if main array should be strictly below all var boxes
+    : varBoxTopMargin;
 
   let mainArrayRenderedHeight = 0;
   if (actualArrayData && actualArrayData.length > 0) {
@@ -602,7 +577,6 @@ export const renderArrayStructureVisualization = (
         .append("g")
         .attr("transform", `translate(${x}, ${y})`);
 
-      // Draw cell background
       cellGroup
         .append("rect")
         .attr("width", cellWidth)
@@ -611,7 +585,6 @@ export const renderArrayStructureVisualization = (
         .attr("stroke", styles.arrayCell.stroke)
         .attr("stroke-width", 1);
 
-      // Check if this value represents an object and render accordingly
       const isObject = isObjectValue(value, addressObjectMap);
       console.log(
         `[ArrayViz Debug] Index ${index}: isObjectValue result = ${isObject}`
@@ -654,16 +627,15 @@ export const renderArrayStructureVisualization = (
         address: `array_cell_${index}`,
       };
     });
-    mainArrayRenderedHeight = cellHeight; // Since it's single line
+    mainArrayRenderedHeight = cellHeight;
     mainArraySystemBottomY = Math.max(
       mainArraySystemBottomY,
       arrayStartY + mainArrayRenderedHeight
     );
   }
 
-  currentLayoutY = mainArraySystemBottomY + rowSpacingY * 2; // Prepare Y for other arrays
+  currentLayoutY = mainArraySystemBottomY + rowSpacingY * 2;
 
-  // --- Render Other Arrays from addressObjectMap ---
   let otherArraysStartX;
   let otherArraysStartY;
   console.log(
@@ -676,12 +648,11 @@ export const renderArrayStructureVisualization = (
       localVarsBoxPosition.x +
       localVarsBoxPosition.width +
       (styles.layout.nodesStartXOffset || 60);
-    otherArraysStartY = localVarsBoxPosition.y; // Align top of other arrays with top of local vars box
+    otherArraysStartY = localVarsBoxPosition.y;
   } else {
-    // Fallback if no local vars box: position to the right of where instance vars would be, and below main array system
     otherArraysStartX =
       firstColX + styles.varBox.width + (styles.layout.nodesStartXOffset || 60);
-    otherArraysStartY = currentLayoutY; // currentLayoutY is already below main array system here
+    otherArraysStartY = currentLayoutY;
   }
 
   let currentOtherArrayY = otherArraysStartY;
@@ -701,7 +672,6 @@ export const renderArrayStructureVisualization = (
       const subIntermediateBoxWidth = 80;
       const subIntermediateBoxHeight = styles.arrayCell.height;
 
-      // Position this intermediate box based on calculated otherArraysStartX and currentOtherArrayY
       const subIntermediateBoxX = otherArraysStartX;
       const subIntermediateBoxY = currentOtherArrayY;
 
@@ -738,12 +708,11 @@ export const renderArrayStructureVisualization = (
         subIntermediateBoxX + subIntermediateBoxWidth;
       subsequentArrayData.forEach((value, index) => {
         const x = subsequentArrayStartX + index * cellWidth;
-        const y = subIntermediateBoxY; // Align cells with this other array's intermediate box Y
+        const y = subIntermediateBoxY;
         const cellGroup = contentGroup
           .append("g")
           .attr("transform", `translate(${x}, ${y})`);
 
-        // Draw cell background
         cellGroup
           .append("rect")
           .attr("width", cellWidth)
@@ -752,7 +721,6 @@ export const renderArrayStructureVisualization = (
           .attr("stroke", styles.arrayCell.stroke)
           .attr("stroke-width", 1);
 
-        // Check if this value represents an object and render accordingly
         if (isObjectValue(value, addressObjectMap)) {
           renderObjectCellContent(
             cellGroup,
@@ -784,41 +752,36 @@ export const renderArrayStructureVisualization = (
           address: `array_${address}_cell_${index}`,
         };
       });
-      currentOtherArrayY += subIntermediateBoxHeight + rowSpacingY; // Increment Y for the next "other" array
+      currentOtherArrayY += subIntermediateBoxHeight + rowSpacingY;
     }
   });
 
-  // Update overall layout Y based on the bottom of the other arrays or the main array system
   currentLayoutY = Math.max(mainArraySystemBottomY, currentOtherArrayY);
 
   const connectionsGroup = contentGroup
     .append("g")
     .attr("class", "connections-group");
 
-  // --- Draw specific connections ---
   console.log(
     `[${snapshotIdentifier || "ArrayViz"}] All collected connections:`,
     JSON.parse(JSON.stringify(allConnections))
-  ); // Log all connections
+  );
   allConnections.forEach((conn) => {
     console.log(
       `[${snapshotIdentifier || "ArrayViz"}] Processing connection:`,
       JSON.parse(JSON.stringify(conn))
-    ); // Log each connection being processed
+    );
     let sourcePoint = conn.sourceCoords;
     let targetIntermediateBoxKey = null;
     let targetIntermediateBoxPos = null;
 
-    // ----> ADDED: Get source container box data <----
     let sourceContainerBoxPosData = null;
     if (conn.sourceName && conn.sourceName.startsWith("instance-")) {
       sourceContainerBoxPosData = nodePositions["instance_vars_box"];
     } else if (conn.sourceName && conn.sourceName.startsWith("local-")) {
       sourceContainerBoxPosData = nodePositions["local_vars_box"];
     }
-    // ----> END ADDED <----
 
-    // Determine if the connection targets an intermediate box
     if (conn.targetAddress === arrayDataAddress) {
       targetIntermediateBoxKey = "intermediate_array_address_box";
     } else if (
@@ -832,7 +795,6 @@ export const renderArrayStructureVisualization = (
       targetIntermediateBoxPos = nodePositions[targetIntermediateBoxKey];
     }
 
-    // Logging for variable connections
     if (
       conn.sourceName &&
       (conn.sourceName.startsWith("local-") ||
@@ -852,28 +814,25 @@ export const renderArrayStructureVisualization = (
       );
     }
 
-    // Draw connection from a variable (instance or local) to an intermediate box
     if (sourcePoint && targetIntermediateBoxPos) {
       const isInstanceToArray =
-        conn.sourceName?.startsWith("instance-") && targetIntermediateBoxPos; // MODIFIED: Check for any valid target box
+        conn.sourceName?.startsWith("instance-") && targetIntermediateBoxPos;
       const isLocalToArray =
-        conn.sourceName?.startsWith("local-") && targetIntermediateBoxPos; // General case for local pointing to any array
+        conn.sourceName?.startsWith("local-") && targetIntermediateBoxPos;
 
       if (isInstanceToArray || isLocalToArray) {
-        // ---- REPLACING WITH LLV/WBV LOGIC ----
         let actualSourceEgressPoint, finalTargetPointForPath;
         let path = "";
-        let markerId = styles.connection.llInstanceVarMarkerId; // Default for var connections
-        let color = styles.connection.instanceVarColor; // Default for var connections
+        let markerId = styles.connection.llInstanceVarMarkerId;
+        let color = styles.connection.instanceVarColor;
         const cornerRadius = styles.connection.cornerRadius || 5;
         let pathOrientationHint = "auto";
-        const sNodeStyle = styles.varBox; // Use varBox style for thresholds as source is var box field
+        const sNodeStyle = styles.varBox;
 
-        const Y_THRESHOLD = (sNodeStyle.fieldHeight || 25) * 1.5; // Adjusted threshold
+        const Y_THRESHOLD = (sNodeStyle.fieldHeight || 25) * 1.5;
         const HORIZONTAL_OVERSHOOT = 20;
         const INITIAL_HORIZONTAL_SEGMENT_FOR_OVERLAP = 20;
 
-        // 1. Source Data (already have sourceContainerBoxPosData and sourcePoint from conn.sourceCoords)
         if (!sourceContainerBoxPosData || !sourcePoint) {
           console.warn(
             `[${
@@ -881,22 +840,19 @@ export const renderArrayStructureVisualization = (
             } Arrow] Missing source VarBox data or field coords:`,
             conn
           );
-          return; // Skip this connection
+          return;
         }
 
-        // 2. Target Data is targetIntermediateBoxPos (already have this)
-
-        // 3. Coordinates & Deltas
         const sourceOverallMidX =
           sourceContainerBoxPosData.x + sourceContainerBoxPosData.width / 2;
-        const sourceFieldActualY = sourcePoint.y; // Y from the actual field
+        const sourceFieldActualY = sourcePoint.y;
 
         const targetOverallMidX =
           targetIntermediateBoxPos.x + targetIntermediateBoxPos.width / 2;
         const targetOverallMidY =
           targetIntermediateBoxPos.y + targetIntermediateBoxPos.height / 2;
 
-        let decisionSourceY = sourceFieldActualY; // For var box connections, decision Y is the field's Y
+        let decisionSourceY = sourceFieldActualY;
 
         const deltaXOverallMid = Math.abs(
           targetOverallMidX - sourceOverallMidX
@@ -913,7 +869,6 @@ export const renderArrayStructureVisualization = (
           )}, Y_THRESH: ${Y_THRESHOLD.toFixed(2)}`
         );
 
-        // 4. Egress Side & Source Point (actualSourceEgressPoint)
         const chosenEgressSide =
           targetOverallMidX < sourceOverallMidX ? "left" : "right";
         actualSourceEgressPoint = { y: sourceFieldActualY };
@@ -924,15 +879,14 @@ export const renderArrayStructureVisualization = (
             sourceContainerBoxPosData.x + sourceContainerBoxPosData.width;
         }
 
-        // 5. Path Style Decision & Target Point (finalTargetPointForPath)
         if (deltaYDecisionMid <= Y_THRESHOLD) {
           pathOrientationHint = "H-V-H";
           finalTargetPointForPath = {
             x:
               sourceOverallMidX < targetOverallMidX
-                ? targetIntermediateBoxPos.x // Target left edge
-                : targetIntermediateBoxPos.x + targetIntermediateBoxPos.width, // Target right edge
-            y: targetOverallMidY, // Target middle Y
+                ? targetIntermediateBoxPos.x
+                : targetIntermediateBoxPos.x + targetIntermediateBoxPos.width,
+            y: targetOverallMidY,
           };
           console.log(
             `[${
@@ -990,9 +944,6 @@ export const renderArrayStructureVisualization = (
           }
         }
 
-        // 6. Marker and Color already set by default for var connections
-
-        // 7. Initial Offset for path generation
         let initialOffset = 15;
         if (pathOrientationHint === "H-V-H") {
           const xDistForOffset = deltaXOverallMid / 2 - cornerRadius * 2;
@@ -1005,7 +956,6 @@ export const renderArrayStructureVisualization = (
           );
         }
 
-        // Logging before path generation (can be kept for debugging)
         console.log(
           `[${snapshotIdentifier || "ArrayViz"} PathGen Pre-Check] Var: ${
             conn.varName
@@ -1030,7 +980,6 @@ export const renderArrayStructureVisualization = (
         console.log(`  Path Hint: ${pathOrientationHint}`);
         console.log(`  Initial Offset: ${initialOffset}`);
 
-        // 8. Generate Path
         path = generateOrthogonalPath(
           actualSourceEgressPoint,
           finalTargetPointForPath,
@@ -1040,7 +989,6 @@ export const renderArrayStructureVisualization = (
           null
         );
 
-        // 9. Draw Path
         if (path) {
           connectionsGroup
             .append("path")
@@ -1110,6 +1058,4 @@ export const renderArrayStructureVisualization = (
     }] Finished ArrayVectorVisualization render. Node Positions:`,
     nodePositions
   );
-  // Placeholder: Auto-fit or center the visualization if needed
-  // autoFitVisualization(svg, contentGroup, zoomBehavior, width, height);
 };
