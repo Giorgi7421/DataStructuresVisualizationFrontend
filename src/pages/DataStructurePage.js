@@ -167,16 +167,16 @@ const bigONotations = {
   },
   TREE: {
     remove: {
-      BS: "O(n)",
+      BS: "O(log n)",
     },
     insert: {
-      BS: "O(n)",
+      BS: "O(log n)",
     },
     clear: {
       BS: "O(n)",
     },
     search: {
-      BS: "O(n)",
+      BS: "O(log n)",
     },
   },
   STACK: {
@@ -213,7 +213,7 @@ const bigONotations = {
   },
   SET: {
     remove: {
-      HASH: "O(n)",
+      HASH: "O(1)",
       MOVE_TO_FRONT: "O(n)",
     },
     clear: {
@@ -221,19 +221,19 @@ const bigONotations = {
       MOVE_TO_FRONT: "O(n)",
     },
     add: {
-      HASH: "O(n)",
+      HASH: "O(1)",
       MOVE_TO_FRONT: "O(1)",
     },
     size: {
-      HASH: "O(n)",
+      HASH: "O(1)",
       MOVE_TO_FRONT: "O(1)",
     },
     isEmpty: {
-      HASH: "O(n)",
+      HASH: "O(1)",
       MOVE_TO_FRONT: "O(1)",
     },
     contains: {
-      HASH: "O(n)",
+      HASH: "O(1)",
       MOVE_TO_FRONT: "O(n)",
     },
   },
@@ -324,14 +324,14 @@ const bigONotations = {
   MAP: {
     put: {
       ARRAY: "O(n)",
-      HASH: "O(n)",
+      HASH: "O(1)",
     },
     get: {
       ARRAY: "O(n)",
-      HASH: "O(n)",
+      HASH: "O(1)",
     },
     clear: {
-      ARRAY: "O(n)",
+      ARRAY: "O(1)",
       HASH: "O(n)",
     },
     size: {
@@ -344,7 +344,7 @@ const bigONotations = {
     },
     containsKey: {
       ARRAY: "O(n)",
-      HASH: "O(n)",
+      HASH: "O(1)",
     },
   },
   DEQUE: {
