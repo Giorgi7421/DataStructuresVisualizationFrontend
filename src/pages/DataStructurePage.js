@@ -1051,6 +1051,15 @@ function DataStructurePage() {
               );
               break;
             case "ARRAY_MAP":
+              renderArrayStructureVisualization(
+                tempGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "TREE_MAP":
             case "DEQUE":
               renderDoublyLinkedStructureVisualization(
@@ -2245,6 +2254,15 @@ function DataStructurePage() {
               );
               break;
             case "ARRAY_MAP":
+              renderArrayStructureVisualization(
+                tempGroup,
+                width,
+                height,
+                effectiveOperation,
+                memorySnapshot,
+                snapshotIdentifier
+              );
+              break;
             case "TREE_MAP":
             case "DEQUE":
               renderDoublyLinkedStructureVisualization(

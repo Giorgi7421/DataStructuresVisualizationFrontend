@@ -10,6 +10,300 @@ import {
 // Import default styles to reference colors/etc.
 import { defaultVisualizationStyles } from "../utils/visualizationUtils";
 
+// Helper function to determine if a value represents an object (not a primitive or array)
+const isObjectValue = (value, addressObjectMap) => {
+  console.log(
+    `[ArrayViz Debug] Checking if value "${value}" (type: ${typeof value}) is an object...`
+  );
+  console.log(
+    `[ArrayViz Debug] Available addresses in addressObjectMap:`,
+    Object.keys(addressObjectMap)
+  );
+
+  // First check if value is directly an object (not a string address)
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    console.log(`[ArrayViz Debug] Value is directly an object:`, value);
+    return true;
+  }
+
+  // Check if value is an address string and points to an object in addressObjectMap
+  const valueStr = String(value);
+  if (isAddress(valueStr) && addressObjectMap && addressObjectMap[valueStr]) {
+    const data = addressObjectMap[valueStr];
+    console.log(
+      `[ArrayViz Debug] Found data at address "${valueStr}":`,
+      data,
+      `(type: ${typeof data}, isArray: ${Array.isArray(data)})`
+    );
+    // Return true if it's an object (not an array)
+    const isObj =
+      typeof data === "object" && data !== null && !Array.isArray(data);
+    console.log(`[ArrayViz Debug] Is object result:`, isObj);
+    return isObj;
+  }
+
+  // Check if value itself could be an object representation or address that we missed
+  if (
+    valueStr.includes("Object") ||
+    valueStr.includes("@") ||
+    valueStr === "[object Object]"
+  ) {
+    console.log(
+      `[ArrayViz Debug] Value looks like object representation: "${valueStr}"`
+    );
+    // If we have any objects in addressObjectMap, this might be referring to one of them
+    const objectAddresses = Object.keys(addressObjectMap).filter((addr) => {
+      const data = addressObjectMap[addr];
+      return typeof data === "object" && data !== null && !Array.isArray(data);
+    });
+
+    if (objectAddresses.length > 0) {
+      console.log(
+        `[ArrayViz Debug] Found potential object addresses:`,
+        objectAddresses
+      );
+      return true;
+    }
+  }
+
+  console.log(`[ArrayViz Debug] Value "${value}" is not an object`);
+  return false;
+};
+
+// Helper function to render an array cell containing an object node
+const renderObjectCellContent = (
+  cellGroup,
+  cellWidth,
+  cellHeight,
+  value,
+  addressObjectMap,
+  nodePositions,
+  styles,
+  index,
+  isMainArray = true
+) => {
+  console.log(`[ArrayViz Debug] Rendering object cell for value:`, value);
+  const indexPartHeight = styles.arrayCell.indexPartitionHeight || 15;
+
+  // Draw the index partition at the top
+  cellGroup
+    .append("line")
+    .attr("x1", 0)
+    .attr("y1", indexPartHeight)
+    .attr("x2", cellWidth)
+    .attr("y2", indexPartHeight)
+    .attr("stroke", styles.arrayCell.stroke)
+    .attr("stroke-width", 0.5);
+
+  // Draw the index number
+  cellGroup
+    .append("text")
+    .attr("x", cellWidth / 2)
+    .attr("y", indexPartHeight / 2)
+    .attr("dy", ".35em")
+    .attr("text-anchor", "middle")
+    .attr("fill", styles.arrayCell.indexTextFill)
+    .style("font-size", styles.arrayCell.indexFontSize)
+    .text(index);
+
+  // Get the object data - try multiple approaches
+  let objectData = null;
+  let objectAddress = null;
+
+  // If value is directly an object
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    objectData = value;
+    objectAddress = `object_${index}`;
+    console.log(`[ArrayViz Debug] Using direct object data:`, objectData);
+  }
+  // If value is an address string
+  else if (isAddress(String(value)) && addressObjectMap[value]) {
+    objectData = addressObjectMap[value];
+    objectAddress = String(value);
+    console.log(
+      `[ArrayViz Debug] Using object data from address "${value}":`,
+      objectData
+    );
+  }
+  // If value looks like "[object Object]" or similar, find the first available object
+  else if (
+    String(value).includes("Object") ||
+    String(value) === "[object Object]"
+  ) {
+    console.log(
+      `[ArrayViz Debug] Searching for object for stringified value "${value}"`
+    );
+    // Find the first object in addressObjectMap (they are likely in the same order as array elements)
+    const objectEntries = Object.entries(addressObjectMap).filter(
+      ([addr, data]) => {
+        return (
+          typeof data === "object" && data !== null && !Array.isArray(data)
+        );
+      }
+    );
+
+    if (objectEntries.length > index) {
+      // Try to use the object at the same index position
+      const [addr, data] = objectEntries[index];
+      objectData = data;
+      objectAddress = addr;
+      console.log(
+        `[ArrayViz Debug] Using object at matching index ${index} from address "${addr}":`,
+        objectData
+      );
+    } else if (objectEntries.length > 0) {
+      // Fallback to first available object
+      const [addr, data] = objectEntries[0];
+      objectData = data;
+      objectAddress = addr;
+      console.log(
+        `[ArrayViz Debug] Using first available object from address "${addr}":`,
+        objectData
+      );
+    }
+  }
+  // Try to find any object in addressObjectMap as last resort
+  else {
+    console.log(
+      `[ArrayViz Debug] Trying fallback object search for value "${value}"`
+    );
+    for (const [addr, data] of Object.entries(addressObjectMap)) {
+      if (typeof data === "object" && data !== null && !Array.isArray(data)) {
+        objectData = data;
+        objectAddress = addr;
+        console.log(
+          `[ArrayViz Debug] Using fallback object at address "${addr}":`,
+          objectData
+        );
+        break;
+      }
+    }
+  }
+
+  if (!objectData) {
+    console.log(`[ArrayViz Debug] No object data found, falling back to text`);
+    // Fallback to simple text if object data not found
+    cellGroup
+      .append("text")
+      .attr("x", cellWidth / 2)
+      .attr("y", indexPartHeight + (cellHeight - indexPartHeight) / 2)
+      .attr("dy", ".35em")
+      .attr("text-anchor", "middle")
+      .attr("fill", styles.arrayCell.textFill)
+      .style("font-size", styles.arrayCell.fontSize)
+      .text(truncateAddress(String(value), 10));
+    return;
+  }
+
+  // Create a sub-group for the object node, positioned in the bottom part of the cell
+  const nodeGroup = cellGroup.append("g").attr("class", "object-node");
+
+  // Calculate available space for the node (below the index partition)
+  const nodeAreaHeight = cellHeight - indexPartHeight;
+  const nodeWidth = cellWidth - 4; // Small padding
+  const nodeHeight = Math.min(nodeAreaHeight - 4, 40); // Limit height and add padding
+
+  // Position the node in the center of the available area
+  const nodeX = 2;
+  const nodeY = indexPartHeight + 2;
+
+  // Draw a simple rectangle for the object container
+  nodeGroup
+    .append("rect")
+    .attr("x", nodeX)
+    .attr("y", nodeY)
+    .attr("width", nodeWidth)
+    .attr("height", nodeHeight)
+    .attr("fill", "#ffffff")
+    .attr("stroke", "#94a3b8")
+    .attr("stroke-width", 1)
+    .attr("rx", 3);
+
+  // Render field names and values (no addresses)
+  const fields = Object.entries(objectData);
+  const maxFields = Math.min(fields.length, 3); // Limit to 3 fields max
+  const fieldHeight = Math.max(10, nodeHeight / maxFields - 2); // Calculate height per field
+
+  fields.slice(0, maxFields).forEach(([key, value], idx) => {
+    const fieldY = nodeY + idx * fieldHeight + fieldHeight / 2 + 4;
+
+    // Render field name (key) on the left
+    nodeGroup
+      .append("text")
+      .attr("x", nodeX + 4)
+      .attr("y", fieldY)
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("font-size", "7px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#64748b")
+      .text(`${key}:`);
+
+    // Render field value on the right, but filter out address-like values
+    const valueStr = String(value);
+    const displayValue = isAddress(valueStr) ? "[ref]" : valueStr;
+
+    nodeGroup
+      .append("text")
+      .attr("x", nodeX + nodeWidth - 4)
+      .attr("y", fieldY)
+      .attr("dy", ".35em")
+      .attr("text-anchor", "end")
+      .attr("font-size", "7px")
+      .attr("fill", "#334155")
+      .text(truncateAddress(displayValue, 6));
+  });
+
+  console.log(
+    `[ArrayViz Debug] Rendered object node with fields:`,
+    fields.slice(0, maxFields)
+  );
+};
+
+// Helper function to render a simple primitive cell content
+const renderPrimitiveCellContent = (
+  cellGroup,
+  cellWidth,
+  cellHeight,
+  value,
+  styles,
+  index
+) => {
+  const indexPartHeight = styles.arrayCell.indexPartitionHeight || 15;
+
+  // Draw partition line
+  cellGroup
+    .append("line")
+    .attr("x1", 0)
+    .attr("y1", indexPartHeight)
+    .attr("x2", cellWidth)
+    .attr("y2", indexPartHeight)
+    .attr("stroke", styles.arrayCell.stroke)
+    .attr("stroke-width", 0.5);
+
+  // Draw index
+  cellGroup
+    .append("text")
+    .attr("x", cellWidth / 2)
+    .attr("y", indexPartHeight / 2)
+    .attr("dy", ".35em")
+    .attr("text-anchor", "middle")
+    .attr("fill", styles.arrayCell.indexTextFill)
+    .style("font-size", styles.arrayCell.indexFontSize)
+    .text(index);
+
+  // Draw value
+  cellGroup
+    .append("text")
+    .attr("x", cellWidth / 2)
+    .attr("y", indexPartHeight + (cellHeight - indexPartHeight) / 2)
+    .attr("dy", ".35em")
+    .attr("text-anchor", "middle")
+    .attr("fill", styles.arrayCell.textFill)
+    .style("font-size", styles.arrayCell.fontSize)
+    .text(truncateAddress(String(value), 10));
+};
+
 export const renderArrayStructureVisualization = (
   contentGroup,
   width,
@@ -308,12 +602,29 @@ export const renderArrayStructureVisualization = (
 
   let mainArrayRenderedHeight = 0;
   if (actualArrayData && actualArrayData.length > 0) {
+    console.log(
+      `[ArrayViz Debug] About to render array with data:`,
+      actualArrayData
+    );
+    console.log(
+      `[ArrayViz Debug] AddressObjectMap contents:`,
+      addressObjectMap
+    );
+
     actualArrayData.forEach((value, index) => {
+      console.log(
+        `[ArrayViz Debug] Processing array element at index ${index}:`,
+        value,
+        `(type: ${typeof value})`
+      );
+
       const x = arrayStartX + index * cellWidth;
       const y = arrayStartY;
       const cellGroup = contentGroup
         .append("g")
         .attr("transform", `translate(${x}, ${y})`);
+
+      // Draw cell background
       cellGroup
         .append("rect")
         .attr("width", cellWidth)
@@ -321,33 +632,42 @@ export const renderArrayStructureVisualization = (
         .attr("fill", styles.arrayCell.fill)
         .attr("stroke", styles.arrayCell.stroke)
         .attr("stroke-width", 1);
-      const indexPartHeight = styles.arrayCell.indexPartitionHeight || 15;
-      cellGroup
-        .append("line")
-        .attr("x1", 0)
-        .attr("y1", indexPartHeight)
-        .attr("x2", cellWidth)
-        .attr("y2", indexPartHeight)
-        .attr("stroke", styles.arrayCell.stroke)
-        .attr("stroke-width", 0.5);
-      cellGroup
-        .append("text")
-        .attr("x", cellWidth / 2)
-        .attr("y", indexPartHeight / 2)
-        .attr("dy", ".35em")
-        .attr("text-anchor", "middle")
-        .attr("fill", styles.arrayCell.indexTextFill)
-        .style("font-size", styles.arrayCell.indexFontSize)
-        .text(index);
-      cellGroup
-        .append("text")
-        .attr("x", cellWidth / 2)
-        .attr("y", indexPartHeight + (cellHeight - indexPartHeight) / 2)
-        .attr("dy", ".35em")
-        .attr("text-anchor", "middle")
-        .attr("fill", styles.arrayCell.textFill)
-        .style("font-size", styles.arrayCell.fontSize)
-        .text(truncateAddress(String(value), 10));
+
+      // Check if this value represents an object and render accordingly
+      const isObject = isObjectValue(value, addressObjectMap);
+      console.log(
+        `[ArrayViz Debug] Index ${index}: isObjectValue result = ${isObject}`
+      );
+
+      if (isObject) {
+        console.log(
+          `[ArrayViz Debug] Rendering object cell for index ${index}`
+        );
+        renderObjectCellContent(
+          cellGroup,
+          cellWidth,
+          cellHeight,
+          value,
+          addressObjectMap,
+          nodePositions,
+          styles,
+          index,
+          true
+        );
+      } else {
+        console.log(
+          `[ArrayViz Debug] Rendering primitive cell for index ${index}`
+        );
+        renderPrimitiveCellContent(
+          cellGroup,
+          cellWidth,
+          cellHeight,
+          value,
+          styles,
+          index
+        );
+      }
+
       nodePositions[`array_cell_${index}`] = {
         x,
         y,
@@ -444,6 +764,8 @@ export const renderArrayStructureVisualization = (
         const cellGroup = contentGroup
           .append("g")
           .attr("transform", `translate(${x}, ${y})`);
+
+        // Draw cell background
         cellGroup
           .append("rect")
           .attr("width", cellWidth)
@@ -451,33 +773,31 @@ export const renderArrayStructureVisualization = (
           .attr("fill", styles.arrayCell.fill)
           .attr("stroke", styles.arrayCell.stroke)
           .attr("stroke-width", 1);
-        const indexPartHeight = styles.arrayCell.indexPartitionHeight || 15;
-        cellGroup
-          .append("line")
-          .attr("x1", 0)
-          .attr("y1", indexPartHeight)
-          .attr("x2", cellWidth)
-          .attr("y2", indexPartHeight)
-          .attr("stroke", styles.arrayCell.stroke)
-          .attr("stroke-width", 0.5);
-        cellGroup
-          .append("text")
-          .attr("x", cellWidth / 2)
-          .attr("y", indexPartHeight / 2)
-          .attr("dy", ".35em")
-          .attr("text-anchor", "middle")
-          .attr("fill", styles.arrayCell.indexTextFill)
-          .style("font-size", styles.arrayCell.indexFontSize)
-          .text(index);
-        cellGroup
-          .append("text")
-          .attr("x", cellWidth / 2)
-          .attr("y", indexPartHeight + (cellHeight - indexPartHeight) / 2)
-          .attr("dy", ".35em")
-          .attr("text-anchor", "middle")
-          .attr("fill", styles.arrayCell.textFill)
-          .style("font-size", styles.arrayCell.fontSize)
-          .text(truncateAddress(String(value), 10));
+
+        // Check if this value represents an object and render accordingly
+        if (isObjectValue(value, addressObjectMap)) {
+          renderObjectCellContent(
+            cellGroup,
+            cellWidth,
+            cellHeight,
+            value,
+            addressObjectMap,
+            nodePositions,
+            styles,
+            index,
+            false
+          );
+        } else {
+          renderPrimitiveCellContent(
+            cellGroup,
+            cellWidth,
+            cellHeight,
+            value,
+            styles,
+            index
+          );
+        }
+
         nodePositions[`array_${address}_cell_${index}`] = {
           x,
           y,
