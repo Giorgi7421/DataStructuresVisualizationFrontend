@@ -703,7 +703,7 @@ function renderHashStructure(
     const orphanNodesStartX = sectionsStartX + 400; // Start after local variables box
 
     // Calculate the actual total node height including all components
-    const fieldCount = 3;
+    const fieldCount = calculateMaxFieldCount(hashData.orphanNodes);
     const fieldsAreaHeight =
       fieldCount * styles.node.fieldHeight +
       (fieldCount - 1) * styles.node.fieldSpacing;
@@ -740,7 +740,7 @@ function renderHashStructure(
     // Render horizontal chain if it exists
     if (bucket.chain) {
       // Calculate the actual total node height including all components
-      const fieldCount = 3;
+      const fieldCount = calculateMaxFieldCount(bucket.chain);
       const fieldsAreaHeight =
         fieldCount * styles.node.fieldHeight +
         (fieldCount - 1) * styles.node.fieldSpacing;
@@ -813,6 +813,50 @@ function renderHashStructure(
   });
 }
 
+// Helper function to calculate the maximum field count in a chain of nodes
+function calculateMaxFieldCount(nodes) {
+  if (!nodes || nodes.length === 0) {
+    return 3; // Default minimum field count
+  }
+
+  let maxFieldCount = 0;
+  nodes.forEach((node) => {
+    const fields = extractNodeFields(node);
+    const fieldCount = Object.keys(fields).length;
+    maxFieldCount = Math.max(maxFieldCount, fieldCount);
+  });
+
+  // Ensure minimum of 3 fields for reasonable display
+  return Math.max(maxFieldCount, 3);
+}
+
+// Helper function to extract actual fields from a node object
+function extractNodeFields(node) {
+  const fields = {};
+
+  // Skip the address field since it's used as the title
+  const skipFields = ["address"];
+
+  // Extract all fields from the node object
+  for (const [key, value] of Object.entries(node)) {
+    if (!skipFields.includes(key)) {
+      // Convert null/undefined to "null" for display
+      fields[key] = value !== null && value !== undefined ? value : "null";
+    }
+  }
+
+  // If no fields found, provide default structure
+  if (Object.keys(fields).length === 0) {
+    fields.data = "null";
+  }
+
+  console.log(
+    `[HashStructure] Extracted fields for node ${node.address}:`,
+    fields
+  );
+  return fields;
+}
+
 // Helper function to render a horizontal chain of nodes
 function renderHorizontalChain(
   contentGroup,
@@ -875,12 +919,7 @@ function renderHorizontalChain(
       y: nodeY,
       address: node.address,
       title: node.address,
-      fields: {
-        key: node.key || node.data || "null",
-        value: node.value || "null",
-        linkAddress:
-          node.linkAddress || node.nextAddress || node.next || "null",
-      },
+      fields: extractNodeFields(node),
       isCurrent: false,
       isIsolated: false,
     };
@@ -910,16 +949,49 @@ function renderHorizontalChain(
       const nextNode = chain[index + 1];
       const nextNodeX = startX + (index + 1) * (nodeWidth + finalSpacing);
 
-      // Calculate connection points similar to linked structure visualization
-      // Source: from the linkAddress field of current node
-      const sourceX = nodeX + nodeWidth; // Right edge of current node (not inside)
+      // Find the field that contains the next pointer (linkAddress, nextAddress, next, etc.)
+      const nodeFields = Object.keys(nodeSpec.fields);
+      const nextPointerFields = [
+        "linkAddress",
+        "nextAddress",
+        "next",
+        "link",
+        "successor",
+      ];
+      let nextPointerFieldIndex = -1;
+      let nextPointerFieldName = null;
+
+      // Look for the next pointer field
+      for (const fieldName of nextPointerFields) {
+        const fieldIndex = nodeFields.indexOf(fieldName);
+        if (fieldIndex !== -1) {
+          nextPointerFieldIndex = fieldIndex;
+          nextPointerFieldName = fieldName;
+          break;
+        }
+      }
+
+      // If no standard next pointer field found, use the last field as default
+      if (nextPointerFieldIndex === -1 && nodeFields.length > 0) {
+        nextPointerFieldIndex = nodeFields.length - 1;
+        nextPointerFieldName = nodeFields[nextPointerFieldIndex];
+      }
+
+      console.log(
+        `[HashStructure] Connection from node ${index}: using field '${nextPointerFieldName}' at index ${nextPointerFieldIndex} out of ${nodeFields.length} total fields`
+      );
+
+      // Calculate connection points based on the actual field position
+      const sourceX = nodeX + nodeWidth; // Right edge of current node
       const sourceY =
-        nodeY +
-        styles.node.headerHeight +
-        styles.node.padding +
-        styles.node.fieldHeight * 2 +
-        styles.node.fieldSpacing * 2 +
-        styles.node.fieldHeight / 2; // Exact middle of linkAddress field (3rd field)
+        nextPointerFieldIndex >= 0
+          ? nodeY +
+            styles.node.headerHeight +
+            styles.node.padding +
+            nextPointerFieldIndex *
+              (styles.node.fieldHeight + styles.node.fieldSpacing) +
+            styles.node.fieldHeight / 2 // Middle of the identified field
+          : nodeY + styles.node.headerHeight / 2; // Fallback to header if no fields
 
       // Target: to the address tag of next node
       const targetX = nextNodeX; // Left edge of next node
