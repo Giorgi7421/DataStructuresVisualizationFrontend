@@ -168,23 +168,15 @@ const bigONotations = {
   TREE: {
     remove: {
       BS: "O(n)",
-      AVL: "O(n)",
-      EXPRESSION: "O(n)",
     },
     insert: {
       BS: "O(n)",
-      AVL: "O(n)",
-      EXPRESSION: "O(n)",
     },
     clear: {
       BS: "O(n)",
-      AVL: "O(n)",
-      EXPRESSION: "O(n)",
     },
     search: {
       BS: "O(n)",
-      AVL: "O(n)",
-      EXPRESSION: "O(n)",
     },
   },
   STACK: {
@@ -221,39 +213,27 @@ const bigONotations = {
   },
   SET: {
     remove: {
-      TREE: "O(n)",
       HASH: "O(n)",
-      SMALL_INT: "O(n)",
       MOVE_TO_FRONT: "O(n)",
     },
     clear: {
-      TREE: "O(n)",
       HASH: "O(n)",
-      SMALL_INT: "O(n)",
       MOVE_TO_FRONT: "O(n)",
     },
     add: {
-      TREE: "O(n)",
       HASH: "O(n)",
-      SMALL_INT: "O(n)",
       MOVE_TO_FRONT: "O(1)",
     },
     size: {
-      TREE: "O(n)",
       HASH: "O(n)",
-      SMALL_INT: "O(n)",
       MOVE_TO_FRONT: "O(1)",
     },
     isEmpty: {
-      TREE: "O(n)",
       HASH: "O(n)",
-      SMALL_INT: "O(n)",
       MOVE_TO_FRONT: "O(1)",
     },
     contains: {
-      TREE: "O(n)",
       HASH: "O(n)",
-      SMALL_INT: "O(n)",
       MOVE_TO_FRONT: "O(n)",
     },
   },
@@ -345,32 +325,26 @@ const bigONotations = {
     put: {
       ARRAY: "O(n)",
       HASH: "O(n)",
-      TREE: "O(n)",
     },
     get: {
       ARRAY: "O(n)",
       HASH: "O(n)",
-      TREE: "O(n)",
     },
     clear: {
       ARRAY: "O(n)",
       HASH: "O(n)",
-      TREE: "O(n)",
     },
     size: {
       ARRAY: "O(1)",
       HASH: "O(1)",
-      TREE: "O(1)",
     },
     isEmpty: {
       ARRAY: "O(1)",
       HASH: "O(1)",
-      TREE: "O(1)",
     },
     containsKey: {
       ARRAY: "O(n)",
       HASH: "O(n)",
-      TREE: "O(n)",
     },
   },
   DEQUE: {
@@ -442,32 +416,26 @@ const bigONotations = {
     put: {
       ARRAY: "O(n)",
       HASH: "O(n)",
-      TREE: "O(n)",
     },
     get: {
       ARRAY: "O(n)",
       HASH: "O(n)",
-      TREE: "O(n)",
     },
     clear: {
       ARRAY: "O(n)",
       HASH: "O(n)",
-      TREE: "O(n)",
     },
     size: {
       ARRAY: "O(1)",
       HASH: "O(1)",
-      TREE: "O(1)",
     },
     isEmpty: {
       ARRAY: "O(1)",
       HASH: "O(1)",
-      TREE: "O(1)",
     },
     containsKey: {
       ARRAY: "O(n)",
       HASH: "O(n)",
-      TREE: "O(n)",
     },
   },
 };
@@ -929,13 +897,7 @@ function DataStructurePage() {
           let combinedType;
 
           // Special cases that should not combine implementation with type
-          const specialTypes = [
-            "BIG_INTEGER",
-            "WEB_BROWSER",
-            "DEQUE",
-            "FILE_SYSTEM",
-            "GRID",
-          ];
+          const specialTypes = ["BIG_INTEGER", "WEB_BROWSER", "DEQUE", "GRID"];
           if (
             impl &&
             impl !== "NULL" &&
@@ -1060,7 +1022,6 @@ function DataStructurePage() {
                 snapshotIdentifier
               );
               break;
-            case "TREE_MAP":
             case "DEQUE":
               renderDoublyLinkedStructureVisualization(
                 tempGroup,
@@ -1091,10 +1052,6 @@ function DataStructurePage() {
                 snapshotIdentifier
               );
               break;
-            case "AVL_TREE":
-            case "EXPRESSION_TREE":
-            case "TREE_SET":
-            case "SMALL_INT_SET":
             case "MOVE_TO_FRONT_SET":
               renderLinkedStructureVisualization(
                 tempGroup,
@@ -1155,7 +1112,6 @@ function DataStructurePage() {
                 snapshotIdentifier
               );
               break;
-            case "FILE_SYSTEM":
             case "LINKED_LIST_EDITOR_BUFFER":
               renderLinkedStructureVisualization(
                 tempGroup,
@@ -2150,13 +2106,9 @@ function DataStructurePage() {
             impl &&
             impl !== "NULL" &&
             impl !== "" &&
-            ![
-              "BIG_INTEGER",
-              "WEB_BROWSER",
-              "DEQUE",
-              "FILE_SYSTEM",
-              "GRID",
-            ].includes(structureType)
+            !["BIG_INTEGER", "WEB_BROWSER", "DEQUE", "GRID"].includes(
+              structureType
+            )
               ? `${impl}_${structureType}`
               : structureType;
 
@@ -2263,7 +2215,6 @@ function DataStructurePage() {
                 `export_snapshot_${i}`
               );
               break;
-            case "TREE_MAP":
             case "DEQUE":
               renderDoublyLinkedStructureVisualization(
                 contentGroup,
@@ -2294,10 +2245,6 @@ function DataStructurePage() {
                 `export_snapshot_${i}`
               );
               break;
-            case "AVL_TREE":
-            case "EXPRESSION_TREE":
-            case "TREE_SET":
-            case "SMALL_INT_SET":
             case "MOVE_TO_FRONT_SET":
               renderLinkedStructureVisualization(
                 contentGroup,
@@ -2358,7 +2305,6 @@ function DataStructurePage() {
                 `export_snapshot_${i}`
               );
               break;
-            case "FILE_SYSTEM":
             case "LINKED_LIST_EDITOR_BUFFER":
               renderLinkedStructureVisualization(
                 contentGroup,

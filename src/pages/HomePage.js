@@ -41,25 +41,18 @@ function HomePage() {
             label: "Binary Heap Priority",
           },
         ];
+      case "SET":
+        return [
+          { value: "HASH", label: "Hash" },
+          { value: "MOVE_TO_FRONT", label: "Move To Front" },
+        ];
       case "MAP":
         return [
           { value: "ARRAY", label: "Array" },
           { value: "HASH", label: "Hash" },
-          { value: "TREE", label: "Tree" },
         ];
       case "TREE":
-        return [
-          { value: "BS", label: "BS" },
-          { value: "AVL", label: "AVL" },
-          { value: "EXPRESSION", label: "Expression" },
-        ];
-      case "SET":
-        return [
-          { value: "TREE", label: "Tree" },
-          { value: "HASH", label: "Hash" },
-          { value: "SMALL_INT", label: "Small Int" },
-          { value: "MOVE_TO_FRONT", label: "Move To Front" },
-        ];
+        return [{ value: "BS", label: "Binary Search" }];
       case "EDITOR_BUFFER":
         return [
           { value: "ARRAY", label: "Array" },
@@ -80,8 +73,6 @@ function HomePage() {
         return [{ value: "GRID", label: "Grid" }];
       case "DEQUE":
         return [{ value: "DEQUE", label: "Deque" }];
-      case "FILE_SYSTEM":
-        return [{ value: "FILE_SYSTEM", label: "File System" }];
       case "WEB_BROWSER":
         return [{ value: "WEB_BROWSER", label: "Web Browser" }];
       case "BIG_INTEGER":
@@ -222,8 +213,6 @@ function HomePage() {
         return "📊"; // Chart for grid
       case "DEQUE":
         return "↔️"; // Left-right arrows for deque
-      case "FILE_SYSTEM":
-        return "📁"; // File folder for file system
       case "WEB_BROWSER":
         return "🌐"; // Globe for web browser
       case "BIG_INTEGER":
@@ -395,7 +384,6 @@ function HomePage() {
                   <option value="EDITOR_BUFFER">Editor Buffer</option>
                   <option value="GRID">Grid</option>
                   <option value="DEQUE">Deque</option>
-                  <option value="FILE_SYSTEM">File System</option>
                   <option value="WEB_BROWSER">Web Browser</option>
                   <option value="BIG_INTEGER">Big Integer</option>
                 </select>
