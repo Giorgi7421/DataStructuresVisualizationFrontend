@@ -1,4 +1,3 @@
-// src/App.js
 import React, { useState, useEffect } from "react";
 import { AuthContext } from "./context/AuthContext";
 import {
@@ -49,7 +48,6 @@ function App() {
   );
 }
 
-// Protected route component to ensure user is authenticated
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = React.useContext(AuthContext);
 

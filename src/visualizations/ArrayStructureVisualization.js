@@ -7,10 +7,8 @@ import {
   generateOrthogonalPath,
 } from "../utils/visualizationUtils";
 
-// Import default styles to reference colors/etc.
 import { defaultVisualizationStyles } from "../utils/visualizationUtils";
 
-// Helper function to determine if a value represents an object (not a primitive or array)
 const isObjectValue = (value, addressObjectMap) => {
   console.log(
     `[ArrayViz Debug] Checking if value "${value}" (type: ${typeof value}) is an object...`
@@ -20,13 +18,11 @@ const isObjectValue = (value, addressObjectMap) => {
     Object.keys(addressObjectMap)
   );
 
-  // First check if value is directly an object (not a string address)
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     console.log(`[ArrayViz Debug] Value is directly an object:`, value);
     return true;
   }
 
-  // Check if value is an address string and points to an object in addressObjectMap
   const valueStr = String(value);
   if (isAddress(valueStr) && addressObjectMap && addressObjectMap[valueStr]) {
     const data = addressObjectMap[valueStr];
@@ -35,14 +31,12 @@ const isObjectValue = (value, addressObjectMap) => {
       data,
       `(type: ${typeof data}, isArray: ${Array.isArray(data)})`
     );
-    // Return true if it's an object (not an array)
     const isObj =
       typeof data === "object" && data !== null && !Array.isArray(data);
     console.log(`[ArrayViz Debug] Is object result:`, isObj);
     return isObj;
   }
 
-  // Check if value itself could be an object representation or address that we missed
   if (
     valueStr.includes("Object") ||
     valueStr.includes("@") ||
@@ -51,7 +45,6 @@ const isObjectValue = (value, addressObjectMap) => {
     console.log(
       `[ArrayViz Debug] Value looks like object representation: "${valueStr}"`
     );
-    // If we have any objects in addressObjectMap, this might be referring to one of them
     const objectAddresses = Object.keys(addressObjectMap).filter((addr) => {
       const data = addressObjectMap[addr];
       return typeof data === "object" && data !== null && !Array.isArray(data);
@@ -70,7 +63,6 @@ const isObjectValue = (value, addressObjectMap) => {
   return false;
 };
 
-// Helper function to render an array cell containing an object node
 const renderObjectCellContent = (
   cellGroup,
   cellWidth,
@@ -85,7 +77,6 @@ const renderObjectCellContent = (
   console.log(`[ArrayViz Debug] Rendering object cell for value:`, value);
   const indexPartHeight = styles.arrayCell.indexPartitionHeight || 15;
 
-  // Draw the index partition at the top
   cellGroup
     .append("line")
     .attr("x1", 0)
@@ -95,7 +86,6 @@ const renderObjectCellContent = (
     .attr("stroke", styles.arrayCell.stroke)
     .attr("stroke-width", 0.5);
 
-  // Draw the index number
   cellGroup
     .append("text")
     .attr("x", cellWidth / 2)
@@ -106,34 +96,27 @@ const renderObjectCellContent = (
     .style("font-size", styles.arrayCell.indexFontSize)
     .text(index);
 
-  // Get the object data - try multiple approaches
   let objectData = null;
   let objectAddress = null;
 
-  // If value is directly an object
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     objectData = value;
     objectAddress = `object_${index}`;
     console.log(`[ArrayViz Debug] Using direct object data:`, objectData);
-  }
-  // If value is an address string
-  else if (isAddress(String(value)) && addressObjectMap[value]) {
+  } else if (isAddress(String(value)) && addressObjectMap[value]) {
     objectData = addressObjectMap[value];
     objectAddress = String(value);
     console.log(
       `[ArrayViz Debug] Using object data from address "${value}":`,
       objectData
     );
-  }
-  // If value looks like "[object Object]" or similar, find the first available object
-  else if (
+  } else if (
     String(value).includes("Object") ||
     String(value) === "[object Object]"
   ) {
     console.log(
       `[ArrayViz Debug] Searching for object for stringified value "${value}"`
     );
-    // Find the first object in addressObjectMap (they are likely in the same order as array elements)
     const objectEntries = Object.entries(addressObjectMap).filter(
       ([addr, data]) => {
         return (
@@ -143,7 +126,6 @@ const renderObjectCellContent = (
     );
 
     if (objectEntries.length > index) {
-      // Try to use the object at the same index position
       const [addr, data] = objectEntries[index];
       objectData = data;
       objectAddress = addr;
@@ -152,7 +134,6 @@ const renderObjectCellContent = (
         objectData
       );
     } else if (objectEntries.length > 0) {
-      // Fallback to first available object
       const [addr, data] = objectEntries[0];
       objectData = data;
       objectAddress = addr;
@@ -161,9 +142,7 @@ const renderObjectCellContent = (
         objectData
       );
     }
-  }
-  // Try to find any object in addressObjectMap as last resort
-  else {
+  } else {
     console.log(
       `[ArrayViz Debug] Trying fallback object search for value "${value}"`
     );
@@ -182,7 +161,6 @@ const renderObjectCellContent = (
 
   if (!objectData) {
     console.log(`[ArrayViz Debug] No object data found, falling back to text`);
-    // Fallback to simple text if object data not found
     cellGroup
       .append("text")
       .attr("x", cellWidth / 2)

@@ -1,4 +1,3 @@
-// src/context/AuthContext.js
 import React, { createContext, useState, useEffect } from "react";
 import api from "../services/api";
 
@@ -11,7 +10,6 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Check for token in localStorage
     const token = localStorage.getItem("token");
     if (token) {
       checkAuthStatus(token);
@@ -22,15 +20,11 @@ export function AuthProvider({ children }) {
 
   const checkAuthStatus = async (token) => {
     try {
-      // Set default auth header
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-      // Fetch user profile
       const response = await api.get("/user/me");
       setCurrentUser(response.data);
       setIsAuthenticated(true);
     } catch (err) {
-      // If token is invalid, remove it
       localStorage.removeItem("token");
       api.defaults.headers.common["Authorization"] = "";
     } finally {
@@ -47,7 +41,6 @@ export function AuthProvider({ children }) {
       localStorage.setItem("token", token);
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      // Fetch user data after successful login
       const userResponse = await api.get("/user/me");
       setCurrentUser(userResponse.data);
       setIsAuthenticated(true);
@@ -61,13 +54,11 @@ export function AuthProvider({ children }) {
   const register = async (username, password) => {
     try {
       setError(null);
-      // First, register the user
       await api.post("/auth/register", {
         username,
         password,
       });
 
-      // Then automatically log in
       const loginResponse = await api.post("/auth/login", {
         username,
         password,
@@ -77,7 +68,6 @@ export function AuthProvider({ children }) {
       localStorage.setItem("token", token);
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      // Fetch user data after successful registration and login
       const userResponse = await api.get("/user/me");
       setCurrentUser(userResponse.data);
       setIsAuthenticated(true);

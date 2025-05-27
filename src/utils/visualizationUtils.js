@@ -1,67 +1,49 @@
-// src/utils/visualizationUtils.js
-
 import * as d3 from "d3";
 
-// Helper function to check if a value is an address
 export const isAddress = (value) => {
   if (!value) return false;
   return typeof value === "string" && value.match(/^0x[0-9a-f]+$/i);
 };
 
-// Helper function to display values (now with truncation)
 export const truncateAddress = (address, length = 6) => {
   if (address === null || address === undefined) return "null";
   const stringValue = String(address);
-  // const maxLength = Math.max(3, length); // Ensure length is at least 3 for ellipsis
-
-  // if (stringValue.length > maxLength) {
-  //   return stringValue.substring(0, maxLength - 3) + "...";
-  // }
   return stringValue;
 };
 
-// Helper to generate curved path between two points
 export const generateCurvedPath = (
   source,
   target,
   pathType = "default",
   curveFactor = 0.4
 ) => {
-  // Calculate the vector between points
   const dx = target.x - source.x;
   const dy = target.y - source.y;
 
-  // Determine if connection is horizontal/vertical/diagonal for default behavior
   const isMainlyHorizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
   const isMainlyVertical = Math.abs(dy) > Math.abs(dx) * 1.5;
 
   const distanceTotal = Math.sqrt(dx * dx + dy * dy);
-  let controlDistance = Math.min(distanceTotal * curveFactor, 80); // Use curveFactor
+  let controlDistance = Math.min(distanceTotal * curveFactor, 80);
 
   let cp1x, cp1y, cp2x, cp2y;
 
   if (pathType === "longArcDown") {
-    // Revised for ERD-style orthogonal connector with ROUNDED corners: Down, Horizontal, Up
     const verticalDipFromSource = 30;
-    const cornerRadius = 8; // Increased radius for more visible rounding
+    const cornerRadius = 8;
 
     let path = `M ${source.x} ${source.y}`;
     const firstVerticalY = source.y + verticalDipFromSource;
     const targetHorizontalSign = Math.sign(target.x - source.x);
 
-    // Segment 1: Go down to the start of the first curve
     path += ` V ${firstVerticalY - cornerRadius}`;
-    // Corner 1: Rounded turn from vertical (down) to horizontal (right or left)
     path += ` Q ${source.x} ${firstVerticalY}, ${
       source.x + targetHorizontalSign * cornerRadius
     } ${firstVerticalY}`;
-    // Segment 2: Go horizontal towards the start of the second curve
     path += ` H ${target.x - targetHorizontalSign * cornerRadius}`;
-    // Corner 2: Rounded turn from horizontal to vertical (up)
     path += ` Q ${target.x} ${firstVerticalY}, ${target.x} ${
       firstVerticalY - cornerRadius
     }`;
-    // Segment 3: Go vertical up to target's Y
     path += ` V ${target.y}`;
 
     console.log("[generateCurvedPath] longArcDown Data (Rounded):", {
@@ -73,21 +55,16 @@ export const generateCurvedPath = (
     });
     return path;
   } else if (pathType === "arcUpHigh") {
-    // New: Force a path that arcs upwards significantly
-    const arcHeight = Math.max(80, distanceTotal * 0.3, Math.abs(dx) * 0.25); // Increased arc height
+    const arcHeight = Math.max(80, distanceTotal * 0.3, Math.abs(dx) * 0.25);
     cp1x = source.x + dx * 0.3;
     cp1y = source.y - arcHeight;
     cp2x = target.x - dx * 0.3;
     cp2y = target.y - arcHeight;
   } else if (pathType === "orthogonalNext") {
-    // ERD-style for node-to-node next pointers: H, V, H
-    const horizontalOffset = 20; // Use a fixed horizontal offset
+    const horizontalOffset = 20;
     let path = `M ${source.x} ${source.y}`;
-    // Segment 1: Horizontal line out from source
     path += ` H ${source.x + horizontalOffset}`;
-    // Segment 2: Vertical line to align with target Y
     path += ` V ${target.y}`;
-    // Segment 3: Horizontal line into target
     path += ` H ${target.x}`;
     console.log("[generateCurvedPath] orthogonalNext Data:", {
       sourceX: source.x,
@@ -98,7 +75,6 @@ export const generateCurvedPath = (
     });
     return path;
   } else {
-    // Default pathing logic
     if (isMainlyHorizontal) {
       cp1x = source.x + Math.sign(dx) * controlDistance;
       cp1y = source.y;
@@ -120,7 +96,6 @@ export const generateCurvedPath = (
   return `M ${source.x} ${source.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
 };
 
-// Universal Orthogonal Path Generator
 export const generateOrthogonalPath = (
   source,
   target,
@@ -155,8 +130,6 @@ export const generateOrthogonalPath = (
       cornerRadius,
       Math.abs(turn1X - source.x)
     );
-    // If turn1Y is the same as turn2Y (i.e., dy is 0), force effectiveRadiusV to be cornerRadius to create a visible bump.
-    // Otherwise, calculate it normally, ensuring it doesn't exceed the vertical segment length or cornerRadius.
     const effectiveRadiusV =
       turn1Y === turn2Y
         ? cornerRadius
@@ -265,7 +238,6 @@ export const generateOrthogonalPath = (
   return path;
 };
 
-// Hardcoded Path Generator for 'end' pointer
 export const generateHardcodedEndPointerPath = (
   sourceConnectionPoint,
   targetNodePosition,
@@ -296,7 +268,6 @@ export const generateHardcodedEndPointerPath = (
   return path;
 };
 
-// Smart Detour Path Generator (for specific cases like 'end' pointer)
 export const generateSmartDetourPath = (
   sourcePoint,
   targetNodePos,
@@ -346,7 +317,6 @@ export const generateSmartDetourPath = (
   return path;
 };
 
-// Helper function to render a generic variable box
 export const renderVariableBox = (
   group,
   title,
@@ -355,7 +325,7 @@ export const renderVariableBox = (
   y,
   styleConfig,
   type,
-  isAddressFn // Use isAddress from this file implicitly
+  isAddressFn
 ) => {
   console.log(
     `[renderVariableBox Entry] Called for title: "${title}", type: "${type}"`
@@ -474,7 +444,7 @@ export const renderVariableBox = (
       .attr("fill", s.keyTextFill)
       .text(`${key}:`);
     const stringValue = String(value);
-    const isAddr = isAddress(stringValue); // Use isAddress from this file
+    const isAddr = isAddress(stringValue);
     fieldGroup
       .append("text")
       .attr("x", x + s.width - s.padding)
@@ -513,10 +483,9 @@ export const renderVariableBox = (
   return { height: boxHeight, connectionPoints: connectionPoints };
 };
 
-// Helper function to define standard arrowhead markers in the SVG <defs>
 export const defineArrowheads = (defs, globalStyles) => {
   const createMarker = (id, color, size = 8, refX = 8) => {
-    if (!id) return; // Do not create marker if ID is invalid
+    if (!id) return;
     if (defs.select(`#${id}`).empty()) {
       defs
         .append("marker")
@@ -539,67 +508,39 @@ export const defineArrowheads = (defs, globalStyles) => {
   const defaultRed = "#ef4444";
   const defaultGreen = "#166534";
 
-  // Define markers using IDs and colors from connStyles, falling back to defaults
-  // Use the IDs provided in connStyles (e.g., llNextMarkerId, llInstanceVarMarkerId)
   createMarker(
-    connStyles.llNextMarkerId || "ll-next-arrow", // Use provided ID or fallback
-    connStyles.nextColor || defaultBlue, // Use provided color or fallback
+    connStyles.llNextMarkerId || "ll-next-arrow",
+    connStyles.nextColor || defaultBlue,
     7,
     7
   );
   createMarker(
-    connStyles.llPrevMarkerId || "ll-prev-arrow", // Use provided ID or fallback
-    connStyles.prevColor || defaultRed, // Use provided color or fallback
+    connStyles.llPrevMarkerId || "ll-prev-arrow",
+    connStyles.prevColor || defaultRed,
     7,
     7
   );
   createMarker(
-    connStyles.llInstanceVarMarkerId || "ll-instance-var-arrow", // Use provided ID or fallback
-    connStyles.instanceVarColor || defaultDarkGray, // Use provided color or fallback
+    connStyles.llInstanceVarMarkerId || "ll-instance-var-arrow",
+    connStyles.instanceVarColor || defaultDarkGray,
     7,
     7
   );
   createMarker(
-    connStyles.llLocalVarMarkerId || "ll-local-var-arrow", // Use provided ID or fallback (assuming local vars might need one)
-    connStyles.localVarColor || connStyles.instanceVarColor || defaultDarkGray, // Use provided color or fallback
+    connStyles.llLocalVarMarkerId || "ll-local-var-arrow",
+    connStyles.localVarColor || connStyles.instanceVarColor || defaultDarkGray,
     7,
     7
   );
-
-  // You might still want some generic fallbacks if the specific IDs aren't provided
-  // createMarker("generic-arrow", defaultSlate);
-
-  // Remove the old hardcoded definitions if they are now redundant
-  // createMarker("array-arrow", connStyles.arrayArrowColor || defaultBlue);
-  // createMarker("var-ref-arrow", connStyles.varRefColor || defaultDarkGray);
-  // createMarker("next-arrow", connStyles.nextColor || defaultBlue); // Generic next
-  // createMarker("prev-arrow", connStyles.prevColor || defaultRed); // Generic prev
-  // createMarker("current-arrow", connStyles.currentColor || defaultGreen); // Generic current
-
-  /* Old hardcoded specific markers - replaced by logic above
-  createMarker(
-    "ll-next-arrow",
-    connStyles.llNextColor || connStyles.nextColor || defaultBlue,
-    7,
-    7
-  );
-  createMarker(
-    "ll-instance-var-arrow",
-    connStyles.llInstanceVarColor || connStyles.varRefColor || defaultDarkGray,
-    7,
-    7
-  );
-  */
 };
 
-// Helper function to render a generic node
 export const renderGenericNode = (
   group,
   nodeSpec,
   styleConfig,
   positionsMap,
-  isAddressFn, // Use isAddress from this file implicitly
-  truncateAddrFn // Use truncateAddress from this file implicitly
+  isAddressFn,
+  truncateAddrFn
 ) => {
   console.log(
     `[renderGenericNode] START processing node: ${nodeSpec?.address}`
@@ -629,7 +570,7 @@ export const renderGenericNode = (
     isolatedStroke: "#ca8a04",
     isolatedStrokeWidth: 1.5,
     isolatedDasharray: "4,4",
-    height: 100, // Added default
+    height: 100,
   };
   const s = { ...defaultConfig, ...styleConfig, ...(nodeSpec.style || {}) };
   const { x, y, address, title, fields, isCurrent, isIsolated } = nodeSpec;
@@ -692,7 +633,7 @@ export const renderGenericNode = (
     .attr("font-weight", "bold")
     .attr("font-size", s.titleFontSize)
     .attr("fill", s.titleTextFill)
-    .text(title || truncateAddress(address)); // Use truncateAddress from this file
+    .text(title || truncateAddress(address));
   if (fieldCount > 0) {
     nodeGroup
       .append("line")
@@ -746,7 +687,7 @@ export const renderGenericNode = (
         .attr("fill", s.keyTextFill)
         .text(`${key}:`);
       const stringValue = String(value);
-      const isAddr = isAddress(stringValue); // Use isAddress from this file
+      const isAddr = isAddress(stringValue);
       fieldGroup
         .append("text")
         .attr("class", "field-value")
@@ -756,7 +697,7 @@ export const renderGenericNode = (
         .attr("font-size", s.fontSize)
         .attr("font-weight", isAddr ? "bold" : "normal")
         .attr("fill", isAddr ? s.addressTextFill : s.valueTextFill)
-        .text(truncateAddress(stringValue)); // Use truncateAddress from this file
+        .text(truncateAddress(stringValue));
       fieldCurrentYOffset += s.fieldHeight + s.fieldSpacing;
     });
     console.log(
@@ -773,7 +714,6 @@ export const renderGenericNode = (
   console.log(`[renderGenericNode] END processing node: ${nodeSpec?.address}`);
 };
 
-// Helper function to show a not implemented message
 export const showNotImplementedMessage = (
   contentGroup,
   width,
@@ -798,12 +738,11 @@ export const showNotImplementedMessage = (
 export const autoFitVisualization = (
   svg,
   contentGroup,
-  zoom, // This is the d3 zoom behavior instance
+  zoom,
   viewWidth,
   viewHeight
 ) => {
   try {
-    // Give the browser a moment to render the SVG content
     setTimeout(() => {
       const contentNode = contentGroup.node();
       if (!contentNode) {
@@ -837,7 +776,7 @@ export const autoFitVisualization = (
 
       const scaleX = viewWidth / paddedWidth;
       const scaleY = viewHeight / paddedHeight;
-      const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in past 1x initially
+      const scale = Math.min(scaleX, scaleY, 1);
 
       const translateX =
         (viewWidth - contentBBox.width * scale) / 2 - contentBBox.x * scale;
@@ -856,7 +795,7 @@ export const autoFitVisualization = (
         translateX,
         translateY,
       });
-    }, 100); // Short delay for rendering
+    }, 100);
   } catch (error) {
     console.error("Error in autoFitVisualization:", error);
   }
