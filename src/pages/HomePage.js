@@ -235,7 +235,9 @@ function HomePage() {
   // Helper function to check if a data structure type has multiple implementations
   const hasMultipleImplementations = (type) => {
     const options = getImplementationOptions(type);
-    return options.length > 1;
+    // Show implementation dropdown for TREE even though it only has one option
+    // and for any type that actually has multiple options
+    return options.length > 1 || type === "TREE";
   };
 
   // Format implementation to display name
