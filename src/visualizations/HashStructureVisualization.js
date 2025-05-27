@@ -672,7 +672,7 @@ function renderHashStructure(
   variableBoxY
 ) {
   const nodeWidth = styles.node.width;
-  const nodeSpacing = 30; // Reduced from 60 to position nodes closer together
+  const nodeSpacing = 60; // Increased from 30 to 60 for more horizontal spacing between chain nodes
 
   // Calculate horizontal sections area - use ALL available width and extend even further
   const sectionsStartX = startX;
@@ -847,8 +847,8 @@ function renderHorizontalChain(
       ? Math.max(baseNodeSpacing, availableSpacingWidth / (chain.length - 1))
       : baseNodeSpacing;
 
-  // Increase the maximum spacing even more to allow maximum spread
-  const maxSpacing = 80; // Reduced from 500 to keep nodes closer together
+  // Increase the maximum spacing to allow more spread between nodes
+  const maxSpacing = 170; // Increased from 80 to 150 for more spacing between nodes
   const finalSpacing = Math.min(dynamicSpacing, maxSpacing);
 
   console.log("[HashStructure] Chain spacing calculations:", {
