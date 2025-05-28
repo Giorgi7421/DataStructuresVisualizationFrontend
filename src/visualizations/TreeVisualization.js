@@ -40,36 +40,15 @@ export function renderTreeVisualization(
   const localVariables = state.localVariables || {};
   const addressObjectMap = state.addressObjectMap || {};
 
-  console.log("[BSTree] Parsed state:", {
-    state,
-    instanceVariables,
-    localVariables,
-    addressObjectMap,
-  });
-
-  console.log("[BSTree] Variable types:", {
-    instanceVariablesType: typeof instanceVariables,
-    instanceVariablesKeys: Object.keys(instanceVariables),
-    localVariablesType: typeof localVariables,
-    localVariablesKeys: Object.keys(localVariables),
-  });
-
   const nodePositions = {};
   const allConnections = [];
 
   const rootAddress =
     instanceVariables && instanceVariables.root ? instanceVariables.root : null;
-  console.log("[BSTree] Root address:", rootAddress);
-  console.log("[BSTree] Address object map:", addressObjectMap);
 
   const treeData = parseTreeStructure(rootAddress, addressObjectMap);
-  console.log("[BSTree] Parsed tree data:", treeData);
 
   const orphanNodes = findOrphanNodes(rootAddress, addressObjectMap);
-  console.log(
-    "[BSTree] Found orphan nodes:",
-    orphanNodes.map((n) => n.address)
-  );
 
   const treeDepth = treeData ? getTreeDepth(treeData) : 1;
   const maxNodes = Math.pow(2, treeDepth);
@@ -82,15 +61,6 @@ export function renderTreeVisualization(
 
   const adaptiveHorizontalSpacing = adaptiveNodeWidth * 3.0;
   const adaptiveVerticalSpacing = Math.max(200, adaptiveNodeWidth * 2.5);
-
-  console.log("[BSTree] Adaptive sizing:", {
-    treeDepth,
-    maxNodes,
-    availableWidth,
-    adaptiveNodeWidth,
-    adaptiveHorizontalSpacing,
-    adaptiveVerticalSpacing,
-  });
 
   const styles = {
     varBox: {
@@ -143,32 +113,22 @@ export function renderTreeVisualization(
   function logTreeStructure(node, depth = 0) {
     if (!node) return;
     const indent = "  ".repeat(depth);
-    console.log(
-      `${indent}Node ${node.address}: value=${node.value}, left=${
-        node.left || "null"
-      }, right=${node.right || "null"}`
-    );
-    console.log(`${indent}Children array:`, node.children);
     if (node.children) {
       if (node.children[0]) {
-        console.log(`${indent}Left child:`, node.children[0].address);
         logTreeStructure(node.children[0], depth + 1);
       }
       if (node.children[1]) {
-        console.log(`${indent}Right child:`, node.children[1].address);
         logTreeStructure(node.children[1], depth + 1);
       }
     }
   }
 
   if (treeData) {
-    console.log("[BSTree] Complete tree structure:");
     logTreeStructure(treeData);
   }
 
   let treeLayout = null;
   if (treeData) {
-    console.log("[BSTree] Starting layout calculation...");
     treeLayout = calculateTreeLayout(
       treeData,
       styles.node.width,
@@ -180,11 +140,6 @@ export function renderTreeVisualization(
     function logLayoutPositions(node, depth = 0) {
       if (!node) return;
       const indent = "  ".repeat(depth);
-      console.log(
-        `${indent}Layout - Node ${node.address}: x=${node.x}, y=${
-          node.y
-        }, level=${node.level || "undefined"}`
-      );
       if (node.children) {
         if (node.children[0]) logLayoutPositions(node.children[0], depth + 1);
         if (node.children[1]) logLayoutPositions(node.children[1], depth + 1);
@@ -192,7 +147,6 @@ export function renderTreeVisualization(
     }
 
     if (treeLayout) {
-      console.log("[BSTree] Final layout positions:");
       logLayoutPositions(treeLayout);
     }
 
@@ -207,23 +161,7 @@ export function renderTreeVisualization(
   const instanceVarBoxX = 30;
   const localVarBoxX = instanceVarBoxX + styles.varBox.width + varBoxSpacing;
 
-  console.log("[BSTree] Position calculations:", {
-    varBoxY,
-    instanceVarBoxX,
-    localVarBoxX,
-    varBoxSpacing,
-  });
-
   let instanceVarBoxResult;
-  console.log("[BSTree] About to render instance variables:", {
-    variables: instanceVariables,
-    hasVariables: Object.keys(instanceVariables).length > 0,
-    x: instanceVarBoxX,
-    y: varBoxY,
-    title: "Instance Variables",
-    xType: typeof instanceVarBoxX,
-    yType: typeof varBoxY,
-  });
 
   try {
     instanceVarBoxResult = renderVariableBox(
@@ -236,25 +174,12 @@ export function renderTreeVisualization(
       "instance",
       isAddress
     );
-    console.log(
-      "[BSTree] Instance variables box rendered successfully:",
-      instanceVarBoxResult
-    );
   } catch (error) {
     console.error("[BSTree] Error rendering instance variables box:", error);
     instanceVarBoxResult = { height: 80, connectionPoints: [] };
   }
 
   let localVarBoxResult;
-  console.log("[BSTree] About to render local variables:", {
-    variables: localVariables,
-    hasVariables: Object.keys(localVariables).length > 0,
-    x: localVarBoxX,
-    y: varBoxY,
-    title: "Local Variables",
-    xType: typeof localVarBoxX,
-    yType: typeof varBoxY,
-  });
 
   try {
     localVarBoxResult = renderVariableBox(
@@ -267,20 +192,12 @@ export function renderTreeVisualization(
       "local",
       isAddress
     );
-    console.log(
-      "[BSTree] Local variables box rendered successfully:",
-      localVarBoxResult
-    );
   } catch (error) {
     console.error("[BSTree] Error rendering local variables box:", error);
     localVarBoxResult = { height: 80, connectionPoints: [] };
   }
 
   if (instanceVarBoxResult?.connectionPoints) {
-    console.log(
-      "[BSTree] Adding instance variable connection points:",
-      instanceVarBoxResult.connectionPoints
-    );
     instanceVarBoxResult.connectionPoints.forEach((cp) => {
       if (
         cp &&
@@ -307,10 +224,6 @@ export function renderTreeVisualization(
     );
   }
   if (localVarBoxResult?.connectionPoints) {
-    console.log(
-      "[BSTree] Adding local variable connection points:",
-      localVarBoxResult.connectionPoints
-    );
     localVarBoxResult.connectionPoints.forEach((cp) => {
       if (
         cp &&
@@ -352,11 +265,8 @@ export function renderTreeVisualization(
     (instanceVarBoxX + localVarBoxX + styles.varBox.width) / 2;
 
   if (treeLayout) {
-    console.log("[BSTree] Tree layout exists, proceeding with rendering");
-
     try {
       const treeBounds = getTreeBounds(treeLayout);
-      console.log("[BSTree] Tree bounds:", treeBounds);
 
       if (!treeBounds || typeof treeBounds.minX === "undefined") {
         console.error("[BSTree] Invalid tree bounds:", treeBounds);
@@ -369,12 +279,6 @@ export function renderTreeVisualization(
         treeBounds.maxY -
         treeBounds.minY +
         2 * (styles.node.headerHeight + styles.node.fieldHeight * 3);
-
-      console.log(`[BSTree] Tree dimensions: ${treeWidth} x ${treeHeight}`);
-      console.log(
-        `[BSTree] Available area: ${treeAreaWidth} x ${treeAreaHeight}`
-      );
-      console.log(`[BSTree] Using adaptive node width: ${styles.node.width}`);
 
       const scale = 1;
       const offsetX = centerBetweenBoxes;
@@ -398,8 +302,6 @@ export function renderTreeVisualization(
         styles,
         nodePositions
       );
-
-      console.log("[BSTree] Tree rendering completed successfully");
     } catch (error) {
       console.error("[BSTree] Error during tree rendering:", error);
 
@@ -450,21 +352,12 @@ export function renderTreeVisualization(
   );
 
   if (rootAddress && treeLayout) {
-    console.log("[BSTree] Attempting to draw root connection...");
     const rootNode = findNodeByAddress(treeLayout, rootAddress);
-    console.log("[BSTree] Root node found:", rootNode);
-    console.log(
-      "[BSTree] Instance var connection points:",
-      instanceVarBoxResult?.connectionPoints
-    );
-
     const rootConnectionPoint = instanceVarBoxResult?.connectionPoints?.find(
       (cp) => cp.targetAddress === rootAddress || cp.varName === "root"
     );
 
     if (rootNode && rootConnectionPoint && rootConnectionPoint.sourceCoords) {
-      console.log("[BSTree] Drawing root connection...");
-
       const scale = 1;
       const offsetX = centerBetweenBoxes;
       const offsetY = treeAreaY;
@@ -493,13 +386,6 @@ export function renderTreeVisualization(
         !isNaN(targetX) &&
         !isNaN(targetY)
       ) {
-        console.log("[BSTree] Creating root connection with coordinates:", {
-          sourceX,
-          sourceY,
-          targetX,
-          targetY,
-        });
-
         const pathData = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
 
         contentGroup
@@ -528,9 +414,7 @@ export function renderTreeVisualization(
     }
   }
 
-  console.log("[BSTree] About to draw connections:", allConnections.length);
   allConnections.forEach((conn, index) => {
-    console.log(`[BSTree] Connection ${index}:`, conn);
     if (
       conn &&
       conn.source &&
@@ -580,12 +464,6 @@ function parseTreeStructure(rootAddress, addressObjectMap) {
       rightChild.side = "right";
       node.children[1] = rightChild;
     }
-
-    console.log(
-      `[BSTree] Built node ${address} with value ${nodeData.value}, left: ${
-        nodeData.left || "null"
-      }, right: ${nodeData.right || "null"}`
-    );
     return node;
   }
 
@@ -627,22 +505,11 @@ function calculateTreeLayout(
     return null;
   }
 
-  console.log(
-    "[BSTree] Starting tree layout calculation for root:",
-    rootNode.address,
-    "with adaptive spacing:",
-    { adaptiveHorizontalSpacing, adaptiveVerticalSpacing }
-  );
-
   const levelHeight = adaptiveVerticalSpacing;
   const minHorizontalSpacing = adaptiveHorizontalSpacing;
 
   const treeDepth = getTreeDepth(rootNode);
   const baseSpacingAtBottom = 50;
-
-  console.log(
-    `[BSTree] Tree depth: ${treeDepth}, base spacing at bottom: ${baseSpacingAtBottom}`
-  );
 
   function assignLevelsAndWidths(node, level = 0) {
     if (!node) return 0;
@@ -660,10 +527,6 @@ function calculateTreeLayout(
       minHorizontalSpacing,
       leftWidth + rightWidth + minHorizontalSpacing
     );
-
-    console.log(
-      `[BSTree] Node ${node.address} at level ${level}: subtreeWidth = ${node.subtreeWidth}`
-    );
     return node.subtreeWidth;
   }
 
@@ -679,45 +542,21 @@ function calculateTreeLayout(
     node.x = centerX;
     node.y = node.level * levelSpacing;
 
-    console.log(
-      `[BSTree] Positioning node ${node.address} at (${node.x}, ${node.y}), level ${node.level}`
-    );
-
     if (node.children) {
       const leftChild = node.children[0];
       const rightChild = node.children[1];
-
-      console.log(
-        `[BSTree] Node ${
-          node.address
-        } children check: left=${!!leftChild}, right=${!!rightChild}`
-      );
 
       const levelsFromBottom = treeDepth - 1 - node.level;
       const horizontalSpread =
         baseSpacingAtBottom * Math.pow(2, levelsFromBottom);
 
-      console.log(
-        `[BSTree] Level ${node.level}, levels from bottom: ${levelsFromBottom}, horizontal spread: ${horizontalSpread}`
-      );
-
       if (leftChild) {
         const childCenterX = centerX - horizontalSpread;
-        console.log(
-          `[BSTree] Left child will be at X: ${childCenterX}, Y will be: ${
-            leftChild.level * levelSpacing
-          }`
-        );
         assignPositions(leftChild, childCenterX);
       }
 
       if (rightChild) {
         const childCenterX = centerX + horizontalSpread;
-        console.log(
-          `[BSTree] Right child will be at X: ${childCenterX}, Y will be: ${
-            rightChild.level * levelSpacing
-          }`
-        );
         assignPositions(rightChild, childCenterX);
       }
 
@@ -732,7 +571,6 @@ function calculateTreeLayout(
   assignLevelsAndWidths(rootNode);
   assignPositions(rootNode, 0);
 
-  console.log("[BSTree] Tree layout calculation completed");
   return rootNode;
 }
 
@@ -842,10 +680,6 @@ function renderTreeNodes(
       return;
     }
 
-    console.log(
-      `[BSTree] Rendering node ${node.address} at (${x}, ${y}) with value: ${node.value} (original coords: ${node.x}, ${node.y})`
-    );
-
     const nodeSpec = {
       x: x - nodeWidth / 2,
       y: y - nodeHeight / 2,
@@ -865,8 +699,6 @@ function renderTreeNodes(
       return;
     }
 
-    console.log(`[BSTree] Node spec for ${node.address}:`, nodeSpec);
-
     renderGenericNode(
       contentGroup,
       nodeSpec,
@@ -884,22 +716,10 @@ function renderTreeNodes(
     };
 
     if (node.children) {
-      console.log(`[BSTree] Checking children for node ${node.address}:`, {
-        hasLeftChild: !!node.children[0],
-        hasRightChild: !!node.children[1],
-        childrenArray: node.children,
-      });
-
       if (node.children[0]) {
-        console.log(
-          `[BSTree] Rendering left child: ${node.children[0].address}`
-        );
         renderAllNodes(node.children[0]);
       }
       if (node.children[1]) {
-        console.log(
-          `[BSTree] Rendering right child: ${node.children[1].address}`
-        );
         renderAllNodes(node.children[1]);
       }
     } else {
@@ -912,10 +732,6 @@ function renderTreeNodes(
     return;
   }
 
-  console.log(
-    "[BSTree] Starting to render all nodes from root:",
-    rootNode.address
-  );
   renderAllNodes(rootNode);
 }
 
@@ -970,15 +786,6 @@ function renderTreeConnections(
     const leftSideX = parentPos.x;
     const rightSideX = parentPos.x + actualNodeWidth;
 
-    console.log(`[BSTree] Connection coords for node ${node.address}:`, {
-      parentPos,
-      actualNodeWidth,
-      leftSideX,
-      rightSideX,
-      leftFieldY,
-      rightFieldY,
-    });
-
     if (node.children) {
       if (node.children[0]) {
         const leftChild = node.children[0];
@@ -1005,10 +812,6 @@ function renderTreeConnections(
           } else {
             extendedX = sourceX - horizontalExtension;
           }
-
-          console.log(
-            `[BSTree] Left child arrow: source(${sourceX}, ${sourceY}) -> left to (${extendedX}, ${targetY}), target bounds: ${targetLeftEdgeX}-${targetRightEdgeX}`
-          );
 
           const pathData = `M ${sourceX} ${sourceY} L ${extendedX} ${sourceY} L ${extendedX} ${targetY}`;
 
@@ -1053,10 +856,6 @@ function renderTreeConnections(
             extendedX = sourceX + horizontalExtension;
           }
 
-          console.log(
-            `[BSTree] Right child arrow: source(${sourceX}, ${sourceY}) -> right to (${extendedX}, ${targetY}), target bounds: ${targetLeftEdgeX}-${targetRightEdgeX}`
-          );
-
           const pathData = `M ${sourceX} ${sourceY} L ${extendedX} ${sourceY} L ${extendedX} ${targetY}`;
 
           contentGroup
@@ -1088,10 +887,6 @@ function renderTreeConnections(
     return;
   }
 
-  console.log(
-    "[BSTree] Starting to render all connections from root:",
-    rootNode.address
-  );
   renderAllConnections(rootNode);
 }
 
@@ -1182,7 +977,6 @@ function drawConnection(contentGroup, connection, styles) {
 
 function validateTreeStructure(rootNode) {
   if (!rootNode) {
-    console.log("[BSTree] Validation: Empty tree (valid)");
     return true;
   }
 
@@ -1232,7 +1026,6 @@ function validateTreeStructure(rootNode) {
     return false;
   }
 
-  console.log("[BSTree] Tree validation passed");
   return true;
 }
 
@@ -1277,10 +1070,6 @@ function findOrphanNodes(rootAddress, addressObjectMap) {
     }
   });
 
-  console.log(
-    "[BSTree] Found orphan nodes:",
-    orphanNodes.map((n) => n.address)
-  );
   return orphanNodes;
 }
 
@@ -1296,8 +1085,6 @@ function renderOrphanNodes(
     return { width: 0, height: 0 };
   }
 
-  console.log("[BSTree] Rendering orphan nodes:", orphanNodes.length);
-
   const nodeSpacing = styles.node.width + 50;
   const scale = 1;
   let maxHeight = 0;
@@ -1309,10 +1096,6 @@ function renderOrphanNodes(
     node.x = nodeX;
     node.y = nodeY;
     node.level = 0;
-
-    console.log(
-      `[BSTree] Positioning orphan node ${node.address} at (${nodeX}, ${nodeY})`
-    );
 
     nodePositions[node.address] = {
       x: nodeX,
@@ -1346,8 +1129,6 @@ function renderOrphanNodes(
         isCurrent: false,
         isIsolated: false,
       };
-
-      console.log(`[BSTree] Orphan node spec for ${node.address}:`, nodeSpec);
 
       renderGenericNode(
         contentGroup,
@@ -1385,8 +1166,6 @@ function renderVariablePointerArrows(
   styles,
   centerX
 ) {
-  console.log("[BSTree] Rendering variable pointer arrows...");
-
   allConnectionPoints.forEach((connectionPoint) => {
     if (
       !connectionPoint ||
@@ -1438,9 +1217,5 @@ function renderVariablePointerArrows(
       .attr("font-weight", "bold")
       .attr("fill", "#2563eb")
       .text(connectionPoint.varName);
-
-    console.log(
-      `[BSTree] Added pointer arrow for ${connectionPoint.varName} -> ${connectionPoint.targetAddress}`
-    );
   });
 }

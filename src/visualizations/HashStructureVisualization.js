@@ -15,13 +15,6 @@ export function renderHashStructureVisualization(
   memorySnapshot,
   snapshotIdentifier
 ) {
-  console.log("[HashStructure] Starting visualization with:", {
-    operation,
-    memorySnapshot,
-    width,
-    height,
-  });
-
   const arrowheadSize = 8;
   contentGroup
     .append("defs")
@@ -42,18 +35,10 @@ export function renderHashStructureVisualization(
   const localVariables = state.localVariables || {};
   const addressObjectMap = state.addressObjectMap || {};
 
-  console.log("[HashStructure] Parsed state:", {
-    state,
-    instanceVariables,
-    localVariables,
-    addressObjectMap,
-  });
-
   const nodePositions = {};
   const allConnections = [];
 
   const hashData = parseHashStructure(instanceVariables, addressObjectMap);
-  console.log("[HashStructure] Parsed hash data:", hashData);
 
   const styles = {
     varBox: {
@@ -142,10 +127,6 @@ export function renderHashStructureVisualization(
       "instance",
       isAddress
     );
-    console.log(
-      "[HashStructure] Instance variables box rendered successfully:",
-      instanceVarBoxResult
-    );
   } catch (error) {
     console.error(
       "[HashStructure] Error rendering instance variables box:",
@@ -164,14 +145,6 @@ export function renderHashStructureVisualization(
 
   const scalingCompensation = estimatedScale < 1 ? 4.0 / estimatedScale : 3.0;
   const hashAreaWidth = baseHashAreaWidth * scalingCompensation;
-
-  console.log("[HashStructure] Width calculations:", {
-    width,
-    baseHashAreaWidth,
-    estimatedScale,
-    scalingCompensation,
-    finalHashAreaWidth: hashAreaWidth,
-  });
 
   const hashAreaHeight = leftSectionHeight;
 
@@ -206,10 +179,6 @@ export function renderHashStructureVisualization(
       styles.varBox,
       "local",
       isAddress
-    );
-    console.log(
-      "[HashStructure] Local variables box rendered successfully:",
-      localVarBoxResult
     );
   } catch (error) {
     console.error(
@@ -327,8 +296,6 @@ export function renderHashStructureVisualization(
   }
 
   if (hashData && hashData.buckets) {
-    console.log("[HashStructure] Rendering hash structure...");
-
     try {
       renderHashStructure(
         contentGroup,
@@ -354,10 +321,6 @@ export function renderHashStructureVisualization(
         nodePositions,
         styles
       );
-
-      console.log(
-        "[HashStructure] Hash structure rendering completed successfully"
-      );
     } catch (error) {
       console.error(
         "[HashStructure] Error during hash structure rendering:",
@@ -374,10 +337,6 @@ export function renderHashStructureVisualization(
         .text("Error rendering hash structure");
     }
   } else {
-    console.log(
-      "[HashStructure] No hash data found, displaying empty visualization"
-    );
-
     contentGroup
       .append("text")
       .attr("x", hashAreaX + hashAreaWidth / 2)
@@ -392,8 +351,6 @@ export function renderHashStructureVisualization(
 }
 
 function parseHashStructure(instanceVariables, addressObjectMap) {
-  console.log("[HashStructure] Parsing hash structure...");
-
   const hashVariableNames = ["buckets", "table", "data", "hashTable", "map"];
   let bucketsAddress = null;
   let bucketCount = 0;
@@ -401,9 +358,6 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
   for (const varName of hashVariableNames) {
     if (instanceVariables[varName] && isAddress(instanceVariables[varName])) {
       bucketsAddress = instanceVariables[varName];
-      console.log(
-        `[HashStructure] Found buckets at ${varName}: ${bucketsAddress}`
-      );
       break;
     }
   }
@@ -415,21 +369,16 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
       typeof instanceVariables[varName] === "number"
     ) {
       bucketCount = instanceVariables[varName];
-      console.log(
-        `[HashStructure] Found bucket count at ${varName}: ${bucketCount}`
-      );
       break;
     }
   }
 
   if (!bucketsAddress) {
-    console.log("[HashStructure] No buckets array found");
     return null;
   }
 
   const bucketsData = addressObjectMap[bucketsAddress];
   if (!bucketsData) {
-    console.log("[HashStructure] Buckets data not found in addressObjectMap");
     return null;
   }
 
@@ -437,18 +386,12 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
   const actualBucketCount = bucketCount || Object.keys(bucketsData).length;
   const chainedNodeAddresses = new Set();
 
-  console.log(`[HashStructure] Processing ${actualBucketCount} buckets`);
-  console.log(`[HashStructure] Buckets data:`, bucketsData);
-
   for (let i = 0; i < actualBucketCount; i++) {
     const bucketAddress = bucketsData[i] || bucketsData[i.toString()];
-    console.log(`[HashStructure] Bucket ${i}: address = ${bucketAddress}`);
 
     const chain = bucketAddress
       ? parseChain(bucketAddress, addressObjectMap)
       : null;
-
-    console.log(`[HashStructure] Bucket ${i}: chain = `, chain);
 
     if (chain) {
       chain.forEach((node) => {
@@ -469,9 +412,6 @@ function parseHashStructure(instanceVariables, addressObjectMap) {
     bucketsAddress
   );
 
-  console.log(`[HashStructure] Final parsed buckets:`, buckets);
-  console.log(`[HashStructure] Found orphan nodes:`, orphanNodes);
-
   return {
     bucketsAddress,
     buckets,
@@ -486,13 +426,6 @@ function findOrphanNodes(
   bucketsAddress
 ) {
   const orphanNodes = [];
-
-  console.log("[HashStructure] Finding orphan nodes...");
-  console.log(
-    "[HashStructure] Chained node addresses:",
-    Array.from(chainedNodeAddresses)
-  );
-  console.log("[HashStructure] Buckets address to exclude:", bucketsAddress);
 
   for (const [address, nodeData] of Object.entries(addressObjectMap)) {
     if (address === bucketsAddress) {
@@ -517,7 +450,6 @@ function findOrphanNodes(
         nodeData.hasOwnProperty("next");
 
       if (hasNodeLikeStructure) {
-        console.log(`[HashStructure] Found orphan node: ${address}`, nodeData);
         orphanNodes.push({
           address: address,
           ...nodeData,
@@ -526,23 +458,13 @@ function findOrphanNodes(
     }
   }
 
-  console.log(
-    `[HashStructure] Total orphan nodes found: ${orphanNodes.length}`
-  );
   return orphanNodes;
 }
 
 function parseChain(startAddress, addressObjectMap) {
   if (!startAddress || !addressObjectMap[startAddress]) {
-    console.log(
-      `[HashStructure] parseChain: Invalid start address: ${startAddress}`
-    );
     return null;
   }
-
-  console.log(
-    `[HashStructure] parseChain: Starting chain from ${startAddress}`
-  );
 
   const nodes = [];
   let currentAddress = startAddress;
@@ -558,16 +480,8 @@ function parseChain(startAddress, addressObjectMap) {
     const nodeData = addressObjectMap[currentAddress];
 
     if (!nodeData) {
-      console.log(
-        `[HashStructure] parseChain: No data found for address ${currentAddress}`
-      );
       break;
     }
-
-    console.log(
-      `[HashStructure] parseChain: Processing node ${currentAddress}:`,
-      nodeData
-    );
 
     const node = {
       address: currentAddress,
@@ -584,24 +498,12 @@ function parseChain(startAddress, addressObjectMap) {
       nodeData.successor ||
       null;
 
-    console.log(
-      `[HashStructure] parseChain: Next address for ${currentAddress}: ${nextAddress}`
-    );
-
     if (!nextAddress || nextAddress === "0x0" || nextAddress === "null") {
-      console.log(
-        `[HashStructure] parseChain: End of chain reached at ${currentAddress}`
-      );
       break;
     }
 
     currentAddress = nextAddress;
   }
-
-  console.log(
-    `[HashStructure] parseChain: Completed chain with ${nodes.length} nodes:`,
-    nodes.map((n) => n.address)
-  );
   return nodes.length > 0 ? nodes : null;
 }
 
@@ -629,17 +531,7 @@ function renderHashStructure(
   const sectionsAreaWidth = availableWidth + 800;
   const sectionsAreaHeight = availableHeight;
 
-  console.log("[HashStructure] Section area calculations:", {
-    availableWidth,
-    sectionsAreaWidth,
-    extension: sectionsAreaWidth - availableWidth,
-  });
-
   if (hashData.orphanNodes && hashData.orphanNodes.length > 0) {
-    console.log(
-      "[HashStructure] Rendering orphan nodes in local variables section..."
-    );
-
     const localVarSectionY = sectionsStartY;
 
     const orphanNodesStartX = sectionsStartX + 400;
@@ -663,10 +555,6 @@ function renderHashStructure(
       styles,
       nodePositions,
       sectionsAreaWidth
-    );
-
-    console.log(
-      `[HashStructure] Rendered ${hashData.orphanNodes.length} orphan nodes in local variables section`
     );
   }
 
@@ -772,11 +660,6 @@ function extractNodeFields(node) {
   if (Object.keys(fields).length === 0) {
     fields.data = "null";
   }
-
-  console.log(
-    `[HashStructure] Extracted fields for node ${node.address}:`,
-    fields
-  );
   return fields;
 }
 
@@ -791,17 +674,6 @@ function renderHorizontalChain(
   nodePositions,
   availableWidth
 ) {
-  console.log(
-    `[HashStructure] renderHorizontalChain: Starting with ${chain.length} nodes`
-  );
-  console.log(
-    `[HashStructure] renderHorizontalChain: Chain addresses:`,
-    chain.map((n) => n.address)
-  );
-  console.log(
-    `[HashStructure] renderHorizontalChain: Start position: (${startX}, ${startY})`
-  );
-
   const totalNodesWidth = chain.length * nodeWidth;
   const usableWidth = availableWidth - startX - 20;
   const availableSpacingWidth = usableWidth - totalNodesWidth;
@@ -814,23 +686,9 @@ function renderHorizontalChain(
   const maxSpacing = 170;
   const finalSpacing = Math.min(dynamicSpacing, maxSpacing);
 
-  console.log("[HashStructure] Chain spacing calculations:", {
-    chainLength: chain.length,
-    totalNodesWidth,
-    usableWidth,
-    availableSpacingWidth,
-    dynamicSpacing,
-    finalSpacing,
-    availableWidth,
-  });
-
   chain.forEach((node, index) => {
     const nodeX = startX + index * (nodeWidth + finalSpacing);
     const nodeY = startY;
-
-    console.log(
-      `[HashStructure] renderHorizontalChain: Rendering node ${index} (${node.address}) at position (${nodeX}, ${nodeY})`
-    );
 
     const nodeSpec = {
       x: nodeX,
@@ -842,11 +700,6 @@ function renderHorizontalChain(
       isIsolated: false,
     };
 
-    console.log(
-      `[HashStructure] renderHorizontalChain: Node spec for ${node.address}:`,
-      nodeSpec
-    );
-
     renderGenericNode(
       contentGroup,
       nodeSpec,
@@ -854,11 +707,6 @@ function renderHorizontalChain(
       nodePositions,
       isAddress,
       truncateAddress
-    );
-
-    console.log(
-      `[HashStructure] renderHorizontalChain: Node ${node.address} rendered, position stored:`,
-      nodePositions[node.address]
     );
 
     if (index < chain.length - 1) {
@@ -890,10 +738,6 @@ function renderHorizontalChain(
         nextPointerFieldName = nodeFields[nextPointerFieldIndex];
       }
 
-      console.log(
-        `[HashStructure] Connection from node ${index}: using field '${nextPointerFieldName}' at index ${nextPointerFieldIndex} out of ${nodeFields.length} total fields`
-      );
-
       const sourceX = nodeX + nodeWidth;
       const sourceY =
         nextPointerFieldIndex >= 0
@@ -922,15 +766,6 @@ function renderHorizontalChain(
                        Q ${midX} ${targetY} ${midX + cornerRadius} ${targetY}
                        L ${targetX} ${targetY}`;
 
-      console.log(
-        `[HashStructure] renderHorizontalChain: Drawing H-V-H connection from node ${index} to node ${
-          index + 1
-        }`
-      );
-      console.log(
-        `[HashStructure] renderHorizontalChain: Path from (${sourceX}, ${sourceY}) to (${targetX}, ${targetY})`
-      );
-
       contentGroup
         .append("path")
         .attr("d", pathData)
@@ -940,10 +775,6 @@ function renderHorizontalChain(
         .attr("marker-end", "url(#arrowhead)");
     }
   });
-
-  console.log(
-    `[HashStructure] renderHorizontalChain: Completed rendering ${chain.length} nodes`
-  );
 }
 
 function drawVariableConnections(
@@ -990,39 +821,17 @@ function drawVariableConnections(
   }
 
   if (localVarBoxResult?.connectionPoints) {
-    console.log(
-      "[HashStructure] Processing local variable connections:",
-      localVarBoxResult.connectionPoints
-    );
-    console.log(
-      "[HashStructure] Available node positions:",
-      Object.keys(nodePositions)
-    );
-
     localVarBoxResult.connectionPoints.forEach((connectionPoint) => {
-      console.log(
-        "[HashStructure] Processing connection point:",
-        connectionPoint
-      );
-
       if (
         connectionPoint.targetAddress &&
         nodePositions[connectionPoint.targetAddress]
       ) {
-        console.log(
-          `[HashStructure] Found target node for address ${connectionPoint.targetAddress}`
-        );
-
         const targetPos = nodePositions[connectionPoint.targetAddress];
 
         const arrowLength = 80;
         const arrowEndX = targetPos.x + targetPos.width;
         const arrowStartX = arrowEndX + arrowLength;
         const arrowY = targetPos.y + styles.node.headerHeight / 2;
-
-        console.log(
-          `[HashStructure] Drawing arrow indicator touching right edge at (${arrowStartX}, ${arrowY}) to (${arrowEndX}, ${arrowY}) for node ${connectionPoint.targetAddress}`
-        );
 
         contentGroup
           .append("line")

@@ -10,30 +10,15 @@ import {
 import { defaultVisualizationStyles } from "../utils/visualizationUtils";
 
 const isObjectValue = (value, addressObjectMap) => {
-  console.log(
-    `[ArrayViz Debug] Checking if value "${value}" (type: ${typeof value}) is an object...`
-  );
-  console.log(
-    `[ArrayViz Debug] Available addresses in addressObjectMap:`,
-    Object.keys(addressObjectMap)
-  );
-
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    console.log(`[ArrayViz Debug] Value is directly an object:`, value);
     return true;
   }
 
   const valueStr = String(value);
   if (isAddress(valueStr) && addressObjectMap && addressObjectMap[valueStr]) {
     const data = addressObjectMap[valueStr];
-    console.log(
-      `[ArrayViz Debug] Found data at address "${valueStr}":`,
-      data,
-      `(type: ${typeof data}, isArray: ${Array.isArray(data)})`
-    );
     const isObj =
       typeof data === "object" && data !== null && !Array.isArray(data);
-    console.log(`[ArrayViz Debug] Is object result:`, isObj);
     return isObj;
   }
 
@@ -42,24 +27,15 @@ const isObjectValue = (value, addressObjectMap) => {
     valueStr.includes("@") ||
     valueStr === "[object Object]"
   ) {
-    console.log(
-      `[ArrayViz Debug] Value looks like object representation: "${valueStr}"`
-    );
     const objectAddresses = Object.keys(addressObjectMap).filter((addr) => {
       const data = addressObjectMap[addr];
       return typeof data === "object" && data !== null && !Array.isArray(data);
     });
 
     if (objectAddresses.length > 0) {
-      console.log(
-        `[ArrayViz Debug] Found potential object addresses:`,
-        objectAddresses
-      );
       return true;
     }
   }
-
-  console.log(`[ArrayViz Debug] Value "${value}" is not an object`);
   return false;
 };
 
@@ -74,7 +50,6 @@ const renderObjectCellContent = (
   index,
   isMainArray = true
 ) => {
-  console.log(`[ArrayViz Debug] Rendering object cell for value:`, value);
   const indexPartHeight = styles.arrayCell.indexPartitionHeight || 15;
 
   cellGroup
@@ -102,21 +77,13 @@ const renderObjectCellContent = (
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     objectData = value;
     objectAddress = `object_${index}`;
-    console.log(`[ArrayViz Debug] Using direct object data:`, objectData);
   } else if (isAddress(String(value)) && addressObjectMap[value]) {
     objectData = addressObjectMap[value];
     objectAddress = String(value);
-    console.log(
-      `[ArrayViz Debug] Using object data from address "${value}":`,
-      objectData
-    );
   } else if (
     String(value).includes("Object") ||
     String(value) === "[object Object]"
   ) {
-    console.log(
-      `[ArrayViz Debug] Searching for object for stringified value "${value}"`
-    );
     const objectEntries = Object.entries(addressObjectMap).filter(
       ([addr, data]) => {
         return (
@@ -129,38 +96,22 @@ const renderObjectCellContent = (
       const [addr, data] = objectEntries[index];
       objectData = data;
       objectAddress = addr;
-      console.log(
-        `[ArrayViz Debug] Using object at matching index ${index} from address "${addr}":`,
-        objectData
-      );
     } else if (objectEntries.length > 0) {
       const [addr, data] = objectEntries[0];
       objectData = data;
       objectAddress = addr;
-      console.log(
-        `[ArrayViz Debug] Using first available object from address "${addr}":`,
-        objectData
-      );
     }
   } else {
-    console.log(
-      `[ArrayViz Debug] Trying fallback object search for value "${value}"`
-    );
     for (const [addr, data] of Object.entries(addressObjectMap)) {
       if (typeof data === "object" && data !== null && !Array.isArray(data)) {
         objectData = data;
         objectAddress = addr;
-        console.log(
-          `[ArrayViz Debug] Using fallback object at address "${addr}":`,
-          objectData
-        );
         break;
       }
     }
   }
 
   if (!objectData) {
-    console.log(`[ArrayViz Debug] No object data found, falling back to text`);
     cellGroup
       .append("text")
       .attr("x", cellWidth / 2)
@@ -224,11 +175,6 @@ const renderObjectCellContent = (
       .attr("fill", "#334155")
       .text(truncateAddress(displayValue, 6));
   });
-
-  console.log(
-    `[ArrayViz Debug] Rendered object node with fields:`,
-    fields.slice(0, maxFields)
-  );
 };
 
 const renderPrimitiveCellContent = (
@@ -279,37 +225,10 @@ export const renderArrayStructureVisualization = (
   memorySnapshot,
   snapshotIdentifier
 ) => {
-  console.log(
-    `[${snapshotIdentifier || "ArrayViz"}] TOP OF RENDER. Op:`,
-    operation,
-    "Snap:",
-    memorySnapshot
-  );
-
   const state = memorySnapshot || operation.state || {};
-  console.log(
-    `[${
-      snapshotIdentifier || "ArrayViz"
-    } Debug] Effective 'state' for rendering:`,
-    JSON.parse(JSON.stringify(state))
-  );
-  console.log(
-    `[${
-      snapshotIdentifier || "ArrayViz"
-    } Debug] Direct 'memorySnapshot' received:`,
-    JSON.parse(JSON.stringify(memorySnapshot))
-  );
   const localVariables = state.localVariables || {};
   const instanceVariables = state.instanceVariables || {};
   const addressObjectMap = state.addressObjectMap || {};
-
-  console.log(
-    `[ArrayStructureViz Debug - ${snapshotIdentifier}] Received for rendering:`,
-    {
-      instanceVariables: JSON.parse(JSON.stringify(instanceVariables)),
-      addressObjectMap: JSON.parse(JSON.stringify(addressObjectMap)),
-    }
-  );
 
   const styles = {
     varBox: {
@@ -398,10 +317,6 @@ export const renderArrayStructureVisualization = (
     currentLayoutY += instanceVarsResult.height + styles.layout.varBoxSpacingY;
   }
 
-  console.log(
-    `[${snapshotIdentifier || "ArrayViz"}] Instance Variables:`,
-    instanceVariables
-  );
   const arrayVarKey = Object.keys(instanceVariables).find(
     (key) =>
       key === "array" ||
@@ -411,40 +326,15 @@ export const renderArrayStructureVisualization = (
       key === "first" ||
       key === "second"
   );
-  console.log(
-    `[${snapshotIdentifier || "ArrayViz"}] Found array variable key:`,
-    arrayVarKey
-  );
   const arrayDataAddress = arrayVarKey ? instanceVariables[arrayVarKey] : null;
-  console.log(
-    `[${snapshotIdentifier || "ArrayViz"}] Array data address:`,
-    arrayDataAddress
-  );
   const arrayVarConnection = allConnections.find(
     (c) => c.varName === arrayVarKey && c.sourceName.startsWith("instance-")
-  );
-  console.log(
-    `[${snapshotIdentifier || "ArrayViz"}] Array variable connection:`,
-    arrayVarConnection
   );
   const arrayVarSourceCoords = arrayVarConnection
     ? arrayVarConnection.sourceCoords
     : null;
-  console.log(
-    `[${snapshotIdentifier || "ArrayViz"}] Array variable source coordinates:`,
-    arrayVarSourceCoords
-  );
 
-  console.log(
-    `[${snapshotIdentifier || "ArrayViz"} Debug] Local Variables object:`,
-    JSON.parse(JSON.stringify(localVariables))
-  );
   if (Object.keys(localVariables).length > 0) {
-    console.log(
-      `[${
-        snapshotIdentifier || "ArrayViz"
-      } Debug] Attempting to render Local Variables box.`
-    );
     const localVarsX = firstColX;
     const localVarsY = currentLayoutY;
     const { height: locHeight, connectionPoints: localConnPoints } =
@@ -555,22 +445,7 @@ export const renderArrayStructureVisualization = (
 
   let mainArrayRenderedHeight = 0;
   if (actualArrayData && actualArrayData.length > 0) {
-    console.log(
-      `[ArrayViz Debug] About to render array with data:`,
-      actualArrayData
-    );
-    console.log(
-      `[ArrayViz Debug] AddressObjectMap contents:`,
-      addressObjectMap
-    );
-
     actualArrayData.forEach((value, index) => {
-      console.log(
-        `[ArrayViz Debug] Processing array element at index ${index}:`,
-        value,
-        `(type: ${typeof value})`
-      );
-
       const x = arrayStartX + index * cellWidth;
       const y = arrayStartY;
       const cellGroup = contentGroup
@@ -586,14 +461,8 @@ export const renderArrayStructureVisualization = (
         .attr("stroke-width", 1);
 
       const isObject = isObjectValue(value, addressObjectMap);
-      console.log(
-        `[ArrayViz Debug] Index ${index}: isObjectValue result = ${isObject}`
-      );
 
       if (isObject) {
-        console.log(
-          `[ArrayViz Debug] Rendering object cell for index ${index}`
-        );
         renderObjectCellContent(
           cellGroup,
           cellWidth,
@@ -606,9 +475,6 @@ export const renderArrayStructureVisualization = (
           true
         );
       } else {
-        console.log(
-          `[ArrayViz Debug] Rendering primitive cell for index ${index}`
-        );
         renderPrimitiveCellContent(
           cellGroup,
           cellWidth,
@@ -638,10 +504,6 @@ export const renderArrayStructureVisualization = (
 
   let otherArraysStartX;
   let otherArraysStartY;
-  console.log(
-    `[ArrayStructureViz Debug - ${snapshotIdentifier}] Determined arrayDataAddress for main array:`,
-    arrayDataAddress
-  );
 
   if (localVarsBoxPosition) {
     otherArraysStartX =
@@ -658,15 +520,7 @@ export const renderArrayStructureVisualization = (
   let currentOtherArrayY = otherArraysStartY;
 
   Object.entries(addressObjectMap).forEach(([address, data]) => {
-    console.log(
-      `[ArrayStructureViz Debug - ${snapshotIdentifier}] Checking addressObjectMap entry: Address = ${address}, IsArray = ${Array.isArray(
-        data
-      )}, IsNotMain = ${address !== arrayDataAddress}`
-    );
     if (Array.isArray(data) && address !== arrayDataAddress) {
-      console.log(
-        `[ArrayStructureViz Debug - ${snapshotIdentifier}] Rendering 'other' array at address: ${address}`
-      );
       const subsequentArrayData = data;
 
       const subIntermediateBoxWidth = 80;
@@ -762,15 +616,7 @@ export const renderArrayStructureVisualization = (
     .append("g")
     .attr("class", "connections-group");
 
-  console.log(
-    `[${snapshotIdentifier || "ArrayViz"}] All collected connections:`,
-    JSON.parse(JSON.stringify(allConnections))
-  );
   allConnections.forEach((conn) => {
-    console.log(
-      `[${snapshotIdentifier || "ArrayViz"}] Processing connection:`,
-      JSON.parse(JSON.stringify(conn))
-    );
     let sourcePoint = conn.sourceCoords;
     let targetIntermediateBoxKey = null;
     let targetIntermediateBoxPos = null;
@@ -859,16 +705,6 @@ export const renderArrayStructureVisualization = (
         );
         const deltaYDecisionMid = Math.abs(targetOverallMidY - decisionSourceY);
 
-        console.log(
-          `[${snapshotIdentifier || "ArrayViz"} ArrowDecision] Var: ${
-            conn.varName
-          }, DeltaX: ${deltaXOverallMid.toFixed(
-            2
-          )}, DeltaY: ${deltaYDecisionMid.toFixed(
-            2
-          )}, Y_THRESH: ${Y_THRESHOLD.toFixed(2)}`
-        );
-
         const chosenEgressSide =
           targetOverallMidX < sourceOverallMidX ? "left" : "right";
         actualSourceEgressPoint = { y: sourceFieldActualY };
@@ -888,11 +724,6 @@ export const renderArrayStructureVisualization = (
                 : targetIntermediateBoxPos.x + targetIntermediateBoxPos.width,
             y: targetOverallMidY,
           };
-          console.log(
-            `[${
-              snapshotIdentifier || "ArrayViz"
-            } ArrowDecision] Path Hint: H-V-H (Y-thresh met)`
-          );
         } else {
           pathOrientationHint = "H-V_to_target_top";
           const sourceRightX =
@@ -903,11 +734,6 @@ export const renderArrayStructureVisualization = (
           const overlap =
             Math.max(sourceContainerBoxPosData.x, targetIntermediateBoxPos.x) <
             Math.min(sourceRightX, targetRightX);
-          console.log(
-            `[${
-              snapshotIdentifier || "ArrayViz"
-            } ArrowDecision] Path Hint: H-V (Y-thresh NOT met). Overlap: ${overlap}`
-          );
 
           if (!overlap) {
             let approachingEdgeX =
@@ -955,30 +781,6 @@ export const renderArrayStructureVisualization = (
             Math.min(30, xDistForOffset, yDistForOffset)
           );
         }
-
-        console.log(
-          `[${snapshotIdentifier || "ArrayViz"} PathGen Pre-Check] Var: ${
-            conn.varName
-          }`
-        );
-        console.log(
-          `  Source Container:`,
-          JSON.parse(JSON.stringify(sourceContainerBoxPosData))
-        );
-        console.log(
-          `  Target Intermediate Box:`,
-          JSON.parse(JSON.stringify(targetIntermediateBoxPos))
-        );
-        console.log(
-          `  Actual Source Egress:`,
-          JSON.parse(JSON.stringify(actualSourceEgressPoint))
-        );
-        console.log(
-          `  Final Target Point:`,
-          JSON.parse(JSON.stringify(finalTargetPointForPath))
-        );
-        console.log(`  Path Hint: ${pathOrientationHint}`);
-        console.log(`  Initial Offset: ${initialOffset}`);
 
         path = generateOrthogonalPath(
           actualSourceEgressPoint,
@@ -1051,11 +853,4 @@ export const renderArrayStructureVisualization = (
       );
     }
   });
-
-  console.log(
-    `[${
-      snapshotIdentifier || "ArrayViz"
-    }] Finished ArrayVectorVisualization render. Node Positions:`,
-    nodePositions
-  );
 };
