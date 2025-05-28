@@ -15,13 +15,6 @@ export const renderLinkedStructureVisualization = (
   operation,
   memorySnapshot
 ) => {
-  console.log(
-    "TOP OF renderLinkedListVectorVisualization. Op:",
-    operation,
-    "Snap:",
-    memorySnapshot
-  );
-
   const state = memorySnapshot || operation.state || {};
   const localVariables = state.localVariables || {};
   const instanceVariables = state.instanceVariables || {};
@@ -610,16 +603,6 @@ export const renderLinkedStructureVisualization = (
     const deltaXOverallMid = Math.abs(targetOverallMidX - sourceOverallMidX);
     const deltaYDecisionMid = Math.abs(targetOverallMidY - decisionSourceY);
 
-    console.log(
-      `[LLV Viz PathDecision] Conn: ${conn.type}-${conn.sourceName}->${
-        conn.targetAddress
-      }, deltaX: ${deltaXOverallMid.toFixed(
-        2
-      )}, deltaYDecision: ${deltaYDecisionMid.toFixed(
-        2
-      )}, Y_THRESH: ${Y_THRESHOLD.toFixed(2)}`
-    );
-
     const chosenEgressSide =
       targetOverallMidX < sourceOverallMidX ? "left" : "right";
     sourcePoint = { y: sourceFieldActualY };
@@ -639,7 +622,6 @@ export const renderLinkedStructureVisualization = (
             : targetPosData.x + targetPosData.width,
         y: targetOverallMidY,
       };
-      console.log(`[LLV PathStyle] Chosen: H-V-H (Y-thresh met)`);
     } else {
       pathOrientationHint = "H-V_to_target_top";
       const sourceRightX =
@@ -649,9 +631,6 @@ export const renderLinkedStructureVisualization = (
       const overlap =
         Math.max(sourceBoundingBoxPosData.x, targetPosData.x) <
         Math.min(sourceRightX, targetRightX);
-      console.log(
-        `[LLV PathStyle] Chosen: H-V (Y-thresh NOT met). Overlap: ${overlap}`
-      );
 
       if (!overlap) {
         let approachingEdgeX;
@@ -670,11 +649,6 @@ export const renderLinkedStructureVisualization = (
               ? targetPosData.y
               : targetPosData.y + targetPosData.height,
         };
-        console.log(
-          `[LLV PathStyle H-V NoOverlap] Egress: ${chosenEgressSide}, ApproachEdgeX: ${approachingEdgeX.toFixed(
-            2
-          )}, OvershotX: ${overshotX.toFixed(2)}`
-        );
       } else {
         let turnX;
         if (chosenEgressSide === "right") {
@@ -689,11 +663,6 @@ export const renderLinkedStructureVisualization = (
               ? targetPosData.y
               : targetPosData.y + targetPosData.height,
         };
-        console.log(
-          `[LLV PathStyle H-V Overlap] Egress: ${chosenEgressSide}, TurnX: ${turnX.toFixed(
-            2
-          )}`
-        );
       }
     }
 
@@ -739,6 +708,4 @@ export const renderLinkedStructureVisualization = (
       );
     }
   });
-
-  console.log("Finished LinkedListVectorVisualization render.");
 };

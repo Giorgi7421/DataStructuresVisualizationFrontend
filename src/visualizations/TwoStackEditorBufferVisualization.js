@@ -14,13 +14,6 @@ export const renderTwoStackEditorBufferVisualization = (
   memorySnapshot,
   snapshotIdentifier
 ) => {
-  console.log(
-    `[${snapshotIdentifier || "TwoStackViz"}] TOP OF RENDER. Op:`,
-    operation,
-    "Snap:",
-    memorySnapshot
-  );
-
   const state = memorySnapshot || operation.state || {};
   const localVariables = state.localVariables || {};
   const instanceVariables = state.instanceVariables || {};
@@ -463,9 +456,4 @@ export const renderTwoStackEditorBufferVisualization = (
         .attr("marker-end", `url(#${styles.connection.llInstanceVarMarkerId})`);
     }
   });
-
-  console.log(
-    `[${snapshotIdentifier || "TwoStackViz"}] Render Complete. NodePos:`,
-    nodePositions
-  );
 };

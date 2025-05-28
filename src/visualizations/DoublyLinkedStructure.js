@@ -14,13 +14,6 @@ export const renderDoublyLinkedStructureVisualization = (
   operation,
   memorySnapshot
 ) => {
-  console.log(
-    "TOP OF renderDoublyLinkedStructureVisualization (Applying 5-step layout - Iteration 1). Op:",
-    operation,
-    "Snap:",
-    memorySnapshot
-  );
-
   const state = memorySnapshot || operation.state || {};
   const localVariables = state.localVariables || {};
   const instanceVariables = state.instanceVariables || {};
@@ -132,9 +125,6 @@ export const renderDoublyLinkedStructureVisualization = (
   const localVarsBoxWidth = styles.varBox.width;
   const nodeWidth = styles.node.width;
 
-  console.log(
-    "[DLS Step 1] Starting Initial Main Chain Traversal for 'visited' set."
-  );
   let trueStartAddress =
     instanceVariables.current ||
     instanceVariables.currentPage ||
@@ -150,9 +140,6 @@ export const renderDoublyLinkedStructureVisualization = (
     trueStartAddress === "null" ||
     !addressObjectMap[trueStartAddress]
   ) {
-    console.log(
-      "[DLS Step 1] No primary start (current/head) in instance vars, searching for a node with null/0x0 prev."
-    );
     const allNodeAddrs = Object.keys(addressObjectMap).filter(
       (addr) =>
         addressObjectMap[addr] &&
@@ -174,9 +161,6 @@ export const renderDoublyLinkedStructureVisualization = (
     else if (allNodeAddrs.length > 0) trueStartAddress = allNodeAddrs[0];
     else trueStartAddress = null;
   }
-  console.log(
-    `[DLS Step 1] True Start Address for visited set: ${trueStartAddress}`
-  );
 
   if (trueStartAddress && addressObjectMap[trueStartAddress]) {
     let count = 0;
@@ -209,16 +193,10 @@ export const renderDoublyLinkedStructureVisualization = (
       currentForVisited = nodeData.nextAddress || nodeData.next;
       count++;
       if (visited.has(currentForVisited) && count < MAX_NODES_TO_RENDER) {
-        console.log(
-          "[DLS Step 1] Loop detected during forward traversal for visited set, breaking."
-        );
         break;
       }
     }
   }
-  console.log("[DLS Step 1] Visited set populated:", visited);
-
-  console.log("[DLS Step 2] Starting Orphan Chain Ordering");
   const orphanAddrs = Object.keys(addressObjectMap).filter(
     (addr) =>
       addressObjectMap[addr] &&
@@ -255,9 +233,6 @@ export const renderDoublyLinkedStructureVisualization = (
       }
     }
   });
-  console.log("[DLS Step 2] Ordered orphan addresses:", orderedOrphanAddrs);
-
-  console.log("[DLS Step 3] Starting Grid Setup");
   const gridRows = 4;
   const baseGridCols = 3;
   const cellHeight = height / gridRows;
@@ -319,13 +294,6 @@ export const renderDoublyLinkedStructureVisualization = (
     styles.varBox.headerHeight / 2 -
     styles.varBox.padding;
 
-  console.log(
-    `[DLS Step 3] Grid Coords: mainX=${mainChainStartX}, mainY=${mainChainY}, orphanY=${orphanGridY}, orphanLeft=${orphanCellLeft}, instX=${instanceVarsX}, instY=${instanceVarsY}, localX=${localVarsX}, localY=${localVarsY}`
-  );
-  console.log(
-    `[DLS Step 3] Cell Widths: Orphan=${cellWidthsArray[0]}, IV/LV Col=${cellWidthsArray[1]}, Main Col=${cellWidthsArray[2]}`
-  );
-
   let instanceVarsBoxInfo = null;
   if (Object.keys(instanceVariables).length > 0) {
     const instanceVarsResult = renderVariableBox(
@@ -347,13 +315,6 @@ export const renderDoublyLinkedStructureVisualization = (
     };
     nodePositions["instance_vars_box"] = instanceVarsBoxInfo;
   }
-  console.log("[DLS] Instance Variables Rendered (if any).");
-
-  console.log(
-    "[DLS] Old Main Chain and Orphan rendering sections are COMMENTED OUT."
-  );
-
-  console.log("[DLS Step 4] Starting Main Chain Layout.");
   const mainListSpecs = [];
   const layoutStartAddress = trueStartAddress;
 
@@ -488,14 +449,6 @@ export const renderDoublyLinkedStructureVisualization = (
       );
     }
   });
-  console.log(
-    "[DLS Step 4] Main Chain Layout and Rendering - DONE. Specs:",
-    mainListSpecs.length
-  );
-
-  console.log(
-    "[DLS Step 5] Starting Orphan Chain Layout - Single Line Horizontal."
-  );
   const orphanSpecs = [];
   let currentOrphanX = orphanCellLeft + orphanCellPadding;
   const currentOrphanY = orphanGridY;
@@ -586,10 +539,6 @@ export const renderDoublyLinkedStructureVisualization = (
       );
     }
   });
-  console.log(
-    "[DLS Step 5] Orphan Chain Layout and Rendering - DONE. Specs:",
-    orphanSpecs.length
-  );
 
   if (Object.keys(localVariables).length > 0) {
     const localVarsResult = renderVariableBox(
@@ -610,7 +559,6 @@ export const renderDoublyLinkedStructureVisualization = (
       height: localVarsResult.height,
     };
   }
-  console.log("[DLS] Local Variables Rendered (if any).");
 
   const connectionsGroup = contentGroup
     .append("g")
@@ -878,12 +826,4 @@ export const renderDoublyLinkedStructureVisualization = (
       );
     }
   });
-  console.log("[DLS] Connection Drawing Attempted.");
-
-  console.log(
-    "Finished renderDoublyLinkedStructureVisualization (Iterative Step 1-3). Node Positions:",
-    nodePositions,
-    "Connections:",
-    allConnections
-  );
 };

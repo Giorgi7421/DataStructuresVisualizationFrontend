@@ -45,14 +45,6 @@ export const generateCurvedPath = (
       firstVerticalY - cornerRadius
     }`;
     path += ` V ${target.y}`;
-
-    console.log("[generateCurvedPath] longArcDown Data (Rounded):", {
-      sourceX: source.x,
-      sourceY: source.y,
-      targetX: target.x,
-      targetY: target.y,
-      generatedPath: path,
-    });
     return path;
   } else if (pathType === "arcUpHigh") {
     const arcHeight = Math.max(80, distanceTotal * 0.3, Math.abs(dx) * 0.25);
@@ -66,13 +58,6 @@ export const generateCurvedPath = (
     path += ` H ${source.x + horizontalOffset}`;
     path += ` V ${target.y}`;
     path += ` H ${target.x}`;
-    console.log("[generateCurvedPath] orthogonalNext Data:", {
-      sourceX: source.x,
-      sourceY: source.y,
-      targetX: target.x,
-      targetY: target.y,
-      generatedPath: path,
-    });
     return path;
   } else {
     if (isMainlyHorizontal) {
@@ -158,18 +143,10 @@ export const generateOrthogonalPath = (
       hint === "V-H-V" &&
       detourTargetY > source.y
     ) {
-      console.log(
-        `[generateOrthogonalPath] V-H-V: Applying detour. SourceY: ${source.y}, DetourTargetY: ${detourTargetY}`
-      );
       turn1Yactual = detourTargetY;
       useDetour = true;
     } else {
       turn1Yactual = source.y + sourceSignY * initialOffset;
-      if (detourTargetY !== null && hint === "V-H-V") {
-        console.log(
-          `[generateOrthogonalPath] V-H-V: DetourY (${detourTargetY}) provided but NOT applied. SourceY: ${source.y}`
-        );
-      }
     }
     const turn1X = source.x;
     const turn1Y = turn1Yactual;
@@ -195,13 +172,6 @@ export const generateOrthogonalPath = (
       turn2Y + signV2 * effectiveRadiusV2
     }`;
     path += ` V ${target.y}`;
-    if (useDetour) {
-      console.log("[generateOrthogonalPath] V-H-V DETOUR path constructed:");
-      console.log(
-        `  Source: (${source.x}, ${source.y}), Target: (${target.x}, ${target.y}), DetourY: ${turn1Yactual}`
-      );
-      console.log(`  Path: ${path}`);
-    }
   } else if (orientation === "H-V_to_target_top") {
     const sourceSignX = Math.sign(dx) || 1;
     const targetSignY = Math.sign(dy) || 1;
@@ -220,21 +190,9 @@ export const generateOrthogonalPath = (
       turn1Y + targetSignY * effectiveRadiusV
     }`;
     path += ` V ${target.y}`;
-    console.log("[generateOrthogonalPath] H-V_to_target_top path constructed:");
-    console.log(
-      `  Source: (${source.x}, ${source.y}), Target: (${target.x}, ${target.y})`
-    );
-    console.log(`  Path: ${path}`);
   } else {
-    console.warn(
-      `[generateOrthogonalPath] Unknown orientation: ${orientation}. Drawing straight line.`
-    );
     path += ` L ${target.x} ${target.y}`;
   }
-
-  console.log(
-    `[generateOrthogonalPath] Hint: ${hint}, Orientation: ${orientation}, Path: ${path}`
-  );
   return path;
 };
 
@@ -255,16 +213,6 @@ export const generateHardcodedEndPointerPath = (
   path += ` H ${targetCenterX}`;
   const targetAttachY = targetNodePosition.y + targetNodePosition.height;
   path += ` V ${targetAttachY}`;
-  console.log("[generateHardcodedEndPointerPath - SHARP] Constructed:", {
-    path,
-    p0,
-    p1x,
-    p2y,
-    targetCenterX,
-    targetAttachY,
-    verticalDrop,
-    horizontalClearance,
-  });
   return path;
 };
 
@@ -302,18 +250,6 @@ export const generateSmartDetourPath = (
     horizontalPathY + signY_horizontalToTarget * rV2
   }`;
   path += ` V ${targetAttachY}`;
-  console.log("[generateSmartDetourPath] Path constructed:", {
-    path,
-    sourcePoint,
-    targetNodeX: targetNodePos.x,
-    targetNodeY: targetNodePos.y,
-    targetNodeWidth: targetNodePos.width,
-    targetNodeHeight: targetNodePos.height,
-    standoff,
-    horizontalPathY,
-    targetAttachX,
-    targetAttachY,
-  });
   return path;
 };
 
@@ -327,9 +263,6 @@ export const renderVariableBox = (
   type,
   isAddressFn
 ) => {
-  console.log(
-    `[renderVariableBox Entry] Called for title: "${title}", type: "${type}"`
-  );
   const boxGroup = group
     .append("g")
     .attr("class", `${type}-variables-box-group`);
@@ -410,9 +343,6 @@ export const renderVariableBox = (
     if (type === "local") {
       const stringVal = String(value);
       const isAddrCheck = isAddressFn(stringVal);
-      console.log(
-        `[renderVariableBox Debug] Local Var: ${key}, Value: '${stringVal}', isAddress: ${isAddrCheck}`
-      );
     }
     if (s.fieldRectFill || s.fieldRectStroke) {
       fieldGroup
@@ -542,9 +472,6 @@ export const renderGenericNode = (
   isAddressFn,
   truncateAddrFn
 ) => {
-  console.log(
-    `[renderGenericNode] START processing node: ${nodeSpec?.address}`
-  );
   const defaultConfig = {
     width: 180,
     headerHeight: 25,
@@ -647,9 +574,6 @@ export const renderGenericNode = (
   }
   if (fields && fieldCount > 0) {
     let fieldCurrentYOffset = s.headerHeight + s.padding;
-    console.log(
-      `[renderGenericNode] Node ${nodeSpec?.address}: Processing ${fieldCount} fields...`
-    );
     Object.entries(fields).forEach(([key, value]) => {
       const fieldGroup = nodeGroup
         .append("g")
@@ -700,18 +624,10 @@ export const renderGenericNode = (
         .text(truncateAddress(stringValue));
       fieldCurrentYOffset += s.fieldHeight + s.fieldSpacing;
     });
-    console.log(
-      `[renderGenericNode] Node ${nodeSpec?.address}: FINISHED processing fields.`
-    );
   }
   if (positionsMap && address) {
     positionsMap[address] = { x: x, y: y, width: s.width, height: nodeHeight };
-  } else if (!address) {
-    console.warn(
-      "renderGenericNode called without an address in nodeSpec. Position not stored."
-    );
   }
-  console.log(`[renderGenericNode] END processing node: ${nodeSpec?.address}`);
 };
 
 export const showNotImplementedMessage = (
@@ -746,20 +662,15 @@ export const autoFitVisualization = (
     setTimeout(() => {
       const contentNode = contentGroup.node();
       if (!contentNode) {
-        console.warn("[autoFitVisualization] Content group node not found.");
         return;
       }
 
       if (contentNode.children.length === 0) {
-        console.log("[autoFitVisualization] No content to fit.");
         return;
       }
 
       const contentBBox = contentNode.getBBox();
       if (contentBBox.width === 0 && contentBBox.height === 0) {
-        console.log(
-          "[autoFitVisualization] Content has zero width and height."
-        );
         return;
       }
 
@@ -768,9 +679,6 @@ export const autoFitVisualization = (
       const paddedHeight = contentBBox.height + padding * 2;
 
       if (paddedWidth <= 0 || paddedHeight <= 0) {
-        console.warn(
-          "[autoFitVisualization] Invalid padded dimensions for fitting."
-        );
         return;
       }
 
@@ -790,11 +698,6 @@ export const autoFitVisualization = (
           zoom.transform,
           d3.zoomIdentity.translate(translateX, translateY).scale(scale)
         );
-      console.log("[autoFitVisualization] Applied auto-fit.", {
-        scale,
-        translateX,
-        translateY,
-      });
     }, 100);
   } catch (error) {
     console.error("Error in autoFitVisualization:", error);

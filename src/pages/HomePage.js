@@ -150,11 +150,6 @@ function HomePage() {
         )}`;
       }
 
-      console.log("Creating data structure with endpoint:", endpoint);
-      console.log("Type:", newDSType);
-      console.log("Implementation:", newDSImplementation);
-      console.log("Name:", newDSName);
-
       const response = await dataStructureService.create(endpoint);
 
       const newDataStructure = {

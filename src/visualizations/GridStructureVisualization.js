@@ -70,14 +70,6 @@ export function renderGridStructureVisualization(
           (stylesForCalc.cell.height + unreferencedRowSpacing) -
         unreferencedRowSpacing +
         unreferencedSectionBottomMargin;
-      console.log(
-        "[GridViz] Unreferenced rows identified:",
-        unreferencedRowAddrs,
-        "Block height:",
-        unreferencedRowsBlockHeight
-      );
-    } else {
-      console.log("[GridViz] No unreferenced rows identified.");
     }
   }
 
@@ -455,7 +447,6 @@ export function renderGridStructureVisualization(
         x: rowStartX + 6,
         y: rowStartY + styles.cell.height / 2,
       };
-      console.log("Row connection path:", { start, end });
       contentGroup
         .append("path")
         .attr(
