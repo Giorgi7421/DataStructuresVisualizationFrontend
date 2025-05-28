@@ -521,13 +521,6 @@ function DataStructurePage() {
       const { instanceVariables, addressObjectMap } = snapshot;
       const structType = (structureType || "").toUpperCase();
 
-      console.log(
-        "Extracting elements from snapshot for",
-        structType,
-        ":",
-        snapshot
-      );
-
       if (structType === "VECTOR") {
         const sizeField = instanceVariables?.size;
         const countField = instanceVariables?.count;
@@ -536,7 +529,6 @@ function DataStructurePage() {
         const arrayAddress = instanceVariables?.array;
 
         if (arrayAddress && addressObjectMap?.[arrayAddress]) {
-          console.log("Vector array found at", arrayAddress, "with size", size);
           const arrayData = addressObjectMap[arrayAddress];
           if (Array.isArray(arrayData)) {
             return arrayData
@@ -651,13 +643,6 @@ function DataStructurePage() {
 
   const renderVisualization = useCallback(
     (directOperation = null, directSnapshot = null) => {
-      console.log(
-        "Starting renderVisualization with forceRender:",
-        forceRender
-      );
-      console.log("Direct operation:", directOperation);
-      console.log("Direct snapshot:", directSnapshot);
-
       if (!svgRef.current) {
         console.error("SVG reference is not available");
         return;
@@ -671,14 +656,11 @@ function DataStructurePage() {
       const svg = d3.select(svgRef.current);
 
       svg.selectAll("*").remove();
-      console.log("Cleared previous visualization");
 
       const parentContainer = svg.node().parentElement;
       const width = parentContainer ? parentContainer.clientWidth : 800;
       const height = parentContainer ? parentContainer.clientHeight : 600;
       svg.attr("width", width).attr("height", height);
-
-      console.log("SVG dimensions for rendering:", { width, height });
 
       const backgroundLayer = svg.append("g").attr("class", "fixed-background");
 
@@ -701,7 +683,6 @@ function DataStructurePage() {
         .on("zoom", (event) => {
           contentGroup.attr("transform", event.transform);
           setZoomLevel(event.transform.k);
-          console.log("Zoom event:", event.transform.k);
         });
 
       zoomRef.current = zoom;
@@ -714,15 +695,11 @@ function DataStructurePage() {
       if (directOperation) {
         operation = directOperation;
         memorySnapshot = directSnapshot;
-        console.log("Using directly provided operation and snapshot");
       } else if (
         currentHistoryIndex >= 0 &&
         currentHistoryIndex < operations.length
       ) {
         operation = operations[currentHistoryIndex];
-        console.log(
-          `Rendering operation ${currentHistoryIndex + 1}/${operations.length}`
-        );
 
         if (
           snapshotMode &&
@@ -734,11 +711,6 @@ function DataStructurePage() {
             operation.memorySnapshots.length - 1
           );
           memorySnapshot = operation.memorySnapshots[validSnapshotIndex];
-          console.log(
-            `Rendering snapshot ${validSnapshotIndex + 1}/${
-              operation.memorySnapshots.length
-            } of operation ${operation.operationName || operation.operation}`
-          );
         }
       } else {
         console.error("No valid operation to render");
@@ -759,7 +731,6 @@ function DataStructurePage() {
       ) {
         memorySnapshot =
           operation.memorySnapshots[operation.memorySnapshots.length - 1];
-        console.log("Defaulting to last snapshot for operation");
       } else if (!memorySnapshot && operation) {
         console.log(
           `No memory snapshots available for operation ${
@@ -767,8 +738,6 @@ function DataStructurePage() {
           }`
         );
       }
-
-      console.log("Memory Snapshot for rendering:", memorySnapshot);
 
       try {
         const structureType = (dataStructure.type || "").toUpperCase();
@@ -816,19 +785,12 @@ function DataStructurePage() {
             result: memorySnapshot.getResult,
             message: memorySnapshot.message,
           };
-          console.log(
-            "Effective operation state (from snapshot) for rendering:",
-            effectiveOperation.state
-          );
         } else if (effectiveOperation.state) {
           console.log(
             "Effective operation state (from operation) for rendering:",
             effectiveOperation.state
           );
         } else {
-          console.log(
-            "No snapshot and no base state in operation. Visualization might be empty or show an error."
-          );
           contentGroup
             .append("text")
             .attr("x", width / 2)
@@ -866,7 +828,6 @@ function DataStructurePage() {
           } else {
             combinedType = type;
           }
-          console.log("Combined structure type for switch:", combinedType);
 
           switch (combinedType) {
             case "WEB_BROWSER":
@@ -1202,9 +1163,6 @@ function DataStructurePage() {
           currentOp.memorySnapshots[currentOp.memorySnapshots.length - 1];
 
         if (memorySnapshot) {
-          console.log(
-            "VECTOR FIX: Getting elements directly from memory snapshot"
-          );
           const arrayAddress = memorySnapshot.instanceVariables?.array;
           const count = memorySnapshot.instanceVariables?.count || 0;
 
@@ -1214,7 +1172,6 @@ function DataStructurePage() {
               const elements = arrayData
                 .slice(0, count)
                 .filter((item) => item !== null);
-              console.log("VECTOR FIX: Found elements:", elements);
 
               operations[currentHistoryIndex] = {
                 ...currentOp,
@@ -1290,11 +1247,6 @@ function DataStructurePage() {
       const svg = d3.select(svgRef.current);
       if (!svg.style("width")) svg.style("width", "100%");
       if (!svg.style("height")) svg.style("height", "500px");
-
-      console.log("SVG dimensions:", {
-        width: svg.style("width"),
-        height: svg.style("height"),
-      });
     }
   }, [svgRef.current]);
 
@@ -1604,8 +1556,6 @@ function DataStructurePage() {
           "/" + argVals.map((v) => encodeURIComponent(String(v))).join("/");
       }
 
-      console.log(`Constructed Endpoint: ${method.toUpperCase()} ${endpoint}`);
-
       const api = require("../services/api").default;
       let response;
       if (method === "get") {
@@ -1654,13 +1604,10 @@ function DataStructurePage() {
   }, [operations, pendingOperation]);
 
   const zoomIn = () => {
-    console.log("Zoom in clicked");
-
     if (svgRef.current && zoomRef.current) {
       try {
         const svg = d3.select(svgRef.current);
         svg.call(zoomRef.current.scaleBy, 1.3);
-        console.log("Zoom in applied");
       } catch (error) {
         console.error("Error during zoom in:", error);
       }
@@ -1668,13 +1615,10 @@ function DataStructurePage() {
   };
 
   const zoomOut = () => {
-    console.log("Zoom out clicked");
-
     if (svgRef.current && zoomRef.current) {
       try {
         const svg = d3.select(svgRef.current);
         svg.call(zoomRef.current.scaleBy, 0.7);
-        console.log("Zoom out applied");
       } catch (error) {
         console.error("Error during zoom out:", error);
       }
@@ -1682,15 +1626,12 @@ function DataStructurePage() {
   };
 
   const resetZoom = () => {
-    console.log("Reset zoom clicked");
-
     if (svgRef.current && zoomRef.current) {
       try {
         const svg = d3.select(svgRef.current);
         const contentGroup = svg.select(".zoom-container");
 
         if (!contentGroup.node()) {
-          console.error("Content group not found");
           return;
         }
 
@@ -1715,8 +1656,6 @@ function DataStructurePage() {
 
         svg.call(zoomRef.current.transform, transform);
         setZoomLevel(scale);
-
-        console.log("Zoom reset applied with fit");
       } catch (error) {
         console.error("Error during zoom reset:", error);
       }
@@ -1730,7 +1669,6 @@ function DataStructurePage() {
         operationIndex >= operations.length ||
         !operations[operationIndex]
       ) {
-        console.error(`Invalid operation index: ${operationIndex}`);
         return;
       }
 
@@ -1746,7 +1684,6 @@ function DataStructurePage() {
           snapshotIndex < operation.memorySnapshots.length
         ) {
           const snapshot = operation.memorySnapshots[snapshotIndex];
-          console.log(`Rendering with snapshot at index ${snapshotIndex}`);
 
           renderVisualization(operation, snapshot);
 
@@ -1754,8 +1691,6 @@ function DataStructurePage() {
           setCurrentSnapshotIndex(snapshotIndex);
           setSnapshotMode(true);
         } else {
-          console.log("Rendering with operation state (no snapshot)");
-
           renderVisualization(operation, null);
 
           setCurrentHistoryIndex(operationIndex);
@@ -1769,9 +1704,7 @@ function DataStructurePage() {
   };
 
   const renderSelectedOperation = useCallback(() => {
-    console.log("Rendering selected operation:", visualState);
     if (!visualState.operation || !visualState.snapshot) {
-      console.log("No visualization state set");
       return;
     }
 
@@ -1785,16 +1718,12 @@ function DataStructurePage() {
   }, [visualState, renderSelectedOperation]);
 
   const renderSpecificOperationDirectly = (operationObj, snapshotObj) => {
-    console.log("Direct rendering operation:", operationObj);
-    console.log("With snapshot:", snapshotObj);
-
     try {
       const svg = d3.select(svgRef.current);
       svg.selectAll("*").remove();
 
       setTimeout(() => {
         renderVisualization(operationObj, snapshotObj);
-        console.log("Direct visualization completed using renderVisualization");
       }, 50);
     } catch (error) {
       console.error("Error rendering visualization directly:", error);
@@ -1802,10 +1731,7 @@ function DataStructurePage() {
   };
 
   const renderMemoryVisualization = (operation, svgRef) => {
-    console.log("Rendering memory-based visualization");
-
     if (!svgRef.current) {
-      console.error("SVG reference is not available");
       return;
     }
 
@@ -1814,7 +1740,6 @@ function DataStructurePage() {
     const height = parseInt(svg.style("height")) || 600;
 
     if (!dataStructure) {
-      console.error("Data structure information is missing");
       return;
     }
 
@@ -1826,14 +1751,9 @@ function DataStructurePage() {
         currentSnapshotIndex < operation.memorySnapshots.length
       ) {
         memorySnapshot = operation.memorySnapshots[currentSnapshotIndex];
-        console.log(
-          "Memory visualization using specific snapshot:",
-          currentSnapshotIndex
-        );
       } else {
         memorySnapshot =
           operation.memorySnapshots[operation.memorySnapshots.length - 1];
-        console.log("Memory visualization using last snapshot");
       }
     }
 
