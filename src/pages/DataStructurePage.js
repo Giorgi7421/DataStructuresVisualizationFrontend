@@ -2385,9 +2385,12 @@ function DataStructurePage() {
 
                                       if (operationArgs.length > 0) {
                                         return operationArgs
-                                          .map(
-                                            (argName) =>
-                                              op.parameters[argName] || ""
+                                          .map((argName) =>
+                                            op.parameters[argName] !==
+                                              undefined &&
+                                            op.parameters[argName] !== null
+                                              ? op.parameters[argName]
+                                              : ""
                                           )
                                           .join(", ");
                                       } else {
